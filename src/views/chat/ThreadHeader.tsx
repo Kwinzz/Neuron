@@ -15,8 +15,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { AGENTS, COST_NOT_REPORTED, reportsCost } from "@/lib/agents";
-import { formatCost, formatTokens } from "@/lib/format";
+import { AGENTS } from "@/lib/agents";
+import { CostLabel } from "@/components/ui/CostLabel";
+import { formatTokens } from "@/lib/format";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { describeStatus, STATUS, TONE_TEXT } from "@/lib/status";
 import { useChat } from "@/stores/chat";
@@ -161,11 +162,7 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
           </Badge>
           <span className="hidden text-xs text-muted-foreground tabular-nums lg:inline">
             {formatTokens(live.tokens)} tokens ·{" "}
-            {reportsCost(live.agent) ? (
-              formatCost(live.costUsd)
-            ) : (
-              <span title={COST_NOT_REPORTED}>inclus (abonnement)</span>
-            )}
+            <CostLabel agent={live.agent} costUsd={live.costUsd} tokens={live.tokens} />
           </span>
           {live.hasContext && <ContextIndicator threadId={threadId} projectId={live.projectId} />}
           {statusMeta.active && (

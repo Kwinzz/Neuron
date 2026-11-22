@@ -49,12 +49,5 @@ export const AGENTS: Record<AgentKind, AgentMeta> = {
   },
 };
 
-/**
- * Whether the agent's CLI reports a cost in USD. Codex (ChatGPT plan) and Antigravity only report tokens:
- * their usage is included in the subscription, so we never show a fake "0 $".
- */
-export function reportsCost(agent: AgentKind): boolean {
-  return agent === "claude_code";
-}
-
-export const COST_NOT_REPORTED = "Ce CLI ne communique pas de coût : l'usage est inclus dans l'abonnement.";
+// Costs: see `components/ui/CostLabel` — Claude Code reports its cost, Codex/Antigravity are estimated by the
+// backend from the public API price (`src-tauri/src/pricing.rs`).

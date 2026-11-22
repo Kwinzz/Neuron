@@ -476,8 +476,14 @@ impl AgentRegistry {
                         AgentEvent::ThreadStatusChanged { status: ThreadStatus::AwaitingApproval, detail },
                     );
                 }
-                AdapterEvent::TurnComplete { usage, duration_ms, error } => {
+                AdapterEvent::TurnComplete { mut usage, duration_ms, error } => {
                     let (stopped, _) = self.take_flags(&id, generation);
+                    // CLIs that only report tokens (Codex, Antigravity): price them at the public API rate.
+                    if usage.cost_usd == 0.0 && rt.agent != AgentKind::ClaudeCode {
+                        if let Some(cost) = model.as_deref().and_then(|m| crate::pricing::estimate(m, &usage)) {
+                            usage.cost_usd = cost;
+                        }
+                    }
                     if let Some(s) = self.lock().get_mut(&id).filter(|s| s.generation == generation) {
                         s.busy = false;
                         s.idle_since = Instant::now();

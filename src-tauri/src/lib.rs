@@ -7,6 +7,7 @@ pub mod context;
 pub mod db;
 pub mod error;
 pub mod memory;
+pub mod pricing;
 pub mod state;
 pub mod util;
 

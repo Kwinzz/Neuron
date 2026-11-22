@@ -219,14 +219,6 @@ export const useActivity = create<ActivityState>((set, get) => {
         case "ThreadError":
           push(threadId, { ...base, id: nextId("err"), ts, kind: "error", text: oneLine(event.message), state: "error" });
           return;
-        case "ThreadStatusChanged": {
-          const label =
-            event.status === "done" ? "Tour terminé" : event.status === "cancelled" ? "Arrêté" : event.status === "starting" ? "Nouveau message" : null;
-          if (label) {
-            push(threadId, { ...base, id: nextId("st"), ts, kind: "status", text: label, state: event.status === "done" ? "ok" : null });
-          }
-          return;
-        }
         default:
           return;
       }

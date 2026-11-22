@@ -88,6 +88,16 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-22 — Coût en dollars pour tous les fournisseurs + terminal épuré
+- **Tarifs** (`pricing.rs`) : Codex et Antigravity ne communiquent que des tokens → coût de chaque requête estimé au
+  tarif API public du modèle (entrée, cache, sortie ; familles sans suffixe de raisonnement). Claude : tarifs officiels
+  Anthropic ; OpenAI / Gemini : listes tierces concordantes (pages officielles non accessibles), à revérifier.
+  Modèles sans tarif connu (GPT-OSS, Orchestrator…) : « — ». Recalcul unique des anciennes requêtes à 0 $ au démarrage.
+- **Affichage** : `CostLabel` partout (en-tête de chat, marqueurs de tour) — montant Claude tel que communiqué,
+  « ≈ » pour les estimations ; carte « Coût estimé » de l'Accueil reformulée.
+- **Mini-terminal** : plus de lignes « Nouveau message » / « Tour terminé » / « Arrêté ».
+
+
 ### 2026-11-22 — Threads live en mini-terminaux + sous-agents
 - **Backend** : le parser Claude lit `parent_tool_use_id` (appels faits par un sous-agent → `parentToolCallId` sur
   `ToolCallStart`) et les événements `task_started` / `task_progress` / `task_notification` → nouvel événement
