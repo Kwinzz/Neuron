@@ -29,6 +29,7 @@ ignore = "0.4.30"
 portable-pty = "0.9.0"
 tauri-plugin-notification = "2.4"
 vte = "0.14"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip"] }
 
 # Keep dependencies optimized so SQLite & JSON parsing stay fast in dev builds.
 [profile.dev.package."*"]

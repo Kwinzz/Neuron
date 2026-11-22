@@ -151,6 +151,9 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
   `useAgentEventBridge` sur transition de statut (terminé / autorisation / erreur) quand la fenêtre n'a pas le focus.
 - Vues chargées à la demande (`React.lazy` dans `AppShell`, préchargées au repos) : garder les imports lourds
   (markdown, highlight.js, recharts) hors du bundle principal.
+- **Coûts** : Claude Code communique son coût ; Codex/Antigravity sont estimés par `pricing.rs` (liste LiteLLM
+  téléchargée ≤ 1×/jour, cache `<data_dir>/prices.json`, entrées des éditeurs uniquement, repli sur la table intégrée).
+  Affichage via `components/ui/CostLabel` (« ≈ » pour les estimations). C'est le seul appel réseau de l'app.
 - `rate_limit_event` (fenêtres 5h / 7j de l'abonnement Claude) → `settings.claude.rate_limits` → `ProviderUsage.live`.
 - Front : `useChat` (timeline par thread, événements appliqués **une fois par frame**), `ChatItem` = même type
   pour l'historique et le live.

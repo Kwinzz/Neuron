@@ -88,6 +88,17 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-22 — Tarifs mis à jour automatiquement (LiteLLM)
+- `pricing.rs` : la liste publique de LiteLLM (GitHub) est téléchargée au démarrage **au plus une fois par jour**
+  (`reqwest`/rustls, 30 s max, en tâche de fond) et mise en cache dans `<data_dir>/prices.json` (≈ 27 Ko, 275 modèles
+  officiels). Seules les entrées des éditeurs (OpenAI, Anthropic, Google) sont gardées, jamais les revendeurs. Un nouveau
+  modèle est chiffré dès qu'il apparaît dans la liste ; hors ligne : dernier cache, puis table intégrée.
+- Après chaque mise à jour, les requêtes Codex/Antigravity encore à 0 $ sont recalculées.
+- Paramètres › Général : carte « Tarifs des modèles » (source, date, nombre de modèles, erreur éventuelle, Actualiser).
+- **Premier appel réseau de l'app elle-même** (validé par l'utilisateur) : téléchargement d'un fichier public, rien
+  n'est envoyé.
+
+
 ### 2026-11-22 — Coût en dollars pour tous les fournisseurs + terminal épuré
 - **Tarifs** (`pricing.rs`) : Codex et Antigravity ne communiquent que des tokens → coût de chaque requête estimé au
   tarif API public du modèle (entrée, cache, sortie ; familles sans suffixe de raisonnement). Claude : tarifs officiels

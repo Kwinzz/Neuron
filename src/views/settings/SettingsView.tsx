@@ -8,6 +8,7 @@ import { toast } from "@/stores/toast";
 import { useUi, type SettingsSection } from "@/stores/ui";
 import { ContextSection } from "./ContextSection";
 import { GeneralSection } from "./GeneralSection";
+import { PricingCard } from "./PricingCard";
 import { GenericClisSection } from "./GenericClisSection";
 import { NotificationsSection } from "./NotificationsSection";
 import { SettingsNav } from "./SettingsNav";
@@ -83,7 +84,10 @@ export function SettingsView({ section }: SettingsViewProps) {
           ) : !loaded || settings === null ? (
             <SettingsSkeleton />
           ) : active === "general" ? (
-            <GeneralSection settings={settings} />
+            <div className="flex flex-col gap-4">
+              <GeneralSection settings={settings} />
+              <PricingCard />
+            </div>
           ) : active === "notifications" ? (
             <NotificationsSection settings={settings} />
           ) : active === "context" ? (

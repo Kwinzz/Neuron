@@ -15,6 +15,7 @@ import type { AppInfo } from "@/bindings/AppInfo";
 import type { ChatItem } from "@/bindings/ChatItem";
 import type { AgyMcpStatus } from "@/bindings/AgyMcpStatus";
 import type { AppSettings } from "@/bindings/AppSettings";
+import type { PricingStatus } from "@/bindings/PricingStatus";
 import type { GenericCliProfile } from "@/bindings/GenericCliProfile";
 import type { GenericCliTest } from "@/bindings/GenericCliTest";
 import type { ContextBundle } from "@/bindings/ContextBundle";
@@ -102,6 +103,8 @@ export const ipc = {
   getAppSettings: () => invoke<AppSettings>("get_app_settings"),
   updateAppSettings: (settings: AppSettings) => invoke<AppSettings>("update_app_settings", { settings }),
   testGenericCli: (profile: GenericCliProfile) => invoke<GenericCliTest>("test_generic_cli", { profile }),
+  pricingStatus: () => invoke<PricingStatus>("pricing_status"),
+  refreshPrices: () => invoke<PricingStatus>("refresh_prices"),
   // Global memory (~/.neuron/memory.md ⇄ SQLite) & its MCP server
   listMemories: () => invoke<Memory[]>("list_memories"),
   createMemory: (category: MemoryCategory, content: string) => invoke<Memory>("create_memory", { category, content }),

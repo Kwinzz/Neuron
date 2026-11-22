@@ -3,6 +3,7 @@
 pub mod dashboard;
 pub mod dev;
 pub mod memory;
+pub mod pricing;
 pub mod projects;
 pub mod settings;
 pub mod system;

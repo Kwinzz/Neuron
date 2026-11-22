@@ -37,6 +37,7 @@ pub fn run() {
             app.manage(state);
             commands::memory::spawn_memory_watcher(app.handle());
             commands::settings::spawn_idle_reaper(app.handle());
+            commands::pricing::spawn_price_refresh(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -67,6 +68,8 @@ pub fn run() {
             commands::settings::get_app_settings,
             commands::settings::update_app_settings,
             commands::settings::test_generic_cli,
+            commands::pricing::pricing_status,
+            commands::pricing::refresh_prices,
             commands::memory::list_memories,
             commands::memory::create_memory,
             commands::memory::update_memory,

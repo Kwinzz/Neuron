@@ -67,12 +67,6 @@ impl AppState {
         if reset > 0 {
             tracing::info!(reset, "stale active threads reset");
         }
-        // Past Codex/Antigravity requests recorded at $0: price them once at the public API rate.
-        match db.blocking(|c| crate::pricing::backfill(c)) {
-            Ok(n) if n > 0 => tracing::info!(rows = n, "token usage priced"),
-            Ok(_) => {}
-            Err(err) => tracing::warn!(%err, "pricing backfill failed"),
-        }
         // memory.md ⇄ SQLite: import edits made while Neuron was closed, (re)create the file.
         {
             let file = memory_file.clone();
