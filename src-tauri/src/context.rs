@@ -88,10 +88,15 @@ pub fn template(project_name: &str) -> String {
 /// Never create `.neuron/` in a folder that doesn't exist (moved project, demo data).
 fn require_dir(root: &Path) -> AppResult<()> {
     if root.is_dir() {
-        Ok(())
-    } else {
-        Err(crate::error::AppError::NotFound(format!("dossier du projet introuvable : {}", root.display())))
+        return Ok(());
     }
+    let message = if root.to_string_lossy().starts_with("demo:") {
+        "projet de démonstration : il n'a pas de vrai dossier. Ajoute un vrai projet (« Ajouter un projet ») pour          utiliser le contexte."
+            .to_string()
+    } else {
+        format!("dossier du projet introuvable : {} (déplacé ou supprimé ?)", root.display())
+    };
+    Err(crate::error::AppError::NotFound(message))
 }
 
 /// Create `.neuron/context.md` with a template when it doesn't exist. Returns (path, created).
