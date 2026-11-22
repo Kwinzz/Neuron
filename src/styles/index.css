@@ -90,6 +90,10 @@
   --color-agent-codex: #d55181;
   --color-agent-generic: #c98500;
 
+  /* Vendor brand marks (logos only) */
+  --color-logo-claude: #d97757;
+  --color-logo-gemini: #8e75b2;
+
   /* Status */
   --color-ok: var(--ok);
   --color-warn: var(--warn);
@@ -177,33 +181,7 @@
   transition-timing-function: var(--ease-out-quick);
 }
 
-/* ---- Animations (transform/opacity only) ---- */
-@keyframes neuron-rise {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-}
-@keyframes neuron-pop {
-  from {
-    opacity: 0;
-    transform: translateY(-4px) scale(0.985);
-  }
-}
-@keyframes neuron-fade {
-  from {
-    opacity: 0;
-  }
-}
-@utility toast-in {
-  animation: neuron-rise 150ms var(--ease-out-quick);
-}
-@utility pop-in {
-  animation: neuron-pop 150ms var(--ease-out-quick);
-}
-@utility fade-in {
-  animation: neuron-fade 150ms var(--ease-out-quick);
-}
+/* Animations come from tw-animate-css (animate-in, fade-in-*, slide-in-*, collapsible-*). */
 
 @media (prefers-reduced-motion: reduce) {
   *,

@@ -1,102 +1,114 @@
 import { memo } from "react";
-import { Brain, Cpu, ShieldCheck } from "lucide-react";
+import { Brain, ChevronDown, ShieldCheck } from "lucide-react";
+import { cn } from "cn";
+import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { CLAUDE_MODELS, type ChatSettings, DEFAULT, EFFORT_LEVELS, PERMISSION_MODES } from "@/lib/models";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { type ChatSettings, DEFAULT_EFFORTS, PERMISSION_MODES, effortLabel, permissionLabel } from "@/lib/models";
+import { findModel, useModels } from "@/stores/models";
+import { ModelPicker } from "./ModelPicker";
 
 interface ChatSettingsBarProps {
   value: ChatSettings;
   onChange: (next: ChatSettings) => void;
+  /** Existing chat: provider locked. */
+  lockAgent?: boolean;
   disabled?: boolean;
 }
 
-const TRIGGER = "h-7 gap-1 border-transparent bg-transparent px-2 text-xs text-muted-foreground shadow-none hover:bg-accent hover:text-foreground dark:bg-transparent";
+const TRIGGER = "h-7 gap-1.5 px-2 text-xs font-normal text-muted-foreground hover:text-foreground";
+const DEFAULT = "default";
 
-/** Model · reasoning effort · permissions selectors (controlled). */
-export const ChatSettingsBar = memo(function ChatSettingsBar({ value, onChange, disabled }: ChatSettingsBarProps) {
-  const customModel = value.model !== null && !CLAUDE_MODELS.some((m) => m.id === value.model);
+/** Model (all providers) · reasoning effort · permissions. Plain menus: no hover-scrolling lists. */
+export const ChatSettingsBar = memo(function ChatSettingsBar({ value, onChange, lockAgent, disabled }: ChatSettingsBarProps) {
+  const providers = useModels((s) => s.providers);
+  const model = findModel(providers, value.agent, value.model);
+  const efforts = model && model.efforts.length > 0 ? model.efforts : [...DEFAULT_EFFORTS];
+  const note = providers.find((p) => p.agent === value.agent)?.note;
+
   return (
     <>
-      <Select
-        value={value.model ?? DEFAULT}
-        onValueChange={(v) => onChange({ ...value, model: v === DEFAULT ? null : v })}
+      <ModelPicker
+        agent={value.agent}
+        model={value.model}
+        lockAgent={lockAgent}
         disabled={disabled}
-      >
-        <SelectTrigger size="sm" className={TRIGGER} aria-label="Modèle">
-          <Cpu className="size-3.5" />
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent align="start">
-          <SelectGroup>
-            <SelectLabel>Modèle</SelectLabel>
-            <SelectItem value={DEFAULT}>Par défaut (Claude Code)</SelectItem>
-            <SelectSeparator />
-            {CLAUDE_MODELS.map((m) => (
-              <SelectItem key={m.id} value={m.id}>
-                <span>{m.label}</span>
-                <span className="text-xs text-muted-foreground">{m.hint}</span>
-              </SelectItem>
-            ))}
-            {customModel && value.model && <SelectItem value={value.model}>{value.model}</SelectItem>}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
+        onChange={(agent, m) => {
+          const next = findModel(providers, agent, m);
+          // Keep the effort only if the new model supports it.
+          const keepEffort = value.effort && (!next || next.efforts.length === 0 || next.efforts.includes(value.effort));
+          onChange({ ...value, agent, model: m, effort: keepEffort ? value.effort : null });
+        }}
+      />
 
-      <Select
-        value={value.effort ?? DEFAULT}
-        onValueChange={(v) => onChange({ ...value, effort: v === DEFAULT ? null : v })}
-        disabled={disabled}
-      >
-        <SelectTrigger size="sm" className={TRIGGER} aria-label="Niveau de raisonnement">
-          <Brain className="size-3.5" />
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent align="start">
-          <SelectGroup>
-            <SelectLabel>Raisonnement</SelectLabel>
-            <SelectItem value={DEFAULT}>Par défaut</SelectItem>
-            <SelectSeparator />
-            {EFFORT_LEVELS.map((e) => (
-              <SelectItem key={e.id} value={e.id}>
-                {e.label}
-              </SelectItem>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className={TRIGGER} disabled={disabled} aria-label="Niveau de raisonnement">
+            <Brain className="size-3.5" />
+            {effortLabel(value.effort)}
+            <ChevronDown className="size-3.5 opacity-60" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-48">
+          <DropdownMenuLabel className="text-xs text-muted-foreground">Raisonnement</DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            value={value.effort ?? DEFAULT}
+            onValueChange={(v) => onChange({ ...value, effort: v === DEFAULT ? null : v })}
+          >
+            <DropdownMenuRadioItem value={DEFAULT}>
+              Par défaut{model?.defaultEffort ? ` (${effortLabel(model.defaultEffort)})` : ""}
+            </DropdownMenuRadioItem>
+            <DropdownMenuSeparator />
+            {efforts.map((e) => (
+              <DropdownMenuRadioItem key={e} value={e}>
+                {effortLabel(e)}
+              </DropdownMenuRadioItem>
             ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
-      <Select
-        value={value.permissionMode}
-        onValueChange={(v) => onChange({ ...value, permissionMode: v })}
-        disabled={disabled}
-      >
-        <SelectTrigger
-          size="sm"
-          className={`${TRIGGER} ${value.permissionMode === "bypassPermissions" ? "text-warn" : ""}`}
-          aria-label="Permissions"
-        >
-          <ShieldCheck className="size-3.5" />
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent align="start">
-          <SelectGroup>
-            <SelectLabel>Permissions</SelectLabel>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(TRIGGER, value.permissionMode === "bypassPermissions" && "text-warn hover:text-warn")}
+            disabled={disabled}
+            aria-label="Permissions"
+          >
+            <ShieldCheck className="size-3.5" />
+            {permissionLabel(value.permissionMode)}
+            <ChevronDown className="size-3.5 opacity-60" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-72">
+          <DropdownMenuLabel className="text-xs text-muted-foreground">Permissions</DropdownMenuLabel>
+          <DropdownMenuRadioGroup value={value.permissionMode} onValueChange={(v) => onChange({ ...value, permissionMode: v })}>
             {PERMISSION_MODES.map((p) => (
-              <SelectItem key={p.id} value={p.id} title={p.hint}>
-                {p.label}
-              </SelectItem>
+              <DropdownMenuRadioItem key={p.id} value={p.id} className="items-start py-1.5">
+                <div className="flex flex-col">
+                  <span className={p.id === "bypassPermissions" ? "text-warn" : undefined}>{p.label}</span>
+                  <span className="text-xs text-muted-foreground">{p.hint}</span>
+                </div>
+              </DropdownMenuRadioItem>
             ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
+          </DropdownMenuRadioGroup>
+          {note && (
+            <>
+              <DropdownMenuSeparator />
+              <p className="px-2 py-1.5 text-xs text-muted-foreground">{note}</p>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </>
   );
 });

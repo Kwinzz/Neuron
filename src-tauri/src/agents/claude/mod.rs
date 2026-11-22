@@ -6,21 +6,14 @@
 
 pub mod parser;
 
-use std::collections::VecDeque;
-use std::process::Stdio;
-
 use serde_json::{Value, json};
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
-use tokio::process::Command;
-use tokio::sync::mpsc;
 
 use crate::agents::events::AgentKind;
-use crate::agents::{AdapterEvent, AgentAdapter, SessionCommand, SessionHandle, SessionSpec};
-use crate::error::{AppError, AppResult};
+use crate::agents::process::{Delivery, spawn_stream_session};
+use crate::agents::{AgentAdapter, SessionCommand, SessionHandle, SessionSpec};
+use crate::error::AppResult;
 
 use parser::ClaudeParser;
-
-const STDERR_TAIL_BYTES: usize = 4096;
 
 /// Reasoning effort levels accepted by `claude --effort`.
 pub const EFFORT_LEVELS: &[&str] = &["low", "medium", "high", "xhigh", "max"];
@@ -114,104 +107,15 @@ impl AgentAdapter for ClaudeCodeAdapter {
     }
 
     fn start(&self, spec: &SessionSpec) -> AppResult<SessionHandle> {
-        if !spec.cwd.is_dir() {
-            return Err(AppError::Invalid(format!("dossier de travail introuvable : {}", spec.cwd.display())));
-        }
-        let mut cmd = Command::new(&self.binary);
-        cmd.args(build_args(spec))
-            .current_dir(&spec.cwd)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .kill_on_drop(true);
-        #[cfg(windows)]
-        {
-            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-            cmd.creation_flags(CREATE_NO_WINDOW);
-        }
-
-        let mut child = cmd.spawn().map_err(|err| {
-            AppError::Other(format!(
-                "impossible de lancer « {} » ({err}). Claude Code est-il installé et dans le PATH ?",
-                self.binary
-            ))
-        })?;
-        let pid = child.id();
-        let (Some(stdin), Some(stdout), Some(stderr)) = (child.stdin.take(), child.stdout.take(), child.stderr.take())
-        else {
-            return Err(AppError::Other("pipes du processus indisponibles".into()));
-        };
-
-        let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<SessionCommand>();
-        let (ev_tx, ev_rx) = mpsc::unbounded_channel::<AdapterEvent>();
-
-        // stdin writer
-        tauri::async_runtime::spawn(async move {
-            let mut stdin = stdin;
-            while let Some(command) = cmd_rx.recv().await {
-                if matches!(command, SessionCommand::Shutdown) {
-                    break; // dropping stdin = EOF → claude exits after the current turn
-                }
-                if let Some(value) = encode_command(&command) {
-                    let line = format!("{value}\n");
-                    if stdin.write_all(line.as_bytes()).await.is_err() || stdin.flush().await.is_err() {
-                        break;
-                    }
-                }
-            }
-        });
-
-        // stderr tail (diagnostics only)
-        let (tail_tx, tail_rx) = tokio::sync::oneshot::channel::<String>();
-        tauri::async_runtime::spawn(async move {
-            let mut stderr = stderr;
-            let mut tail: VecDeque<u8> = VecDeque::with_capacity(STDERR_TAIL_BYTES);
-            let mut buf = [0u8; 1024];
-            while let Ok(n) = stderr.read(&mut buf).await {
-                if n == 0 {
-                    break;
-                }
-                for b in &buf[..n] {
-                    if tail.len() == STDERR_TAIL_BYTES {
-                        tail.pop_front();
-                    }
-                    tail.push_back(*b);
-                }
-            }
-            let _ = tail_tx.send(String::from_utf8_lossy(&tail.into_iter().collect::<Vec<_>>()).into_owned());
-        });
-
-        // stdout → parser → events, then wait for exit
-        let thread_id = spec.thread_id.clone();
-        tauri::async_runtime::spawn(async move {
-            let mut parser = ClaudeParser::new();
-            let mut lines = BufReader::new(stdout).lines();
-            loop {
-                match lines.next_line().await {
-                    Ok(Some(line)) => {
-                        for event in parser.feed(&line) {
-                            if let AdapterEvent::Warning(w) = &event {
-                                tracing::debug!(thread = %thread_id, "claude: {w}");
-                                continue;
-                            }
-                            if ev_tx.send(event).is_err() {
-                                break;
-                            }
-                        }
-                    }
-                    Ok(None) => break,
-                    Err(err) => {
-                        tracing::warn!(thread = %thread_id, %err, "claude stdout read failed");
-                        break;
-                    }
-                }
-            }
-            let code = child.wait().await.ok().and_then(|s| s.code());
-            let stderr_tail = tail_rx.await.unwrap_or_default();
-            let _ = ev_tx.send(AdapterEvent::Exited { code, stderr_tail });
-        });
-
-        Ok(SessionHandle { commands: cmd_tx, events: ev_rx, pid })
+        let mut parser = ClaudeParser::new();
+        spawn_stream_session(
+            &self.binary,
+            &build_args(spec),
+            &spec.cwd,
+            spec.thread_id.clone(),
+            |command| encode_command(command).map_or(Delivery::Ignore, Delivery::Line),
+            move |line| parser.feed(line),
+        )
     }
 }
 

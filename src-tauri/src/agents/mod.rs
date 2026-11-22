@@ -6,8 +6,12 @@
 //!   adapter events to SQLite and emits normalized [`events::AgentEvent`]s to the frontend.
 
 pub mod activity;
+pub mod antigravity;
+pub mod catalog;
 pub mod claude;
+pub mod codex;
 pub mod events;
+pub mod process;
 pub mod registry;
 
 use std::path::PathBuf;

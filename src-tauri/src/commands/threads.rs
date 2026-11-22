@@ -7,7 +7,6 @@ use ts_rs::TS;
 
 use crate::agents::events::AgentKind;
 use crate::db::chat::{self, ChatItem};
-use crate::agents::claude::EFFORT_LEVELS;
 use crate::db::{projects, settings};
 use crate::db::threads::{self, NewThread, ThreadSummary};
 use crate::error::{AppError, AppResult};
@@ -150,7 +149,8 @@ fn validate_settings(mode: &str, effort: Option<&str>) -> AppResult<()> {
         return Err(AppError::Invalid(format!("mode de permission inconnu : {mode}")));
     }
     if let Some(e) = effort.filter(|e| !e.is_empty()) {
-        if !EFFORT_LEVELS.contains(&e) {
+        // Union of the levels supported by the adapters; each adapter ignores levels it doesn't know.
+        if !crate::agents::codex::EFFORT_LEVELS.contains(&e) {
             return Err(AppError::Invalid(format!("niveau de raisonnement inconnu : {e}")));
         }
     }
@@ -254,4 +254,10 @@ pub async fn delete_project(state: State<'_, AppState>, project_id: String) -> A
             projects::list(c)
         })
         .await
+}
+
+/// Models per provider (Claude Code, Codex, Antigravity), read from the installed CLIs.
+#[tauri::command]
+pub async fn list_models(refresh: Option<bool>) -> AppResult<Vec<crate::agents::catalog::ProviderCatalog>> {
+    Ok(crate::agents::catalog::catalog(refresh.unwrap_or(false)).await)
 }

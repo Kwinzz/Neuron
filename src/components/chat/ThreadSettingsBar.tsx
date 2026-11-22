@@ -7,9 +7,10 @@ import { ChatSettingsBar } from "./ChatSettingsBar";
 
 /**
  * Settings of an existing chat. Changes apply to the next message: a running agent restarts and
- * resumes the conversation with the new model / effort / permissions.
+ * resumes the conversation. The provider (CLI) is locked — another provider means a new chat.
  */
 export const ThreadSettingsBar = memo(function ThreadSettingsBar({ threadId }: { threadId: string }) {
+  const agent = useLive((s) => s.threads[threadId]?.agent ?? "claude_code");
   const model = useLive((s) => s.threads[threadId]?.model ?? null);
   const effort = useLive((s) => s.threads[threadId]?.effort ?? null);
   const permissionMode = useLive((s) => s.threads[threadId]?.permissionMode ?? "manual");
@@ -18,7 +19,7 @@ export const ThreadSettingsBar = memo(function ThreadSettingsBar({ threadId }: {
   const onChange = useCallback(
     (next: ChatSettings) => {
       ipc
-        .updateThreadSettings(threadId, next)
+        .updateThreadSettings(threadId, { model: next.model, effort: next.effort, permissionMode: next.permissionMode })
         .then((summary) => useLive.getState().hydrate([summary]))
         .catch((err: unknown) =>
           toast({ tone: "danger", title: "Réglage non appliqué", description: ipcErrorMessage(err) }),
@@ -27,5 +28,12 @@ export const ThreadSettingsBar = memo(function ThreadSettingsBar({ threadId }: {
     [threadId],
   );
 
-  return <ChatSettingsBar value={{ model, effort, permissionMode }} onChange={onChange} disabled={!known} />;
+  return (
+    <ChatSettingsBar
+      value={{ agent, model, effort, permissionMode }}
+      onChange={onChange}
+      lockAgent
+      disabled={!known}
+    />
+  );
 });

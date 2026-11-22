@@ -212,24 +212,24 @@ const ProjectFolder = memo(function ProjectFolder({ project, chats }: { project:
     <Collapsible asChild open={open} onOpenChange={(o) => useNav.getState().setProjectOpen(project.id, o)}>
       <SidebarMenuItem>
         <CollapsibleTrigger asChild>
-          <SidebarMenuButton tooltip={project.path} className="group/folder">
+          <SidebarMenuButton tooltip={project.path}>
+            <ChevronRight
+              className={`size-3.5! text-muted-foreground transition-transform duration-200 ${open ? "rotate-90" : ""}`}
+            />
             {open ? <FolderOpen /> : <Folder />}
             <span>{project.name}</span>
             {activeCount > 0 && (
-              <span className="ml-auto flex items-center gap-1 text-xs text-live tabular-nums">
+              <span className="ml-auto flex items-center gap-1 text-xs text-live tabular-nums group-hover/menu-item:opacity-0">
                 <span className="size-1.5 animate-pulse rounded-full bg-live" />
                 {activeCount}
               </span>
             )}
-            <ChevronRight
-              className={`text-muted-foreground transition-transform duration-200 ${activeCount > 0 ? "" : "ml-auto"} ${open ? "rotate-90" : ""}`}
-            />
           </SidebarMenuButton>
         </CollapsibleTrigger>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <SidebarMenuAction showOnHover className="right-7">
+            <SidebarMenuAction showOnHover>
               <MoreHorizontal />
               <span className="sr-only">Actions du projet</span>
             </SidebarMenuAction>
@@ -256,7 +256,7 @@ const ProjectFolder = memo(function ProjectFolder({ project, chats }: { project:
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <CollapsibleContent>
+        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
           <SidebarMenuSub>
             <SidebarMenuSubItem>
               <SidebarMenuSubButton
@@ -268,8 +268,12 @@ const ProjectFolder = memo(function ProjectFolder({ project, chats }: { project:
                 <span>Nouveau chat</span>
               </SidebarMenuSubButton>
             </SidebarMenuSubItem>
-            {visible.map((c) => (
-              <SidebarMenuSubItem key={c.id}>
+            {visible.map((c, i) => (
+              <SidebarMenuSubItem
+                key={c.id}
+                className="animate-in fade-in-0 slide-in-from-left-1 fill-mode-both duration-200"
+                style={{ animationDelay: `${Math.min(i, 10) * 25}ms` }}
+              >
                 <ChatLink chat={c} sub />
               </SidebarMenuSubItem>
             ))}

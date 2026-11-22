@@ -9,6 +9,7 @@ import type { AgentEventEnvelope } from "@/bindings/AgentEventEnvelope";
 import type { AppInfo } from "@/bindings/AppInfo";
 import type { ChatItem } from "@/bindings/ChatItem";
 import type { NewThreadInput } from "@/bindings/NewThreadInput";
+import type { ProviderCatalog } from "@/bindings/ProviderCatalog";
 import type { ThreadSettingsInput } from "@/bindings/ThreadSettingsInput";
 import type { DashboardSnapshot } from "@/bindings/DashboardSnapshot";
 import type { IpcError } from "@/bindings/IpcError";
@@ -73,6 +74,8 @@ export const ipc = {
   createProject: (path: string, name?: string) =>
     invoke<ProjectSummary[]>("create_project", { path, name: name ?? null }),
   deleteProject: (projectId: string) => invoke<ProjectSummary[]>("delete_project", { projectId }),
+  /** Models per provider, read from the installed CLIs (cached 10 min server-side). */
+  listModels: (refresh = false) => invoke<ProviderCatalog[]>("list_models", { refresh }),
   /** Native folder picker; resolves to null when cancelled. */
   pickDirectory: async (defaultPath?: string): Promise<string | null> => {
     const picked = await openDialog({ directory: true, multiple: false, ...(defaultPath ? { defaultPath } : {}) });

@@ -13,7 +13,9 @@ use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
 
 use crate::agents::activity::tool_activity;
+use crate::agents::antigravity::AntigravityAdapter;
 use crate::agents::claude::ClaudeCodeAdapter;
+use crate::agents::codex::CodexAdapter;
 use crate::agents::events::{
     AGENT_EVENT_CHANNEL, AgentEvent, AgentEventEnvelope, AgentKind, ThreadStatus, TokenUsage,
 };
@@ -76,6 +78,8 @@ impl AgentRegistry {
     pub fn new() -> Self {
         let mut adapters: HashMap<AgentKind, Arc<dyn AgentAdapter>> = HashMap::new();
         adapters.insert(AgentKind::ClaudeCode, Arc::new(ClaudeCodeAdapter::default()));
+        adapters.insert(AgentKind::Antigravity, Arc::new(AntigravityAdapter::default()));
+        adapters.insert(AgentKind::Codex, Arc::new(CodexAdapter::default()));
         Self { sessions: Mutex::new(HashMap::new()), adapters, spawn_lock: tokio::sync::Mutex::new(0) }
     }
 
@@ -462,7 +466,7 @@ impl AgentRegistry {
                 }
                 AdapterEvent::Warning(w) => tracing::debug!(thread = %id, "{w}"),
                 AdapterEvent::Exited { code, stderr_tail } => {
-                    let (_, shutdown) = {
+                    let (stopped, shutdown) = {
                         let mut sessions = self.lock();
                         let flags = match sessions.get(&id) {
                             Some(s) if s.generation == generation => (s.stop_requested, s.shutdown_requested),
@@ -475,7 +479,16 @@ impl AgentRegistry {
                     };
                     let was_active = last_status.as_ref().is_some_and(|(s, _)| s.is_active());
                     tracing::info!(thread = %id, ?code, was_active, "agent session exited");
-                    if was_active && !shutdown {
+                    if was_active && stopped && !shutdown {
+                        // Stop on an agent without an interrupt message = kill: that's a cancellation.
+                        let tid = id.clone();
+                        persist!(move |c| {
+                            let now = now_ms();
+                            chat::close_dangling_tools(c, &tid, now)?;
+                            threads::set_status(c, &tid, ThreadStatus::Cancelled, now)
+                        });
+                        emit(&app, &id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::Cancelled, detail: None });
+                    } else if was_active && !shutdown {
                         let tail = stderr_tail.trim();
                         let message = if tail.is_empty() {
                             format!("Le processus de l'agent s'est arrêté (code {}).", code.map_or("?".into(), |c| c.to_string()))

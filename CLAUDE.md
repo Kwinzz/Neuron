@@ -114,6 +114,15 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
 - `AgentRegistry` (dans `AppState`) : sessions par thread + une tâche *pump* par session qui persiste
   (messages / tool_calls partagent `seq`, `token_usage`, statut) puis émet sur `agent://event`.
   Au démarrage, les threads restés actifs repassent `idle` ; à la fermeture, tous les processus sont tués.
+- **Antigravity** : `agy --input-format stream-json --output-format stream-json [--mode …] [--model] [--effort]
+  [--conversation <id>] -p ""` (process longue durée, entrées `{"event":"user",…}`, sorties `init` / `step_update` /
+  `result` ; pas d'approbation interactive ; Stop = kill puis reprise via `--conversation`).
+- **Codex** : `codex exec --json --skip-git-repo-check --sandbox … [-m] [-c model_reasoning_effort="…"]
+  [resume <thread_id>] -- <prompt>` — **un processus par tour** (la boucle de session de l'adaptateur le masque au
+  registre) ; pas d'approbation : sandbox `workspace-write` (lecture seule en mode Plan).
+- Plomberie commune des process NDJSON : `agents/process.rs`. Catalogue de modèles (`list_models`) lu depuis les CLI
+  (`codex debug models`, `agy models`), cache 10 min. Tests live (ignorés par défaut) :
+  `NEURON_LIVE_DIR=<dossier jetable> cargo test --test live_agents -- --ignored`.
 - `rate_limit_event` (fenêtres 5h / 7j de l'abonnement Claude) → `settings.claude.rate_limits` → `ProviderUsage.live`.
 - Front : `useChat` (timeline par thread, événements appliqués **une fois par frame**), `ChatItem` = même type
   pour l'historique et le live.

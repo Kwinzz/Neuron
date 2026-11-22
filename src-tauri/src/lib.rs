@@ -52,6 +52,7 @@ pub fn run() {
             commands::threads::prompt_history,
             commands::threads::default_cwd,
             commands::threads::update_thread_settings,
+            commands::threads::list_models,
             commands::threads::create_project,
             commands::threads::delete_project,
             commands::dev::dev_seed_demo,

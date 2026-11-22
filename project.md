@@ -84,9 +84,30 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 - [x] **Phase 2** — `AgentAdapter`, registre multi-threads, `ClaudeCodeAdapter`, chat streaming
 - [ ] **Phase 3** — Projets, `.neuron/context.md`, injection de contexte
 - [ ] **Phase 4** — Mémoire globale (`~/.neuron/memory.md` + SQLite), vue Mémoire, serveur MCP embarqué
-- [ ] **Phase 5** — Adaptateurs Antigravity / Codex / Generic PTY, paramètres, raccourcis, fluidité
+- [ ] **Phase 5** — ~~Adaptateurs Antigravity / Codex~~ (faits), Generic PTY, paramètres, raccourcis, fluidité
 
 ## Journal des changements
+
+### 2026-11-22 — Multi-fournisseurs (Claude Code, Codex, Antigravity), sélecteurs refaits, sidebar
+- **Codex et Antigravity fonctionnent pour de vrai** (avancé depuis la Phase 5). Protocoles vérifiés en réel avant
+  de coder :
+  - Antigravity : stream-json bidirectionnel avec un champ `event` (`{"event":"user",…}` → `init` / `step_update` /
+    `result`) ; plusieurs tours par process ; usage du `result` **cumulé** → compté par étape ; pas de demande de
+    permission en mode non interactif.
+  - Codex : `exec --json` = 1 process par tour, `resume <thread_id>` pour la suite ; options avant `resume` ;
+    `--` avant le prompt ; modèle par défaut de l'utilisateur (`gpt-6.1-sol`) refusé par un compte ChatGPT → le
+    catalogue (`codex debug models`) ne propose que les modèles listés.
+- Plomberie NDJSON commune (`agents/process.rs`), adaptateur Claude migré dessus ; Stop par kill = « Annulé ».
+- Tests : parseurs sur flux réels nettoyés + **tests live** des 3 CLI (2 tours chacun : ONE/TWO) — tous verts.
+- `list_models` : catalogue par fournisseur (Claude statique, Codex et Antigravity lus depuis les CLI, cache 10 min,
+  disponibilité du CLI).
+- UI : sélecteur de modèle **tous fournisseurs** (popover + recherche, groupé par fournisseur, logos) ; dans un chat
+  existant le fournisseur est verrouillé ; raisonnement (niveaux propres au modèle) et permissions en menus simples
+  (fini le défilement au survol des `Select` Radix ; `Select` passé en mode `popper` partout) ; logos Claude / Gemini
+  (Simple Icons, CC0), glyphe neutre pour Codex ; badges d'agent avec logo.
+- Sidebar : chevron du dossier à gauche (ne chevauche plus le menu « … »), dépliage animé + apparition en cascade
+  des chats.
+
 
 ### 2026-11-22 — shadcn/ui adopté, « chats », projets en dossiers, nouveau chat direct
 - La variante **shadcn/ui** (branche `design/shadcn`) est fusionnée dans `main` ; l'interface Vision est supprimée

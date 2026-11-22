@@ -25,21 +25,34 @@ fn truncate(text: &str, max: usize) -> String {
 /// Returns the status and detail to show while `tool` runs with `input`.
 pub fn tool_activity(tool: &str, input: &Value) -> (ThreadStatus, Option<String>) {
     let lower = tool.to_ascii_lowercase();
-    let path = str_field(input, &["file_path", "path", "notebook_path"]).map(file_name);
+    let path = str_field(input, &["file_path", "path", "notebook_path", "Path", "TargetFile", "AbsolutePath", "DirectoryPath"])
+        .map(file_name);
     match lower.as_str() {
-        "read" | "ls" | "notebookread" => (ThreadStatus::Reading, path),
-        "glob" | "grep" => (
+        "read" | "ls" | "notebookread" | "view_file" | "read_file" | "list_dir" | "view_code_item" => {
+            (ThreadStatus::Reading, path)
+        }
+        "glob" | "grep" | "grep_search" | "find_by_name" | "codebase_search" => (
             ThreadStatus::Reading,
-            str_field(input, &["pattern", "query"]).map(|p| truncate(p, 48)),
+            str_field(input, &["pattern", "query", "Query", "Pattern", "SearchPath"]).map(|p| truncate(p, 48)),
         ),
         "webfetch" | "websearch" => (
             ThreadStatus::Reading,
             str_field(input, &["url", "query"]).map(|p| truncate(p, 48)),
         ),
-        "edit" | "multiedit" | "write" | "notebookedit" | "apply_patch" => (ThreadStatus::Editing, path),
-        "bash" | "powershell" | "shell" | "exec" => (
+        "edit" | "multiedit" | "write" | "notebookedit" | "apply_patch" | "write_file" | "write_to_file"
+        | "replace_file_content" | "multi_replace_file_content" | "edit_file" => (ThreadStatus::Editing, path),
+        "filechange" => (
+            ThreadStatus::Editing,
+            input
+                .get("changes")
+                .and_then(Value::as_array)
+                .and_then(|c| c.first())
+                .and_then(|c| str_field(c, &["path"]))
+                .map(file_name),
+        ),
+        "bash" | "powershell" | "shell" | "exec" | "run_command" | "execute_command" => (
             ThreadStatus::Running,
-            str_field(input, &["command", "cmd"]).map(|c| truncate(c, 60)),
+            str_field(input, &["command", "cmd", "CommandLine", "Command"]).map(|c| truncate(c, 60)),
         ),
         "task" | "agent" => (
             ThreadStatus::Running,
@@ -71,6 +84,18 @@ mod tests {
         assert_eq!(
             tool_activity("mcp__neuron__memory_read", &json!({})),
             (ThreadStatus::Running, Some("mcp__neuron__memory_read".into()))
+        );
+        assert_eq!(
+            tool_activity("write_file", &json!({"Path": r"C:\w\hi.txt"})),
+            (ThreadStatus::Editing, Some("hi.txt".into()))
+        );
+        assert_eq!(
+            tool_activity("run_command", &json!({"CommandLine": "cargo test"})),
+            (ThreadStatus::Running, Some("cargo test".into()))
+        );
+        assert_eq!(
+            tool_activity("FileChange", &json!({"changes": [{"path": "src/a.rs", "kind": "update"}]})),
+            (ThreadStatus::Editing, Some("a.rs".into()))
         );
     }
 }

@@ -13,7 +13,7 @@ import { useUi } from "@/stores/ui";
 import { Composer } from "./Composer";
 
 const DEFAULTS_KEY = "neuron.chatDefaults";
-const FALLBACK: ChatSettings = { model: null, effort: null, permissionMode: "manual" };
+const FALLBACK: ChatSettings = { agent: "claude_code", model: null, effort: null, permissionMode: "manual" };
 
 function readDefaults(): ChatSettings {
   try {
@@ -64,7 +64,7 @@ export function DraftChat({ projectId }: { projectId: string | null }) {
     async (text: string) => {
       try {
         const chat = await ipc.createThread({
-          agent: "claude_code",
+          agent: settings.agent,
           cwd: projectId ? null : cwd || null,
           model: settings.model,
           effort: settings.effort,
@@ -125,7 +125,7 @@ export function DraftChat({ projectId }: { projectId: string | null }) {
               Dans le projet <span className="font-medium text-foreground">{project.name}</span>
             </span>
           ) : (
-            "Choisis le modèle et le niveau de raisonnement, puis écris ton premier message."
+            "Choisis le modèle (Claude, Codex, Antigravity…) et le niveau de raisonnement, puis écris ton premier message."
           )}
         </p>
       </div>
@@ -134,7 +134,7 @@ export function DraftChat({ projectId }: { projectId: string | null }) {
         projectId={projectId}
         submit={submit}
         toolbar={toolbar}
-        placeholder="Que doit faire Claude ? (Entrée pour démarrer le chat)"
+        placeholder="Que doit faire l'agent ? (Entrée pour démarrer le chat)"
         active={false}
         onSent={noop}
         showPill={false}
