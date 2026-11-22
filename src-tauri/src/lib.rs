@@ -5,6 +5,7 @@ pub mod commands;
 pub mod db;
 pub mod error;
 pub mod state;
+pub mod util;
 
 use std::time::Instant;
 
@@ -30,7 +31,18 @@ pub fn run() {
             app.manage(state);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![commands::system::app_info])
+        .invoke_handler(tauri::generate_handler![
+            commands::system::app_info,
+            commands::dashboard::dashboard_snapshot,
+            commands::dashboard::usage_report,
+            commands::dashboard::update_provider,
+            commands::dashboard::list_projects,
+            commands::dashboard::list_threads,
+            commands::dashboard::get_thread,
+            commands::dev::dev_seed_demo,
+            commands::dev::dev_clear_demo,
+            commands::dev::dev_simulate_activity,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running Neuron");
 }

@@ -26,14 +26,22 @@ src-tauri/
     lib.rs                  bootstrap Tauri, setup (DB, état), registre des commandes
     error.rs                AppError (thiserror) sérialisé vers le front
     state.rs                AppState partagé (managed state Tauri)
-    db/                     connexion, PRAGMAs, migrations (PRAGMA user_version)
+    db/                     connexion, PRAGMAs, migrations (PRAGMA user_version) + requêtes par domaine
+                            (projects, threads, providers, usage) — fonctions sync `fn(&Connection, ...)`
+    util.rs                 now_ms, constantes de durée
     commands/               commandes #[tauri::command] groupées par domaine
     agents/                 trait AgentAdapter, adaptateurs, registre de processus, events normalisés
 src/
   bindings/                 GÉNÉRÉ par `cargo test` (ts-rs) — ne pas éditer à la main
   lib/ipc.ts                SEUL point d'accès à invoke()/listen()
+  lib/                      agents.ts (méta + ordre), status.ts, format.ts, fuzzy.ts
+  stores/                   zustand : ui, live (threads temps réel), dashboard, toast
+  hooks/                    useAgentEventBridge, useHotkey, useNow
+  components/shell/         AppShell, Sidebar, LiveDock, DockThreadRow, Toaster
+  components/palette/       CommandPalette (Ctrl+K)
+  components/ui/            primitives partagées (AgentBadge, StatusDot, Kbd, LiveTimer)
+  views/home/               Mission Control (périmètre neon)
   styles/index.css          design tokens Tailwind v4 (@theme)
-  components/ views/ hooks/ (à partir de la Phase 1)
 scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
 .claude/agents/neon.md      définition du sous-agent neon
 ```
@@ -72,6 +80,19 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
 - Transitions : `150ms`, uniquement `transform`/`opacity`/`color`/`background-color` (GPU-friendly).
 - Pas de spinner inutile ; streaming sans re-render global (état par thread, mémoïsation).
 - Composants fonctionnels, un composant par fichier, nommage `PascalCase.tsx`.
+- État global : **zustand** (`src/stores/`). Toujours lire via sélecteur (`useLive(s => s.threads[id])`) ;
+  sélecteur qui renvoie un tableau/objet neuf → `useShallow`. Les événements agents entrent **uniquement** par
+  `useAgentEventBridge` (monté une fois dans `AppShell`).
+- Horloges : `useNow(periodMs)` (un seul `setInterval` partagé), uniquement dans des composants feuilles.
+- Couleurs d'agents = palette catégorielle validée (outil dataviz) dans un **ordre fixe**
+  `AGENT_ORDER` (claude → antigravity → codex → generic) ; ne jamais réordonner par rang. Texte jamais coloré
+  avec la couleur de série ; identité jamais portée par la couleur seule (toujours un libellé).
+
+## Dev
+
+- `NEURON_DATA_DIR=<dossier>` : base SQLite isolée (tests manuels, captures).
+- En debug, palette `Ctrl+K` → *Générer des données de démo* / *Simuler de l'activité live* / *Supprimer les données
+  de démo* (commandes `dev_*`, refusées en release, lignes préfixées `demo-`).
 
 ## Commandes
 

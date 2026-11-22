@@ -2,6 +2,10 @@
 //! so the async runtime (and therefore the UI) never waits on disk I/O.
 
 pub mod migrations;
+pub mod projects;
+pub mod providers;
+pub mod threads;
+pub mod usage;
 
 use std::path::Path;
 use std::sync::{Arc, Mutex};

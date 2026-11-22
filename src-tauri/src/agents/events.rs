@@ -20,6 +20,32 @@ pub enum AgentKind {
     Generic,
 }
 
+impl AgentKind {
+    pub const ALL: [AgentKind; 4] = [
+        AgentKind::ClaudeCode,
+        AgentKind::Antigravity,
+        AgentKind::Codex,
+        AgentKind::Generic,
+    ];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AgentKind::ClaudeCode => "claude_code",
+            AgentKind::Antigravity => "antigravity",
+            AgentKind::Codex => "codex",
+            AgentKind::Generic => "generic",
+        }
+    }
+
+    /// Unknown values map to [`AgentKind::Generic`].
+    pub fn parse(value: &str) -> Self {
+        Self::ALL
+            .into_iter()
+            .find(|k| k.as_str() == value)
+            .unwrap_or(AgentKind::Generic)
+    }
+}
+
 /// Granular, live status of a thread (drives the Live Dock).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
@@ -52,6 +78,37 @@ impl ThreadStatus {
             ThreadStatus::Error => "error",
             ThreadStatus::Cancelled => "cancelled",
         }
+    }
+
+    pub const ALL: [ThreadStatus; 10] = [
+        ThreadStatus::Idle,
+        ThreadStatus::Starting,
+        ThreadStatus::Thinking,
+        ThreadStatus::Reading,
+        ThreadStatus::Editing,
+        ThreadStatus::Running,
+        ThreadStatus::AwaitingApproval,
+        ThreadStatus::Done,
+        ThreadStatus::Error,
+        ThreadStatus::Cancelled,
+    ];
+
+    /// Unknown values map to [`ThreadStatus::Idle`].
+    pub fn parse(value: &str) -> Self {
+        Self::ALL
+            .into_iter()
+            .find(|s| s.as_str() == value)
+            .unwrap_or(ThreadStatus::Idle)
+    }
+
+    /// SQL list of active statuses, for `status IN (...)` filters.
+    pub fn active_sql_list() -> String {
+        Self::ALL
+            .into_iter()
+            .filter(|s| s.is_active())
+            .map(|s| format!("'{}'", s.as_str()))
+            .collect::<Vec<_>>()
+            .join(",")
     }
 
     /// True while the agent process is doing work.
@@ -158,6 +215,23 @@ pub struct AgentEventEnvelope {
     pub ts: i64,
     pub event: AgentEvent,
 }
+
+macro_rules! sql_text_enum {
+    ($ty:ty) => {
+        impl rusqlite::types::FromSql for $ty {
+            fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+                value.as_str().map(<$ty>::parse)
+            }
+        }
+        impl rusqlite::types::ToSql for $ty {
+            fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+                Ok(self.as_str().into())
+            }
+        }
+    };
+}
+sql_text_enum!(AgentKind);
+sql_text_enum!(ThreadStatus);
 
 #[cfg(test)]
 mod tests {

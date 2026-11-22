@@ -5,7 +5,13 @@ use rusqlite::Connection;
 use crate::error::{AppError, AppResult};
 
 /// Ordered list of migrations. Index + 1 == schema version. Never reorder or edit released entries.
-const MIGRATIONS: &[(&str, &str)] = &[("0001_init", include_str!("../../migrations/0001_init.sql"))];
+const MIGRATIONS: &[(&str, &str)] = &[
+    ("0001_init", include_str!("../../migrations/0001_init.sql")),
+    (
+        "0002_default_providers",
+        include_str!("../../migrations/0002_default_providers.sql"),
+    ),
+];
 
 /// Schema version after all embedded migrations are applied.
 pub const LATEST_VERSION: u32 = MIGRATIONS.len() as u32;

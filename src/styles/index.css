@@ -29,11 +29,12 @@
   --color-accent-strong: #00ffb3;
   --color-accent-fg: #04140e;
 
-  /* Agents */
-  --color-agent-claude: #e8a05c;
-  --color-agent-antigravity: #5b9cff;
-  --color-agent-codex: #d4d4d8;
-  --color-agent-generic: #a78bfa;
+  /* Agents — categorical, validated on the dark surface (dataviz validator: lightness band, chroma,
+     adjacent CVD ΔE ≥ 13). FIXED stacking order: claude → antigravity → codex → generic. */
+  --color-agent-claude: #d95926;
+  --color-agent-antigravity: #3987e5;
+  --color-agent-codex: #d55181;
+  --color-agent-generic: #c98500;
 
   /* Semantic */
   --color-ok: #00e5a0;
@@ -57,6 +58,43 @@
 @utility duration-fast {
   transition-duration: 150ms;
   transition-timing-function: var(--ease-out-quick);
+}
+
+/* Entry animations — transform/opacity only (GPU). */
+@keyframes neuron-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes neuron-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+  }
+}
+@keyframes neuron-fade {
+  from {
+    opacity: 0;
+  }
+}
+@utility toast-in {
+  animation: neuron-rise 150ms var(--ease-out-quick);
+}
+@utility pop-in {
+  animation: neuron-pop 150ms var(--ease-out-quick);
+}
+@utility fade-in {
+  animation: neuron-fade 150ms var(--ease-out-quick);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @layer base {

@@ -35,7 +35,11 @@ fn as_u64(value: u128) -> u64 {
 impl AppState {
     /// Resolve paths, open the database and apply migrations. Local only, no network.
     pub fn init(app: &AppHandle, started: Instant) -> AppResult<Self> {
-        let data_dir = app.path().app_data_dir()?;
+        // NEURON_DATA_DIR lets dev/test runs use an isolated database.
+        let data_dir = match std::env::var_os("NEURON_DATA_DIR") {
+            Some(dir) if !dir.is_empty() => PathBuf::from(dir),
+            _ => app.path().app_data_dir()?,
+        };
         std::fs::create_dir_all(&data_dir)?;
         let db_path = data_dir.join("neuron.db");
         let neuron_home = app.path().home_dir()?.join(".neuron");

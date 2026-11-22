@@ -1,7 +1,7 @@
 # Neuron — Contexte projet
 
 > Document vivant. **Mis à jour à chaque changement** (voir règle dans `CLAUDE.md`).
-> Dernière mise à jour : 2026-11-22
+> Dernière mise à jour : 2026-11-22 (Phase 1)
 
 ## Vision
 
@@ -39,7 +39,7 @@ Linear / Raycast *Dark Minimalist Precision* + touche *Cyber-Industrial* pour le
 | Surface / hover | `#121418` / `#181B21` |
 | Bordure | `1px rgba(255,255,255,0.07)` |
 | Accent | Émeraude `#00E5A0` |
-| Agents | Claude `#E8A05C` · Antigravity `#5B9CFF` · Codex `#D4D4D8` · Générique `#A78BFA` |
+| Agents (ordre fixe) | Claude `#d95926` · Antigravity `#3987e5` · Codex `#d55181` · Générique `#c98500` — validés sur fond sombre (bande de luminosité, chroma, CVD adjacent ΔE ≥ 13) |
 | Typo | Inter (UI), JetBrains Mono (code, tokens, chronos, `tabular-nums`) |
 | Motion | 150 ms, GPU (transform/opacity) |
 
@@ -57,6 +57,14 @@ Linear / Raycast *Dark Minimalist Precision* + touche *Cyber-Industrial* pour le
 | Sous-agent **neon** → `agy -p` via `scripts/neon-bridge.sh` | parallélisation du travail UI ; mode par défaut `--dangerously-skip-permissions` (choix utilisateur), surcharge via `NEON_MODE` |
 | DB dans `app_data_dir()/neuron.db` (WAL) | données app séparées de la mémoire utilisateur `~/.neuron/` |
 | Git : commit local par phase validée, pas de push | choix utilisateur |
+| **zustand** pour l'état front | sélecteurs fins → un event d'un thread ne re-rend que sa ligne ; pas de Provider |
+| Un seul aller-retour `dashboard_snapshot` pour l'accueil | < 1 ms de requêtes SQLite mesuré (affiché dans l'en-tête) |
+| Buckets d'usage en heure **locale** calculés par SQLite (CTE récursive) | pas de dépendance chrono, buckets vides inclus |
+| Rafraîchissement dashboard throttlé (2,5 s) sur events | évite de spammer SQLite pendant le streaming |
+| Graphiques SVG faits main (pas de lib de charts) | bundle léger, contrôle total des règles dataviz |
+| Commandes `dev_*` (seed / simulation d'events / purge) en debug | tester UI et pipeline d'events avant les vrais adaptateurs |
+| `NEURON_DATA_DIR` | base isolée pour tests manuels et captures |
+| Cartes quotas : limites `NULL` par défaut, éditables | les limites réelles Claude/Antigravity/Codex ne sont pas publiques en tokens |
 
 ## Environnement de dev
 
@@ -65,13 +73,31 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 ## État d'avancement
 
 - [x] **Phase 0** — Init Tauri v2 + React/TS/Tailwind v4, CLAUDE.md, project.md, neon, bridge, schéma SQLite
-- [ ] **Phase 1** — Shell (sidebar, dock live, palette Ctrl+K) + Mission Control sur SQLite
+- [x] **Phase 1** — Shell (sidebar, dock live, palette Ctrl+K) + Mission Control sur SQLite
 - [ ] **Phase 2** — `AgentAdapter`, registre multi-threads, `ClaudeCodeAdapter`, chat streaming
 - [ ] **Phase 3** — Projets, `.neuron/context.md`, injection de contexte
 - [ ] **Phase 4** — Mémoire globale (`~/.neuron/memory.md` + SQLite), vue Mémoire, serveur MCP embarqué
 - [ ] **Phase 5** — Adaptateurs Antigravity / Codex / Generic PTY, paramètres, raccourcis, fluidité
 
 ## Journal des changements
+
+### 2026-11-22 — Phase 1 terminée
+- Back : migration `0002_default_providers` (4 cartes quotas), modules `db/{projects,threads,providers,usage}`,
+  commandes `dashboard_snapshot`, `usage_report`, `update_provider`, `list_projects`, `list_threads`, `get_thread`,
+  `dev_seed_demo` / `dev_simulate_activity` / `dev_clear_demo` (debug), `NEURON_DATA_DIR`. `AgentKind`/`ThreadStatus`
+  lisibles/écrivables directement en SQL. 34 tests, clippy propre.
+- Front : stores zustand (`ui`, `live`, `dashboard`, `toast`), pont d'events unique, `useNow` (horloge partagée),
+  `useHotkey`. Shell : Sidebar (recherche, nav, projets avec compteurs live), **Live Dock** (statut granulaire,
+  chrono, tokens, badges « À valider / Terminé / Erreur », rail réduit avec indicateurs, `Ctrl+J`), **palette `Ctrl+K`**
+  (recherche floue sans accents, navigation clavier, threads/projets/actions), toasts d'attention.
+- **Mission Control** (réalisé par neon) : cartes quotas éditables (popover), stats, graphique empilé SVG par IA
+  (tooltip, clavier, vue tableau), répartition par IA / projet, activité en cours + récents.
+- Palette des agents revue et validée avec l'outil dataviz (l'ancienne échouait luminosité/chroma).
+- Vérifié en app réelle sur base isolée : seed, simulation live (statuts, tokens, terminé/erreur/approbation, toast).
+- **Bilan neon/Antigravity** : ~1 400 lignes produites en une passe à partir d'un brief détaillé, ~90 % conservées ;
+  2 vrais bugs corrigés en relecture (ResizeObserver figé, popover qui se rouvrait) + finitions. Gain réel sur une vue
+  volumineuse et bien spécifiée ; la relecture reste indispensable. Corrections d'intégration faites ensuite :
+  en-tête des cartes tronqué, tuile cache sur 2 lignes, format monétaire.
 
 ### 2026-11-22 — Phase 0 terminée
 - Fichiers de pilotage : `CLAUDE.md`, `project.md`, `.gitignore`, `.gitattributes` (LF partout),
