@@ -37,7 +37,7 @@ export const RecentThreadRow = memo(function RecentThreadRow({ thread }: RecentT
       aria-label={`Ouvrir ${t.title}`}
       onClick={openThread}
       onKeyDown={handleKeyDown}
-      className="cursor-pointer outline-none focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+      className="cursor-pointer duration-150 outline-none focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
     >
       <TableCell>
         <div className="max-w-[280px] truncate font-medium">{t.title}</div>

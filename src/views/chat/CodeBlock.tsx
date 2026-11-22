@@ -59,11 +59,14 @@ export function CodeBlock({ children }: { children?: ReactNode }) {
           variant="ghost"
           size="xs"
           onClick={handleCopy}
-          className={cn(copied ? "text-ok hover:text-ok" : "text-muted-foreground hover:text-foreground")}
+          className={cn(
+            "transition-colors active:scale-95",
+            copied ? "text-ok hover:text-ok" : "text-muted-foreground hover:text-foreground",
+          )}
         >
           {copied ? (
             <>
-              <Check />
+              <Check className="animate-in zoom-in-75 fade-in-0 duration-150" />
               Copié
             </>
           ) : (

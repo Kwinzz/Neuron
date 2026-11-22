@@ -191,7 +191,7 @@ export const Composer = memo(function Composer({
             <NewMessagesPill onClick={onPillClick} />
           </div>
         )}
-        <InputGroup className="rounded-xl bg-card shadow-sm dark:bg-card">
+        <InputGroup className="rounded-xl bg-card shadow-sm transition-[border-color,box-shadow,background-color] duration-200 ease-snappy dark:bg-card">
           <InputGroupTextarea
             ref={textareaRef}
             data-composer
@@ -212,7 +212,7 @@ export const Composer = memo(function Composer({
                 <InputGroupButton
                   variant="outline"
                   size="icon-sm"
-                  className="rounded-full"
+                  className="rounded-full animate-in fade-in-0 zoom-in-75 duration-150"
                   aria-label="Arrêter l'agent"
                   title="Arrêter"
                   onClick={() => threadId && void useChat.getState().stop(threadId)}
@@ -223,7 +223,7 @@ export const Composer = memo(function Composer({
               <InputGroupButton
                 variant="default"
                 size="icon-sm"
-                className="rounded-full"
+                className="rounded-full active:scale-95"
                 aria-label="Envoyer"
                 disabled={!value.trim()}
                 onClick={() => void sendCurrent()}

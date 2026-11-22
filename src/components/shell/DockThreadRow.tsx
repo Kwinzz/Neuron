@@ -35,7 +35,7 @@ export const DockThreadRow = memo(function DockThreadRow({ id }: { id: string })
       }}
       aria-current={focused ? "true" : undefined}
       className={cn(
-        "flex w-full min-w-0 flex-col gap-1.5 overflow-hidden rounded-lg border border-transparent px-3 py-2.5 text-left text-sm transition-colors",
+        "flex w-full min-w-0 flex-col gap-1.5 overflow-hidden rounded-lg border border-transparent px-3 py-2.5 text-left text-sm transition-[background-color,border-color,color,transform] duration-150 ease-snappy active:scale-[0.99]",
         "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         focused && "border-border bg-sidebar-accent",
       )}
@@ -44,7 +44,7 @@ export const DockThreadRow = memo(function DockThreadRow({ id }: { id: string })
         <StatusDot status={thread.status} />
         <span className="min-w-0 flex-1 truncate font-medium">{thread.title || "Chat sans titre"}</span>
         {attn && (
-          <Badge variant="outline" className={cn("shrink-0 px-1.5 text-[10px]", attn.className)}>
+          <Badge variant="outline" className={cn("shrink-0 px-1.5 text-[10px] animate-in zoom-in-50 fade-in-0 duration-200", attn.className)}>
             {attn.text}
           </Badge>
         )}

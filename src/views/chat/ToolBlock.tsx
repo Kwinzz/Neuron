@@ -20,13 +20,13 @@ export const ToolBlock = memo(function ToolBlock({ item }: { item: ToolItem }) {
     <Collapsible
       open={open}
       onOpenChange={setManual}
-      className="rounded-lg border bg-card animate-in fade-in-0 slide-in-from-bottom-2 duration-300"
+      className="rounded-lg border bg-card animate-in fade-in-0 slide-in-from-bottom-2 duration-200"
     >
       <CollapsibleTrigger asChild>
         <button
           type="button"
           className={cn(
-            "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-muted/50",
+            "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors duration-150 hover:bg-muted/50",
             open && "rounded-b-none",
           )}
         >
@@ -59,7 +59,7 @@ export const ToolBlock = memo(function ToolBlock({ item }: { item: ToolItem }) {
           </Badge>
           <ChevronRight
             className={cn(
-              "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
+              "size-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-snappy",
               open && "rotate-90",
             )}
           />

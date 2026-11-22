@@ -56,7 +56,7 @@ export function OutputBlock({ text, maxLines = 60, tone = "default" }: OutputBlo
             variant="link"
             size="xs"
             onClick={() => setExpanded((v) => !v)}
-            className="h-auto px-0 text-muted-foreground hover:text-foreground"
+            className="h-auto px-0 text-muted-foreground transition-colors hover:text-foreground active:scale-95"
           >
             {expanded ? "Réduire" : `Afficher tout (${totalLines} lignes)`}
           </Button>

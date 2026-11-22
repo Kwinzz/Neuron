@@ -23,7 +23,8 @@ interface ChatSettingsBarProps {
   disabled?: boolean;
 }
 
-const TRIGGER = "h-7 gap-1.5 px-2 text-xs font-normal text-muted-foreground hover:text-foreground";
+const TRIGGER =
+  "h-7 gap-1.5 px-2 text-xs font-normal text-muted-foreground transition-colors duration-150 hover:text-foreground [&>svg:last-child]:transition-transform [&>svg:last-child]:duration-200 data-[state=open]:[&>svg:last-child]:rotate-180";
 const DEFAULT = "default";
 
 /** Model (all providers) · reasoning effort · permissions. Plain menus: no hover-scrolling lists. */

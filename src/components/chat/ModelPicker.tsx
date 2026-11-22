@@ -53,7 +53,7 @@ export const ModelPicker = memo(function ModelPicker({ agent, model, onChange, l
           variant="ghost"
           size="sm"
           disabled={disabled}
-          className="h-7 max-w-64 gap-1.5 px-2 text-xs font-normal text-muted-foreground hover:text-foreground"
+          className="h-7 max-w-64 gap-1.5 px-2 text-xs font-normal text-muted-foreground transition-colors duration-150 hover:text-foreground [&>svg:last-child]:transition-transform [&>svg:last-child]:duration-200 data-[state=open]:[&>svg:last-child]:rotate-180"
           aria-label="Modèle"
         >
           {current ? <VendorLogo vendor={current.vendor} size={14} /> : <AgentLogo agent={agent} size={14} />}

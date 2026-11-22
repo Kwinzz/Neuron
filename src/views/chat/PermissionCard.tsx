@@ -58,19 +58,19 @@ export const PermissionCard = memo(function PermissionCard({
   if (!isPending) {
     const allowed = item.state === "allowed";
     return (
-      <div className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm">
+      <div className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm animate-in fade-in-0 duration-200">
         <ShieldAlert className="size-4 shrink-0 text-muted-foreground" />
         <span className="shrink-0 font-medium text-foreground">{item.toolName}</span>
         <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={item.description}>
           {item.description}
         </span>
         {allowed ? (
-          <Badge variant="outline" className="shrink-0 border-ok/30 text-ok">
+          <Badge variant="outline" className="shrink-0 border-ok/30 text-ok animate-in zoom-in-75 fade-in-0 duration-200">
             <Check />
             Autorisé
           </Badge>
         ) : (
-          <Badge variant="outline" className="shrink-0 border-destructive/30 text-destructive">
+          <Badge variant="outline" className="shrink-0 border-destructive/30 text-destructive animate-in zoom-in-75 fade-in-0 duration-200">
             <X />
             Refusé
           </Badge>
@@ -98,11 +98,11 @@ export const PermissionCard = memo(function PermissionCard({
         <ToolBody name={item.toolName} input={item.input} output={null} />
       </div>
       <div className="col-start-2 mt-3 flex flex-wrap items-center gap-2">
-        <Button ref={allowRef} size="sm" disabled={submitted} onClick={() => respond(true)}>
+        <Button ref={allowRef} size="sm" className="active:scale-[0.97]" disabled={submitted} onClick={() => respond(true)}>
           <Check />
           Autoriser
         </Button>
-        <Button variant="outline" size="sm" disabled={submitted} onClick={() => respond(false)}>
+        <Button variant="outline" size="sm" className="active:scale-[0.97]" disabled={submitted} onClick={() => respond(false)}>
           <X />
           Refuser
         </Button>

@@ -114,11 +114,19 @@ export function DraftChat({ projectId }: { projectId: string | null }) {
   return (
     <div className="flex min-h-full flex-col px-4 md:px-6">
       <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center gap-3 py-12 text-center">
-        <div className="flex size-11 items-center justify-center rounded-xl border bg-card">
+        <div className="flex size-11 items-center justify-center rounded-xl border bg-card animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-backwards duration-300 ease-snappy">
           <MessageSquarePlus className="size-5 text-muted-foreground" />
         </div>
-        <h2 className="text-2xl font-semibold tracking-tight">Nouveau chat</h2>
-        <p className="max-w-md text-sm text-muted-foreground">
+        <h2
+          className="text-2xl font-semibold tracking-tight animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-backwards duration-300 ease-snappy"
+          style={{ animationDelay: "40ms" }}
+        >
+          Nouveau chat
+        </h2>
+        <p
+          className="max-w-md text-sm text-muted-foreground animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-backwards duration-300 ease-snappy"
+          style={{ animationDelay: "80ms" }}
+        >
           {project ? (
             <span className="inline-flex items-center gap-1.5">
               <FolderGit2 className="size-4" />

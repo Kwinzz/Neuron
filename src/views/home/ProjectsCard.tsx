@@ -54,9 +54,9 @@ export function ProjectsCard() {
             ))}
           </div>
         ) : rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Aucune donnée par projet</p>
+          <p className="text-sm text-muted-foreground animate-in fade-in-0 duration-300">Aucune donnée par projet</p>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 animate-in fade-in-0 duration-300">
             {rows.map((r) => (
               <div key={r.key}>
                 <div className="flex items-baseline justify-between gap-2 text-sm">

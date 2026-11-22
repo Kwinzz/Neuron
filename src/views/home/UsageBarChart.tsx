@@ -84,6 +84,8 @@ export function UsageBarChart({ rows, presentAgents, config, range }: UsageBarCh
             stackId="a"
             fill={`var(--color-${agent})`}
             radius={i === presentAgents.length - 1 ? [4, 4, 0, 0] : 0}
+            animationDuration={350}
+            animationEasing="ease-out"
           />
         ))}
         <ChartLegend content={<ChartLegendContent />} />

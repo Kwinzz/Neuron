@@ -219,7 +219,7 @@ const ProjectFolder = memo(function ProjectFolder({ project, chats }: { project:
             {open ? <FolderOpen /> : <Folder />}
             <span>{project.name}</span>
             {activeCount > 0 && (
-              <span className="ml-auto flex items-center gap-1 text-xs text-live tabular-nums group-hover/menu-item:opacity-0">
+              <span className="ml-auto flex items-center gap-1 text-xs text-live tabular-nums transition-opacity duration-150 group-hover/menu-item:opacity-0 animate-in fade-in-0 zoom-in-75 animation-duration-200">
                 <span className="size-1.5 animate-pulse rounded-full bg-live" />
                 {activeCount}
               </span>
@@ -301,8 +301,12 @@ function LooseChatsNav() {
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
       <SidebarGroupLabel>Chats</SidebarGroupLabel>
       <SidebarMenu>
-        {visible.map((c) => (
-          <SidebarMenuItem key={c.id}>
+        {visible.map((c, i) => (
+          <SidebarMenuItem
+            key={c.id}
+            className="animate-in fade-in-0 slide-in-from-left-1 fill-mode-both duration-200"
+            style={{ animationDelay: `${Math.min(i, 10) * 25}ms` }}
+          >
             <ChatLink chat={c} />
           </SidebarMenuItem>
         ))}
@@ -330,7 +334,7 @@ const ChatLink = memo(function ChatLink({ chat, sub = false }: { chat: ThreadSum
     return (
       <SidebarMenuSubButton isActive={active} onClick={open} title={label}>
         <span className="truncate">{label}</span>
-        {STATUS[status].active && <StatusDot status={status} className="ml-auto" />}
+        {STATUS[status].active && <StatusDot status={status} className="ml-auto animate-in fade-in-0 zoom-in-50 duration-200" />}
       </SidebarMenuSubButton>
     );
   }
@@ -342,7 +346,7 @@ const ChatLink = memo(function ChatLink({ chat, sub = false }: { chat: ThreadSum
       </SidebarMenuButton>
       {STATUS[status].active && (
         <SidebarMenuBadge>
-          <StatusDot status={status} />
+          <StatusDot status={status} className="animate-in fade-in-0 zoom-in-50 duration-200" />
         </SidebarMenuBadge>
       )}
     </>

@@ -88,6 +88,21 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-22 — Transitions partout (neon) + curseur d'agent fluide
+- **Curseur d'agent** : le logo n'est plus attaché au bloc de texte ; un curseur unique par conversation, dans la
+  marge gauche de la timeline, suit le **dernier élément quel qu'il soit** (ligne de texte, bloc de code, bloc shell,
+  carte, ligne « Working ») via un ressort amorti piloté par rAF (transform écrit directement, sans re-render) → glisse
+  fluidement même quand un gros bloc apparaît. Reste visible tant qu'un texte se révèle (store `reveal`), y compris
+  après la fin du tour (Codex).
+- **Transitions (neon / Gemini 4 Neon High, ~95 % Antigravity, 38 fichiers)** : changement de vue (fondu + légère
+  montée ; chat → chat en fondu seul pour ne pas faire bouger l'en-tête), dock « Threads live » qui s'ouvre/se ferme en
+  glissant (largeur animée, panneau démonté après la fermeture), lignes du dock en cascade, survols/actifs en fondu
+  dans la sidebar, fil d'Ariane en fondu, palette (surbrillance qui glisse, résultats en fondu), Accueil (cartes en
+  cascade, valeurs en fondu, barres qui poussent, anneau du cache qui se remplit, barres de quotas animées), chat
+  (focus du composer, bouton Stop, pastille « Nouveaux messages », flèches, boutons copier, sélecteurs).
+  Respect de `prefers-reduced-motion`. Relu : pas de sélecteur instable, pas de hex, build OK.
+
+
 ### 2026-11-22 — Débordements corrigés, modèles Antigravity regroupés par famille
 - **Texte qui dépasse à droite** : cause principale dans le dock « Threads live » — le `ScrollArea` Radix enveloppe le
   contenu dans un bloc `display: table` qui s'élargit avec le texte et neutralise `truncate` → remplacé par un simple

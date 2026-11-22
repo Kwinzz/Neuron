@@ -232,11 +232,11 @@ function PaletteContent() {
     <CommandRoot shouldFilter={false} loop>
       <CommandInput value={query} onValueChange={setQuery} placeholder="Rechercher un chat, un projet, une action…" />
       <CommandList className="max-h-[420px]">
-        <CommandEmpty>Aucun résultat pour « {query} »</CommandEmpty>
+        <CommandEmpty className="animate-in fade-in-0 duration-150">Aucun résultat pour « {query} »</CommandEmpty>
         {groups.map(([group, items]) => (
           <CommandGroup key={group} heading={group}>
             {items.map((cmd) => (
-              <CommandItem key={cmd.id} value={cmd.id} onSelect={() => run(cmd)}>
+              <CommandItem key={cmd.id} value={cmd.id} onSelect={() => run(cmd)} className="animate-in fade-in-0 duration-150">
                 {cmd.icon}
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate">{cmd.title}</span>

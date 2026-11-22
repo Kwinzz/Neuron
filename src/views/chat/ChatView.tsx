@@ -12,6 +12,8 @@ import { ThreadHeader } from "./ThreadHeader";
 import { Timeline } from "./Timeline";
 import { TimelineSkeleton } from "./TimelineSkeleton";
 import { useStickToBottom } from "./useStickToBottom";
+import { AgentCursor } from "./AgentCursor";
+import { selectAnyRevealing, useReveal } from "@/stores/reveal";
 import { WorkingIndicator } from "./WorkingIndicator";
 import "./chat.css";
 
@@ -25,6 +27,7 @@ export function ChatView({ threadId }: { threadId: string }) {
   });
   const projectId = useLive((s) => s.threads[threadId]?.projectId ?? null);
   const agent = useLive((s) => s.threads[threadId]?.agent ?? "claude_code");
+  const revealing = useReveal(selectAnyRevealing);
 
   const scrollRoot = useScrollRoot();
   const contentRef = useRef<HTMLDivElement>(null);
@@ -65,7 +68,7 @@ export function ChatView({ threadId }: { threadId: string }) {
 
       <div
         ref={contentRef}
-        className="mx-auto flex w-full min-w-0 max-w-3xl flex-1 flex-col gap-4"
+        className="relative mx-auto flex w-full min-w-0 max-w-3xl flex-1 flex-col gap-4 pl-10"
       >
         {!loaded && (loading || thread === undefined) ? (
           <TimelineSkeleton />
@@ -99,6 +102,8 @@ export function ChatView({ threadId }: { threadId: string }) {
           <Timeline items={items} threadId={threadId} agent={agent} />
         )}
         {loaded && working && <WorkingIndicator threadId={threadId} />}
+        {/* Absolutely positioned in the column gutter; it skips itself when measuring the last element. */}
+        {loaded && <AgentCursor containerRef={contentRef} agent={agent} visible={active || revealing} />}
       </div>
 
       <Composer

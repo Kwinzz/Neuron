@@ -37,7 +37,7 @@ export function ActiveThreadsCard() {
             ))}
           </div>
         ) : !activeThreads || activeThreads.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-6 text-center">
+          <div className="flex flex-col items-center gap-2 py-6 text-center animate-in fade-in-0 duration-300">
             <div
               className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground"
               aria-hidden
@@ -60,7 +60,7 @@ export function ActiveThreadsCard() {
             </Button>
           </div>
         ) : (
-          <div className="flex max-h-[360px] flex-col gap-1 overflow-y-auto">
+          <div className="flex max-h-[360px] flex-col gap-1 overflow-y-auto animate-in fade-in-0 duration-300">
             {activeThreads.map((t) => (
               <ActiveThreadRow key={t.id} id={t.id} fallback={t} />
             ))}

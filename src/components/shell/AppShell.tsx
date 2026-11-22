@@ -1,4 +1,5 @@
 import { type CSSProperties, useEffect, useState } from "react";
+import { cn } from "cn";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
@@ -51,6 +52,13 @@ export function AppShell() {
   useHotkey("mod+j", () => useUi.getState().toggleDock());
   useHotkey("mod+n", () => useUi.getState().startChat(null));
 
+  const viewKey =
+    view.kind === "thread"
+      ? `thread-${view.id}`
+      : view.kind === "draft"
+        ? `draft-${view.projectId ?? ""}`
+        : "home";
+
   return (
     <TooltipProvider delayDuration={300}>
       <SidebarProvider style={PROVIDER_STYLE} className="h-svh min-h-0 overflow-hidden">
@@ -59,9 +67,17 @@ export function AppShell() {
           <SiteHeader />
           <ScrollRootContext.Provider value={scrollRoot}>
             <div ref={setScrollRoot} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
-              {view.kind === "home" && <MissionControl />}
-              {view.kind === "draft" && <DraftChat key={`draft-${view.projectId ?? ""}`} projectId={view.projectId} />}
-              {view.kind === "thread" && <ChatView key={view.id} threadId={view.id} />}
+              <div
+                key={viewKey}
+                className={cn(
+                  "flex min-h-full min-w-0 flex-col *:flex-1",
+                  view.kind === "thread" ? "view-fade" : "view-enter",
+                )}
+              >
+                {view.kind === "home" && <MissionControl />}
+                {view.kind === "draft" && <DraftChat key={`draft-${view.projectId ?? ""}`} projectId={view.projectId} />}
+                {view.kind === "thread" && <ChatView key={view.id} threadId={view.id} />}
+              </div>
             </div>
           </ScrollRootContext.Provider>
         </SidebarInset>

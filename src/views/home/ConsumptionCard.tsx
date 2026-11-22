@@ -65,6 +65,7 @@ export function ConsumptionCard() {
               type="button"
               variant="ghost"
               size="sm"
+              className="active:scale-[0.97]"
               aria-pressed={tableMode}
               onClick={() => setTableMode((v) => !v)}
             >
@@ -78,7 +79,7 @@ export function ConsumptionCard() {
         {isLoading ? (
           <Skeleton className="h-[250px] w-full rounded-lg" />
         ) : rows.length === 0 || grandTotal === 0 ? (
-          <div className="flex h-[250px] flex-col items-center justify-center gap-2 text-center">
+          <div className="flex h-[250px] flex-col items-center justify-center gap-2 text-center animate-in fade-in-0 duration-300">
             <div
               className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground"
               aria-hidden
@@ -90,15 +91,19 @@ export function ConsumptionCard() {
               En dev, <Kbd>{MOD_LABEL}</Kbd> <Kbd>K</Kbd> → « Générer des données de démo »
             </p>
           </div>
-        ) : tableMode ? (
-          <UsageTable rows={rows} presentAgents={presentAgents} range={range} />
         ) : (
-          <UsageBarChart
-            rows={rows}
-            presentAgents={presentAgents}
-            config={config}
-            range={range}
-          />
+          <div key={tableMode ? "table" : "chart"} className="animate-in fade-in-0 duration-200">
+            {tableMode ? (
+              <UsageTable rows={rows} presentAgents={presentAgents} range={range} />
+            ) : (
+              <UsageBarChart
+                rows={rows}
+                presentAgents={presentAgents}
+                config={config}
+                range={range}
+              />
+            )}
+          </div>
         )}
       </CardContent>
     </Card>

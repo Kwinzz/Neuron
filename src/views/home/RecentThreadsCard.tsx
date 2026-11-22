@@ -54,12 +54,12 @@ export function RecentThreadsCard({ className }: RecentThreadsCardProps) {
             ))}
           </div>
         ) : recent.length === 0 ? (
-          <div className="flex flex-col items-center gap-1 py-8 text-center text-muted-foreground">
+          <div className="flex flex-col items-center gap-1 py-8 text-center text-muted-foreground animate-in fade-in-0 duration-300">
             <p className="font-medium">Aucun chat récent</p>
             <p className="text-xs">Les chats terminés apparaîtront ici.</p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border">
+          <div className="overflow-hidden rounded-lg border animate-in fade-in-0 duration-300">
             <Table>
               <TableHeader className="bg-muted/50">
                 <TableRow>

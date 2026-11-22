@@ -62,6 +62,7 @@ export function CacheCard() {
               aria-label={
                 ratio != null ? `Taux de lecture cache : ${pctText}` : "Aucune donnée de cache"
               }
+              className="animate-in fade-in-0 duration-300"
             >
               <ChartContainer
                 config={CACHE_CHART_CONFIG}
@@ -75,7 +76,13 @@ export function CacheCard() {
                   outerRadius={95}
                 >
                   <PolarAngleAxis type="number" domain={[0, 100]} tick={false} axisLine={false} />
-                  <RadialBar dataKey="value" background cornerRadius={10} />
+                  <RadialBar
+                    dataKey="value"
+                    background
+                    cornerRadius={10}
+                    animationDuration={600}
+                    animationEasing="ease-out"
+                  />
                   <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
                     <Label
                       content={({ viewBox }) => {
@@ -105,7 +112,7 @@ export function CacheCard() {
               </ChartContainer>
             </div>
 
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 animate-in fade-in-0 duration-300">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Cache lu</span>
                 <span className="font-mono font-medium tabular-nums">

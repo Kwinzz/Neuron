@@ -226,3 +226,23 @@
     user-select: text;
   }
 }
+
+/* ---- Motion ---- */
+@theme inline {
+  --ease-snappy: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes neuron-view-enter {
+  from { opacity: 0; transform: translateY(6px); }
+}
+@keyframes neuron-fade-in {
+  from { opacity: 0; }
+}
+/* View change (Accueil / nouveau chat): fade + 6px rise. `backwards` so no transform remains afterwards. */
+@utility view-enter {
+  animation: neuron-view-enter 220ms var(--ease-snappy) backwards;
+}
+/* Chat → chat: opacity only, so the sticky chat header never moves. */
+@utility view-fade {
+  animation: neuron-fade-in 180ms var(--ease-snappy) backwards;
+}

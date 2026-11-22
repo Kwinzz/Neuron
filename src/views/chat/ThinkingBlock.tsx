@@ -24,7 +24,7 @@ export const ThinkingBlock = memo(function ThinkingBlock({ item }: { item: Think
         >
           <Brain />
           <span>Réflexion{item.streaming ? "…" : ""}</span>
-          <ChevronRight className={cn("transition-transform", open && "rotate-90")} />
+          <ChevronRight className={cn("transition-transform duration-200 ease-snappy", open && "rotate-90")} />
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-1 ml-2 max-h-80 overflow-auto data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down border-l-2 pl-3 text-sm italic leading-6 text-muted-foreground whitespace-pre-wrap select-text">

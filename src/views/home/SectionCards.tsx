@@ -14,6 +14,7 @@ export function SectionCards() {
   return (
     <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
       <KpiCard
+        index={0}
         label="Tokens entrée"
         value={totals ? formatTokens(totals.input) : "—"}
         delta={totals && prev ? computeDelta(totals.input, prev.input) : null}
@@ -21,6 +22,7 @@ export function SectionCards() {
         loading={isLoading}
       />
       <KpiCard
+        index={1}
         label="Tokens sortie"
         value={totals ? formatTokens(totals.output) : "—"}
         delta={totals && prev ? computeDelta(totals.output, prev.output) : null}
@@ -28,6 +30,7 @@ export function SectionCards() {
         loading={isLoading}
       />
       <KpiCard
+        index={2}
         label="Coût estimé"
         value={totals ? formatCost(totals.costUsd) : "—"}
         delta={totals && prev ? computeDelta(totals.costUsd, prev.costUsd) : null}
@@ -35,6 +38,7 @@ export function SectionCards() {
         loading={isLoading}
       />
       <KpiCard
+        index={3}
         label="Tours"
         value={totals ? formatInteger(totals.turns) : "—"}
         delta={totals && prev ? computeDelta(totals.turns, prev.turns) : null}

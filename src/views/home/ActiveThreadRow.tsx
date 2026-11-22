@@ -31,7 +31,7 @@ export const ActiveThreadRow = memo(function ActiveThreadRow({
     <button
       type="button"
       onClick={handleClick}
-      className="flex w-full items-start gap-3 rounded-lg p-2 text-left transition-colors duration-fast hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50 outline-none"
+      className="flex w-full items-start gap-3 rounded-lg p-2 text-left transition-[background-color,transform] duration-fast hover:bg-muted/50 active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-ring/50 outline-none"
     >
       <StatusIconBox status={t.status} />
 

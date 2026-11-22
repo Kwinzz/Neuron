@@ -69,6 +69,7 @@ export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
               type="button"
               variant="ghost"
               size="icon-sm"
+              className="active:scale-95"
               aria-label={`Configurer ${provider.label}`}
             >
               <Settings2 className="size-4" />
@@ -90,7 +91,7 @@ export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
         {isAlert ? (
-          <span className={cn("inline-flex items-center gap-1 font-medium", LEVEL_TEXT[level])}>
+          <span className={cn("inline-flex items-center gap-1 font-medium animate-in fade-in-0 duration-200", LEVEL_TEXT[level])}>
             <AlertTriangle className="size-3.5 shrink-0" aria-hidden />
             <span>{level === "danger" ? "Quota dépassé" : "Seuil d'alerte atteint"}</span>
           </span>

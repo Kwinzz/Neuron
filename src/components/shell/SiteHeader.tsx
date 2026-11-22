@@ -29,15 +29,15 @@ export function SiteHeader() {
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
         <nav aria-label="Fil d'Ariane" className="flex min-w-0 items-center gap-1.5 text-sm">
-          <span className="shrink-0 text-muted-foreground">{section}</span>
+          <span key={section} className="shrink-0 text-muted-foreground animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ease-snappy">{section}</span>
           <span className="text-muted-foreground">/</span>
-          <h1 className="truncate font-medium">{title}</h1>
+          <h1 key={title} className="truncate font-medium animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ease-snappy">{title}</h1>
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <Button
             variant="outline"
             size="sm"
-            className="hidden w-56 justify-start gap-2 text-muted-foreground lg:flex"
+            className="hidden w-56 justify-start gap-2 text-muted-foreground active:scale-[0.97] lg:flex"
             onClick={() => useUi.getState().setPaletteOpen(true)}
           >
             <Search />
@@ -46,7 +46,7 @@ export function SiteHeader() {
               {MOD_LABEL} K
             </kbd>
           </Button>
-          <Button size="sm" onClick={() => useUi.getState().startChat(null)} title={`Nouveau chat (${MOD_LABEL}+N)`}>
+          <Button size="sm" className="active:scale-[0.97]" onClick={() => useUi.getState().startChat(null)} title={`Nouveau chat (${MOD_LABEL}+N)`}>
             <Plus />
             Nouveau chat
           </Button>
@@ -66,14 +66,17 @@ function DockToggle() {
         <Button
           variant={dockOpen ? "secondary" : "ghost"}
           size="icon"
-          className="relative size-8"
+          className="relative size-8 active:scale-[0.97]"
           onClick={() => useUi.getState().toggleDock()}
           aria-pressed={dockOpen}
           aria-label="Threads live"
         >
           <PanelRight />
           {attention > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-warn px-1 text-[10px] font-semibold tabular-nums text-background">
+            <span
+              key={attention}
+              className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-warn px-1 text-[10px] font-semibold tabular-nums text-background animate-in zoom-in-50 fade-in-0 duration-200"
+            >
               {attention}
             </span>
           )}

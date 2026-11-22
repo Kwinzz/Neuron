@@ -42,9 +42,9 @@ export function QuotasCard({ className }: QuotasCardProps) {
             ))}
           </div>
         ) : !providers || providers.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Aucun fournisseur configuré</p>
+          <p className="text-sm text-muted-foreground animate-in fade-in-0 duration-300">Aucun fournisseur configuré</p>
         ) : (
-          <div className="flex flex-col divide-y">
+          <div className="flex flex-col divide-y animate-in fade-in-0 duration-300">
             {providers.map((usage) => (
               <QuotaRow key={usage.provider.id} usage={usage} />
             ))}

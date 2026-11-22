@@ -116,7 +116,7 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
         <div className="relative flex size-9 shrink-0 items-center justify-center rounded-lg border bg-card shadow-xs">
           <AgentLogo agent={live.agent} size={18} />
           {statusMeta.active && (
-            <span className="absolute -right-0.5 -top-0.5 flex size-2.5" aria-hidden>
+            <span className="absolute -right-0.5 -top-0.5 flex size-2.5 animate-in fade-in-0 zoom-in-50 duration-200" aria-hidden>
               <span className="absolute inset-0 animate-ping rounded-full bg-live/70" />
               <span className="relative size-2.5 rounded-full bg-live ring-2 ring-background" />
             </span>
@@ -167,7 +167,12 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
             )}
           </span>
           {statusMeta.active && (
-            <Button variant="outline" size="sm" onClick={() => void useChat.getState().stop(threadId)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="animate-in fade-in-0 zoom-in-95 duration-150 active:scale-[0.97]"
+              onClick={() => void useChat.getState().stop(threadId)}
+            >
               <Square className="fill-current" />
               Arrêter
             </Button>

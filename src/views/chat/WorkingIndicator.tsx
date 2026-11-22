@@ -1,27 +1,23 @@
 import { memo } from "react";
-import { AgentLogo } from "@/components/ui/AgentLogo";
 import { describeStatus } from "@/lib/status";
 import { useLive } from "@/stores/live";
 
 /**
  * "Working" row shown under the conversation while the agent works and nothing is streaming yet:
- * agent logo (breathing) + shimmering "Working" + bouncing dots + the current activity.
+ * shimmering "Working" + bouncing dots + the current activity. The agent logo is the timeline's
+ * AgentCursor, which sits in the gutter next to this row.
  */
 export const WorkingIndicator = memo(function WorkingIndicator({ threadId }: { threadId: string }) {
-  const agent = useLive((s) => s.threads[threadId]?.agent ?? "claude_code");
   const status = useLive((s) => s.threads[threadId]?.status ?? "starting");
   const detail = useLive((s) => s.threads[threadId]?.detail ?? null);
   const activity = status === "thinking" || status === "starting" ? null : describeStatus(status, detail);
 
   return (
     <div
-      className="flex items-center gap-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-300"
+      className="flex h-7 items-center gap-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-300"
       role="status"
       aria-live="polite"
     >
-      <span className="chat-working-logo flex size-7 shrink-0 items-center justify-center rounded-lg border bg-card">
-        <AgentLogo agent={agent} size={15} />
-      </span>
       {/* Dots sit on the word's baseline ("Working..."), not centered next to it. */}
       <span className="inline-flex items-end gap-1">
         <span className="chat-working-text text-sm leading-none font-medium">Working</span>
