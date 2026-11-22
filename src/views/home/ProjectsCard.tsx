@@ -1,8 +1,15 @@
 import { useMemo } from "react";
-import { Card } from "@/components/legacy/Card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatCost, formatTokens } from "@/lib/format";
 import { useDashboard } from "@/stores/dashboard";
-import { Placeholder } from "./Placeholder";
-import { ProjectRow } from "./ProjectRow";
 import { RANGE_LABEL } from "./rangeLabel";
 
 export function ProjectsCard() {
@@ -31,28 +38,46 @@ export function ProjectsCard() {
   }, [usage?.byProject]);
 
   return (
-    <Card title="Par projet" subtitle={RANGE_LABEL[range]}>
-      {isLoading ? (
-        <div className="flex flex-col gap-4">
-          {[0, 1, 2].map((i) => (
-            <Placeholder key={i} className="h-10 w-full" />
-          ))}
-        </div>
-      ) : rows.length === 0 ? (
-        <p className="text-sm text-fg-muted">Aucune donnée par projet</p>
-      ) : (
-        <div className="flex flex-col gap-4">
-          {rows.map((r) => (
-            <ProjectRow
-              key={r.key}
-              name={r.name}
-              tokens={r.tokens}
-              costUsd={r.costUsd}
-              share={r.share}
-            />
-          ))}
-        </div>
-      )}
+    <Card>
+      <CardHeader>
+        <CardTitle>Par projet</CardTitle>
+        <CardDescription>{RANGE_LABEL[range]}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex flex-col gap-4">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex flex-col gap-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-1 w-full" />
+              </div>
+            ))}
+          </div>
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Aucune donnée par projet</p>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {rows.map((r) => (
+              <div key={r.key}>
+                <div className="flex items-baseline justify-between gap-2 text-sm">
+                  <span className="truncate font-medium">{r.name}</span>
+                  <span className="shrink-0 font-mono tabular-nums">
+                    {formatTokens(r.tokens)}
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      {formatCost(r.costUsd)}
+                    </span>
+                  </span>
+                </div>
+                <Progress
+                  value={Math.min(100, r.share * 100)}
+                  className="mt-2 h-1"
+                  aria-label={`Part du projet ${r.name}`}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
     </Card>
   );
 }

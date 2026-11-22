@@ -1,45 +1,44 @@
-import { ArrowDownToLine, ArrowUpFromLine, CircleDollarSign, Repeat } from "lucide-react";
 import { formatCost, formatInteger, formatTokens } from "@/lib/format";
 import { useDashboard } from "@/stores/dashboard";
 import { computeDelta } from "./computeDelta";
-import { StatCard } from "./StatCard";
+import { KpiCard } from "./KpiCard";
 
-export function StatCards() {
+export function SectionCards() {
   const usage = useDashboard((s) => s.snapshot?.usage);
   const loading = useDashboard((s) => s.loading);
   const isLoading = loading && !usage;
 
   const totals = usage?.totals;
-  const previous = usage?.previous;
+  const prev = usage?.previous;
 
   return (
-    <div className="grid grid-cols-1 gap-[18px] @xl:grid-cols-2 @5xl:grid-cols-4">
-      <StatCard
+    <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+      <KpiCard
         label="Tokens entrée"
         value={totals ? formatTokens(totals.input) : "—"}
-        delta={totals && previous ? computeDelta(totals.input, previous.input) : null}
-        icon={<ArrowDownToLine size={22} />}
+        delta={totals && prev ? computeDelta(totals.input, prev.input) : null}
+        detail="Prompts et contexte envoyés"
         loading={isLoading}
       />
-      <StatCard
+      <KpiCard
         label="Tokens sortie"
         value={totals ? formatTokens(totals.output) : "—"}
-        delta={totals && previous ? computeDelta(totals.output, previous.output) : null}
-        icon={<ArrowUpFromLine size={22} />}
+        delta={totals && prev ? computeDelta(totals.output, prev.output) : null}
+        detail="Réponses générées par les agents"
         loading={isLoading}
       />
-      <StatCard
+      <KpiCard
         label="Coût estimé"
         value={totals ? formatCost(totals.costUsd) : "—"}
-        delta={totals && previous ? computeDelta(totals.costUsd, previous.costUsd) : null}
-        icon={<CircleDollarSign size={22} />}
+        delta={totals && prev ? computeDelta(totals.costUsd, prev.costUsd) : null}
+        detail="Estimation au tarif API"
         loading={isLoading}
       />
-      <StatCard
+      <KpiCard
         label="Tours"
         value={totals ? formatInteger(totals.turns) : "—"}
-        delta={totals && previous ? computeDelta(totals.turns, previous.turns) : null}
-        icon={<Repeat size={22} />}
+        delta={totals && prev ? computeDelta(totals.turns, prev.turns) : null}
+        detail="Échanges agent ↔ modèle"
         loading={isLoading}
       />
     </div>

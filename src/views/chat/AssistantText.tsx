@@ -1,4 +1,5 @@
 import { type ComponentProps, memo } from "react";
+import { cn } from "cn";
 import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
@@ -13,7 +14,12 @@ const REHYPE: MarkdownProps["rehypePlugins"] = [[rehypeHighlight, { detect: fals
 const COMPONENTS: Components = {
   pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
   a: ({ href, children }) => (
-    <a href={href} target="_blank" rel="noreferrer" className="text-hl underline-offset-2 hover:underline">
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="font-medium text-foreground underline underline-offset-4 hover:text-muted-foreground"
+    >
       {children}
     </a>
   ),
@@ -21,7 +27,7 @@ const COMPONENTS: Components = {
 
 export const AssistantText = memo(function AssistantText({ item }: { item: TextItem }) {
   return (
-    <div className={`chat-prose select-text text-fg ${item.streaming ? "chat-streaming" : ""}`}>
+    <div className={cn("chat-prose select-text text-sm leading-7 text-foreground", item.streaming && "chat-streaming")}>
       <ReactMarkdown remarkPlugins={REMARK} rehypePlugins={REHYPE} components={COMPONENTS}>
         {item.text}
       </ReactMarkdown>

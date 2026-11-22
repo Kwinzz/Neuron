@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
+import { cn } from "cn";
 import { diffLines } from "diff";
+import { Button } from "@/components/ui/button";
 
 const CONTEXT_KEEP = 3;
 const CONTEXT_COLLAPSE_THRESHOLD = 8;
@@ -77,15 +79,15 @@ export function DiffView({ oldText, newText }: DiffViewProps) {
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-2 font-mono text-[11px] font-bold tabular-nums">
+      <div className="flex items-center gap-2 font-mono text-[11px] font-medium tabular-nums">
         <span className="text-ok">+{addedCount}</span>
-        <span className="text-danger">−{removedCount}</span>
+        <span className="text-destructive">−{removedCount}</span>
       </div>
-      <div className="max-h-[360px] overflow-auto rounded-md bg-bg/40 font-mono text-xs leading-relaxed select-text">
+      <div className="max-h-[360px] overflow-auto rounded-md border bg-muted/30 font-mono text-xs leading-relaxed select-text">
         {visible.map((row, idx) => {
           if (row.kind === "gap") {
             return (
-              <div key={idx} className="bg-surface/40 px-3 py-0.5 text-fg-subtle select-none">
+              <div key={idx} className="bg-muted/50 px-3 py-0.5 text-muted-foreground select-none">
                 ⋯ {row.count} lignes inchangées
               </div>
             );
@@ -94,11 +96,11 @@ export function DiffView({ oldText, newText }: DiffViewProps) {
             row.kind === "add"
               ? "bg-ok/10 text-ok"
               : row.kind === "del"
-                ? "bg-danger/10 text-danger"
-                : "text-fg-subtle";
+                ? "bg-destructive/10 text-destructive"
+                : "text-muted-foreground";
           const gutter = row.kind === "add" ? "+" : row.kind === "del" ? "−" : " ";
           return (
-            <div key={idx} className={`whitespace-pre px-3 ${style}`}>
+            <div key={idx} className={cn("whitespace-pre px-3", style)}>
               <span className="mr-2 inline-block select-none opacity-75">{gutter}</span>
               {row.text || " "}
             </div>
@@ -107,13 +109,14 @@ export function DiffView({ oldText, newText }: DiffViewProps) {
       </div>
       {rows.length > MAX_VISIBLE_ROWS && (
         <div>
-          <button
-            type="button"
+          <Button
+            variant="link"
+            size="xs"
             onClick={() => setExpanded((v) => !v)}
-            className="text-xs font-bold text-hl transition-colors duration-fast hover:text-hl-strong"
+            className="h-auto px-0 text-muted-foreground hover:text-foreground"
           >
             {expanded ? "Réduire" : `Afficher tout (${rows.length} lignes)`}
-          </button>
+          </Button>
         </div>
       )}
     </div>

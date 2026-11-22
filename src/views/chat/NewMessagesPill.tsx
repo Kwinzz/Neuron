@@ -1,14 +1,11 @@
 import { ArrowDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export function NewMessagesPill({ onClick }: { onClick: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="pop-in inline-flex items-center gap-1.5 rounded-full bg-brand px-3 py-1.5 text-xs font-bold text-brand-fg shadow-lg transition-colors duration-fast hover:bg-brand-hover"
-    >
+    <Button variant="secondary" size="sm" onClick={onClick} className="rounded-full shadow-md">
       Nouveaux messages
-      <ArrowDown size={13} />
-    </button>
+      <ArrowDown />
+    </Button>
   );
 }

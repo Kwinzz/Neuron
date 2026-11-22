@@ -1,6 +1,9 @@
-import { useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { NewThreadDialog } from "@/components/threads/NewThreadDialog";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAgentEventBridge } from "@/hooks/useAgentEventBridge";
 import { useHotkey } from "@/hooks/useHotkey";
 import { ipc } from "@/lib/ipc";
@@ -9,11 +12,10 @@ import { useLive } from "@/stores/live";
 import { useUi } from "@/stores/ui";
 import { ChatView } from "@/views/chat/ChatView";
 import { MissionControl } from "@/views/home/MissionControl";
+import { AppSidebar } from "./AppSidebar";
 import { LiveDock } from "./LiveDock";
-import { Navbar } from "./Navbar";
 import { ScrollRootContext } from "./ScrollRoot";
-import { Sidebar } from "./Sidebar";
-import { Toaster } from "./Toaster";
+import { SiteHeader } from "./SiteHeader";
 
 /** Make sure the opened thread's summary is in the live store (title, agent, cwd…). */
 function useHydrateOpenThread(): void {
@@ -29,7 +31,12 @@ function useHydrateOpenThread(): void {
   }, [threadId]);
 }
 
-/** Persistent app frame: floating sidebar · navbar + main view · floating live dock, plus overlays. */
+const PROVIDER_STYLE = {
+  "--sidebar-width": "calc(var(--spacing) * 64)",
+  "--header-height": "calc(var(--spacing) * 12)",
+} as CSSProperties;
+
+/** shadcn "dashboard-01" frame: inset sidebar · header + scrolling view · live dock, plus overlays. */
 export function AppShell() {
   const view = useUi((s) => s.view);
   const [scrollRoot, setScrollRoot] = useState<HTMLElement | null>(null);
@@ -45,19 +52,23 @@ export function AppShell() {
   useHotkey("mod+n", () => useUi.getState().setNewThreadOpen(true));
 
   return (
-    <div className="flex h-full gap-4 overflow-hidden p-4">
-      <Sidebar />
-      <ScrollRootContext.Provider value={scrollRoot}>
-        <main ref={setScrollRoot} className="-my-4 min-w-0 flex-1 overflow-y-auto py-4">
-          <Navbar scrollRoot={scrollRoot} />
-          {view.kind === "home" && <MissionControl />}
-          {view.kind === "thread" && <ChatView key={view.id} threadId={view.id} />}
-        </main>
-      </ScrollRootContext.Provider>
-      <LiveDock />
+    <TooltipProvider delayDuration={300}>
+      <SidebarProvider style={PROVIDER_STYLE} className="h-svh min-h-0 overflow-hidden">
+        <AppSidebar variant="inset" collapsible="icon" />
+        <SidebarInset className="min-w-0 overflow-hidden md:peer-data-[variant=inset]:mr-0">
+          <SiteHeader />
+          <ScrollRootContext.Provider value={scrollRoot}>
+            <div ref={setScrollRoot} className="min-h-0 flex-1 overflow-y-auto">
+              {view.kind === "home" && <MissionControl />}
+              {view.kind === "thread" && <ChatView key={view.id} threadId={view.id} />}
+            </div>
+          </ScrollRootContext.Provider>
+        </SidebarInset>
+        <LiveDock />
+      </SidebarProvider>
       <CommandPalette />
       <NewThreadDialog />
-      <Toaster />
-    </div>
+      <Toaster theme="dark" position="bottom-right" richColors={false} />
+    </TooltipProvider>
   );
 }

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { JsonValue } from "@/bindings/serde_json/JsonValue";
+import { Badge } from "@/components/ui/badge";
 import { DiffView } from "./DiffView";
 import { OutputBlock } from "./OutputBlock";
 import { arr, asObject, num, prettyJson, str } from "./json";
@@ -15,7 +16,7 @@ interface ToolBodyProps {
 function FileHeader({ path }: { path: string | null }) {
   if (!path) return null;
   return (
-    <div className="truncate font-mono text-xs text-fg-muted select-text" title={path}>
+    <div className="truncate font-mono text-xs text-muted-foreground select-text" title={path}>
       {path}
     </div>
   );
@@ -81,9 +82,9 @@ function renderInput(name: string, input: JsonValue): ReactNode {
       const description = str(obj, "description");
       return (
         <div className="flex flex-col gap-1.5">
-          {description && <p className="text-xs text-fg-subtle">{description}</p>}
-          <pre className="rounded-md bg-bg/40 px-3 py-2 font-mono text-xs text-fg whitespace-pre-wrap break-all select-text">
-            <span className="select-none text-hl-2">$ </span>
+          {description && <p className="text-xs text-muted-foreground">{description}</p>}
+          <pre className="rounded-md border bg-muted/40 px-3 py-2 font-mono text-xs text-foreground whitespace-pre-wrap break-all select-text">
+            <span className="select-none text-muted-foreground">$ </span>
             {command}
           </pre>
         </div>
@@ -98,12 +99,16 @@ function renderInput(name: string, input: JsonValue): ReactNode {
       const limit = num(obj, "limit");
       return (
         <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
-          <span className="text-fg select-text">{filePath}</span>
+          <span className="text-foreground select-text">{filePath}</span>
           {offset !== null && (
-            <span className="rounded-sm bg-surface px-1.5 py-0.5 text-fg-muted">offset {offset}</span>
+            <Badge variant="secondary" className="font-mono">
+              offset {offset}
+            </Badge>
           )}
           {limit !== null && (
-            <span className="rounded-sm bg-surface px-1.5 py-0.5 text-fg-muted">limit {limit}</span>
+            <Badge variant="secondary" className="font-mono">
+              limit {limit}
+            </Badge>
           )}
         </div>
       );
@@ -116,8 +121,10 @@ function renderInput(name: string, input: JsonValue): ReactNode {
       const path = str(obj, "path");
       return (
         <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
-          <span className="rounded-sm bg-surface px-2 py-0.5 text-fg select-text">{pattern}</span>
-          {path && <span className="text-fg-subtle select-text">{path}</span>}
+          <Badge variant="secondary" className="font-mono select-text">
+            {pattern}
+          </Badge>
+          {path && <span className="text-muted-foreground select-text">{path}</span>}
         </div>
       );
     }
@@ -130,9 +137,15 @@ function renderInput(name: string, input: JsonValue): ReactNode {
       const glob = str(obj, "glob");
       return (
         <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
-          <span className="rounded-sm bg-surface px-2 py-0.5 text-fg select-text">{pattern}</span>
-          {path && <span className="text-fg-subtle select-text">{path}</span>}
-          {glob && <span className="rounded-sm bg-surface px-1.5 py-0.5 text-fg-muted">{glob}</span>}
+          <Badge variant="secondary" className="font-mono select-text">
+            {pattern}
+          </Badge>
+          {path && <span className="text-muted-foreground select-text">{path}</span>}
+          {glob && (
+            <Badge variant="secondary" className="font-mono">
+              {glob}
+            </Badge>
+          )}
         </div>
       );
     }
@@ -147,7 +160,7 @@ export function ToolBody({ name, input, output, outputTone = "default" }: ToolBo
       {renderInput(name, input)}
       {output !== null && output.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <div className="text-xs font-bold uppercase tracking-wide text-fg-subtle">Sortie</div>
+          <div className="text-xs font-medium text-muted-foreground">Sortie</div>
           <OutputBlock text={output} maxLines={60} tone={outputTone} />
         </div>
       )}

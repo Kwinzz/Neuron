@@ -8,7 +8,14 @@ import {
   useState,
 } from "react";
 import { ArrowUp, Square } from "lucide-react";
-import { Button } from "@/components/legacy/Button";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupText,
+  InputGroupTextarea,
+} from "@/components/ui/input-group";
+import { Kbd } from "@/components/ui/Kbd";
 import { ipc } from "@/lib/ipc";
 import { useChat } from "@/stores/chat";
 import { NewMessagesPill } from "./NewMessagesPill";
@@ -164,15 +171,15 @@ export const Composer = memo(function Composer({
   };
 
   return (
-    <div className="sticky bottom-0 z-10 -mx-6 bg-linear-to-t from-bg via-bg/80 to-transparent px-6 pb-4 pt-6">
-      <div className="relative mx-auto w-full max-w-[920px]">
+    <div className="sticky bottom-0 z-10 -mx-4 bg-linear-to-t from-background via-background/90 to-transparent px-4 pb-4 pt-6 md:-mx-6 md:px-6">
+      <div className="relative mx-auto w-full max-w-3xl">
         {showPill && (
-          <div className="absolute -top-8 left-1/2 -translate-x-1/2">
+          <div className="absolute -top-10 left-1/2 -translate-x-1/2">
             <NewMessagesPill onClick={onPillClick} />
           </div>
         )}
-        <div className="glass-overlay flex items-end gap-2 rounded-xl p-2 transition-colors duration-fast focus-within:border-hl/60">
-          <textarea
+        <InputGroup className="rounded-xl bg-card shadow-sm dark:bg-card">
+          <InputGroupTextarea
             ref={textareaRef}
             data-composer
             rows={1}
@@ -180,30 +187,46 @@ export const Composer = memo(function Composer({
             onChange={onChange}
             onKeyDown={onKeyDown}
             aria-label="Message"
-            placeholder="Demandez quelque chose à Claude… (Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne)"
-            className="max-h-[240px] flex-1 resize-none overflow-y-auto bg-transparent px-3 py-2 text-sm leading-6 text-fg outline-none placeholder:text-fg-subtle"
+            placeholder="Demandez quelque chose à l'agent…"
+            className="min-h-0 max-h-[256px] overflow-y-auto px-3.5 pt-3 text-sm leading-6 field-sizing-fixed"
           />
-          {active && (
-            <Button
-              variant="subtle"
-              className="size-10 shrink-0 px-0! text-danger"
-              aria-label="Arrêter l'agent"
-              title="Arrêter"
-              onClick={() => void useChat.getState().stop(threadId)}
-            >
-              <Square size={15} className="fill-current" />
-            </Button>
-          )}
-          <Button
-            variant="brand"
-            className="size-10 shrink-0 px-0!"
-            aria-label="Envoyer"
-            disabled={!value.trim()}
-            onClick={() => void sendCurrent()}
-          >
-            <ArrowUp size={18} />
-          </Button>
-        </div>
+          <InputGroupAddon align="block-end">
+            <InputGroupText className="hidden gap-1.5 text-xs sm:flex">
+              <Kbd>Entrée</Kbd>
+              <span>envoyer</span>
+              <span>·</span>
+              <Kbd>Maj+Entrée</Kbd>
+              <span>nouvelle ligne</span>
+              <span>·</span>
+              <Kbd>↑</Kbd>
+              <span>historique</span>
+            </InputGroupText>
+            <div className="ml-auto flex items-center gap-1.5">
+              {active && (
+                <InputGroupButton
+                  variant="outline"
+                  size="icon-sm"
+                  className="rounded-full"
+                  aria-label="Arrêter l'agent"
+                  title="Arrêter"
+                  onClick={() => void useChat.getState().stop(threadId)}
+                >
+                  <Square className="size-3.5 fill-current" />
+                </InputGroupButton>
+              )}
+              <InputGroupButton
+                variant="default"
+                size="icon-sm"
+                className="rounded-full"
+                aria-label="Envoyer"
+                disabled={!value.trim()}
+                onClick={() => void sendCurrent()}
+              >
+                <ArrowUp />
+              </InputGroupButton>
+            </div>
+          </InputGroupAddon>
+        </InputGroup>
       </div>
     </div>
   );

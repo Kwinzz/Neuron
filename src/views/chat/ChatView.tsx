@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef } from "react";
 import { MessageSquare, XCircle } from "lucide-react";
 import type { ChatItem } from "@/bindings/ChatItem";
 import { useScrollRoot } from "@/components/shell/ScrollRoot";
-import { Button } from "@/components/legacy/Button";
-import { IconBox } from "@/components/ui/IconBox";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { STATUS } from "@/lib/status";
 import { useChat } from "@/stores/chat";
 import { useLive } from "@/stores/live";
@@ -52,42 +52,38 @@ export function ChatView({ threadId }: { threadId: string }) {
   }, [scrollToBottom]);
 
   return (
-    <div className="flex min-h-full flex-col gap-4 px-6 pb-4">
+    <div className="flex min-h-full flex-col gap-4 px-4 pb-4 md:px-6">
       <ThreadHeader threadId={threadId} />
 
       <div
         ref={contentRef}
-        className="mx-auto flex w-full max-w-[920px] flex-1 flex-col gap-3"
+        className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4"
       >
         {!loaded && (loading || thread === undefined) ? (
           <TimelineSkeleton />
         ) : !loaded && error ? (
-          <div className="glass-tile flex items-start gap-3 rounded-xl border border-danger/30 p-5">
-            <IconBox tone="danger" size={36}>
-              <XCircle size={17} strokeWidth={2} />
-            </IconBox>
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-bold text-fg">Impossible de charger l'historique</div>
-              <p className="mt-1 text-sm text-fg-muted whitespace-pre-wrap break-words select-text">
-                {error}
-              </p>
+          <Alert variant="destructive" className="p-4">
+            <XCircle />
+            <AlertTitle>Impossible de charger l'historique</AlertTitle>
+            <AlertDescription className="col-start-2 select-text whitespace-pre-wrap break-words">
+              {error}
+            </AlertDescription>
+            <div className="col-start-2 mt-3">
               <Button
-                variant="subtle"
+                variant="outline"
                 size="sm"
-                className="mt-3"
+                className="text-foreground"
                 onClick={() => void useChat.getState().load(threadId, true)}
               >
                 Réessayer
               </Button>
             </div>
-          </div>
+          </Alert>
         ) : loaded && items.length === 0 ? (
           <div className="my-auto flex flex-col items-center justify-center py-12 text-center">
-            <IconBox tone="brand" size={45}>
-              <MessageSquare size={20} strokeWidth={2} />
-            </IconBox>
-            <h2 className="mt-4 text-lg font-bold text-fg">Nouvelle conversation</h2>
-            <p className="mt-1 text-sm text-fg-muted">
+            <MessageSquare className="size-8 text-muted-foreground" />
+            <h2 className="mt-3 text-base font-semibold text-foreground">Nouvelle conversation</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
               Envoyez un premier message pour démarrer l'agent.
             </p>
           </div>

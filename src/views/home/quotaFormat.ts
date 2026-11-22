@@ -58,25 +58,18 @@ export function quotaLevel(ratio: number | null, alertPct: number): QuotaLevel {
   return "ok";
 }
 
-export const LEVEL_COLOR: Record<QuotaLevel, string> = {
-  none: "var(--color-brand)",
-  ok: "var(--color-brand)",
-  warn: "var(--color-warn)",
-  danger: "var(--color-danger)",
-};
-
 export const LEVEL_FILL: Record<QuotaLevel, string> = {
-  none: "bg-brand",
-  ok: "bg-ok",
-  warn: "bg-warn",
-  danger: "bg-danger",
+  none: "*:data-[slot=progress-indicator]:bg-primary",
+  ok: "*:data-[slot=progress-indicator]:bg-ok",
+  warn: "*:data-[slot=progress-indicator]:bg-warn",
+  danger: "*:data-[slot=progress-indicator]:bg-destructive",
 };
 
 export const LEVEL_TEXT: Record<QuotaLevel, string> = {
-  none: "text-fg-muted",
+  none: "text-muted-foreground",
   ok: "text-ok",
   warn: "text-warn",
-  danger: "text-danger",
+  danger: "text-destructive",
 };
 
 /**
@@ -89,27 +82,4 @@ export function effectiveRatio(usage: ProviderUsage): number | null {
 
 export function effectiveResetsAt(usage: ProviderUsage): number | null {
   return usage.live?.resetsAt ?? usage.resetsAt;
-}
-
-export function pickTopProvider(list: readonly ProviderUsage[] | undefined): ProviderUsage | null {
-  if (!list || list.length === 0) return null;
-
-  let bestWithRatio: ProviderUsage | null = null;
-  for (const item of list) {
-    const r = effectiveRatio(item);
-    if (r != null) {
-      if (bestWithRatio === null || r > (effectiveRatio(bestWithRatio) ?? -1)) {
-        bestWithRatio = item;
-      }
-    }
-  }
-  if (bestWithRatio !== null) return bestWithRatio;
-
-  let bestByUsed: ProviderUsage | null = list[0] ?? null;
-  for (const item of list) {
-    if (bestByUsed === null || item.used > bestByUsed.used) {
-      bestByUsed = item;
-    }
-  }
-  return bestByUsed;
 }

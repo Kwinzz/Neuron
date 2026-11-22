@@ -1,9 +1,20 @@
 import { type KeyboardEvent, memo, useEffect, useRef, useState } from "react";
+import { cn } from "cn";
 import { Pencil, Square } from "lucide-react";
-import { AgentBadge } from "@/components/ui/AgentBadge";
-import { Button } from "@/components/legacy/Button";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { LiveTimer } from "@/components/ui/LiveTimer";
-import { StatusIconBox } from "@/components/ui/StatusIconBox";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StatusDot } from "@/components/ui/StatusDot";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { AGENTS } from "@/lib/agents";
 import { formatCost, formatTokens } from "@/lib/format";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { describeStatus, STATUS, TONE_TEXT } from "@/lib/status";
@@ -42,17 +53,17 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
 
   if (!live) {
     return (
-      <header className="glass-card flex items-center gap-4 rounded-xl px-5 py-4" aria-busy="true">
-        <div className="size-9 shrink-0 rounded-md bg-surface" />
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
-          <div className="h-5 w-48 rounded-sm bg-surface" />
-          <div className="flex items-center gap-2">
-            <div className="h-4 w-24 rounded-sm bg-surface" />
-            <div className="h-4 w-32 rounded-sm bg-surface" />
-          </div>
-          <div className="h-4 w-28 rounded-sm bg-surface" />
+      <header className="flex flex-col gap-2 pt-4" aria-busy="true">
+        <div className="flex items-center justify-between gap-3">
+          <Skeleton className="h-5 w-48" />
+          <Skeleton className="h-4 w-32" />
         </div>
-        <div className="h-4 w-32 shrink-0 rounded-sm bg-surface" />
+        <div className="flex flex-wrap items-center gap-2">
+          <Skeleton className="h-5 w-20 rounded-full" />
+          <Skeleton className="h-5 w-24 rounded-full" />
+          <Skeleton className="h-5 w-28 rounded-full" />
+        </div>
+        <Separator className="mt-1" />
       </header>
     );
   }
@@ -60,6 +71,7 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
   const activePending = pending && pending.threadId === threadId && pending.title !== live.title ? pending.title : null;
   const displayTitle = activePending ?? live.title;
   const statusMeta = STATUS[live.status];
+  const agentMeta = AGENTS[live.agent];
   const permissionLabel = PERMISSION_LABELS[live.permissionMode] ?? live.permissionMode;
   const isBypass = live.permissionMode === "bypassPermissions";
 
@@ -101,13 +113,11 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
   };
 
   return (
-    <header className="glass-card flex flex-wrap items-center gap-4 rounded-xl px-5 py-4">
-      <StatusIconBox status={live.status} size={36} />
-
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center">
+    <header className="flex flex-col gap-2 pt-4">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center">
           {editing ? (
-            <input
+            <Input
               ref={inputRef}
               type="text"
               value={draft}
@@ -115,77 +125,85 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
               onKeyDown={onInputKeyDown}
               onBlur={() => void commit()}
               aria-label="Nom du thread"
-              className="w-full max-w-[480px] rounded-md bg-surface px-2 text-lg font-bold text-fg outline-none"
+              className="h-8 max-w-[480px] rounded-md bg-transparent px-2 text-base font-semibold md:text-base dark:bg-transparent"
             />
           ) : (
             <button
               type="button"
               title="Renommer"
               onClick={startEdit}
-              className="group flex min-w-0 items-center gap-2 rounded-md text-left transition-colors duration-fast hover:text-fg"
+              className="group flex min-w-0 max-w-full items-center gap-1.5 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
             >
-              <span className="truncate text-lg font-bold text-fg">{displayTitle}</span>
-              <Pencil
-                size={13}
-                className="shrink-0 text-fg-subtle opacity-0 transition-opacity duration-fast group-hover:opacity-100 group-focus-visible:opacity-100"
-              />
+              <span className="truncate text-base font-semibold text-foreground">{displayTitle}</span>
+              <Pencil className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
             </button>
           )}
         </div>
 
-        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
-          <AgentBadge
-            agent={live.agent}
-            variant="full"
-            className="rounded-sm bg-surface px-2 py-0.5 font-bold"
-          />
-          <span className="rounded-sm bg-surface px-2 py-0.5 font-bold text-fg-muted">
-            {live.model ?? "modèle par défaut"}
-          </span>
-          <span
-            className={`rounded-sm px-2 py-0.5 font-bold ${
-              isBypass ? "bg-warn/10 text-warn" : "bg-surface text-fg-muted"
-            }`}
-          >
-            {permissionLabel}
-          </span>
-          {live.cwd && (
-            <span className="max-w-[320px] truncate font-mono text-fg-subtle" title={live.cwd}>
-              {live.cwd}
-            </span>
+        <div className="ml-auto flex shrink-0 items-center gap-3">
+          <div className="font-mono text-xs text-muted-foreground tabular-nums">
+            <span className="font-medium text-foreground">{formatTokens(live.tokens)}</span>{" "}
+            tokens ·{" "}
+            <span className="font-medium text-foreground">{formatCost(live.costUsd)}</span>
+          </div>
+
+          {statusMeta.active && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void useChat.getState().stop(threadId)}
+            >
+              <Square className="fill-current" />
+              Arrêter
+            </Button>
           )}
         </div>
+      </div>
 
-        <div className="mt-1.5 flex items-center gap-2 text-sm">
-          <span className={`truncate font-bold ${TONE_TEXT[statusMeta.tone]}`}>
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="outline">
+          <span className={cn("size-1.5 rounded-full", agentMeta.bg)} aria-hidden />
+          {agentMeta.label}
+        </Badge>
+        <Badge variant="outline" className="text-muted-foreground">
+          {live.model ?? "modèle par défaut"}
+        </Badge>
+        <Badge
+          variant="outline"
+          className={isBypass ? "border-warn/40 text-warn" : "text-muted-foreground"}
+        >
+          {permissionLabel}
+        </Badge>
+        {live.cwd && (
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  tabIndex={0}
+                  className="max-w-[320px] truncate rounded-sm font-mono text-xs text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                >
+                  {live.cwd}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-md break-all font-mono">
+                {live.cwd}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+
+        <div className="ml-auto flex min-w-0 items-center gap-2">
+          <StatusDot status={live.status} />
+          <span className={cn("truncate text-xs font-medium", TONE_TEXT[statusMeta.tone])}>
             {describeStatus(live.status, live.detail)}
           </span>
           {statusMeta.active && (
-            <LiveTimer startedAt={live.runStartedAt} className="shrink-0 text-xs text-fg-muted" />
+            <LiveTimer startedAt={live.runStartedAt} className="shrink-0 text-xs text-muted-foreground" />
           )}
         </div>
       </div>
 
-      <div className="ml-auto flex shrink-0 items-center gap-3">
-        <div className="text-right text-sm tabular-nums">
-          <span className="font-bold text-fg">{formatTokens(live.tokens)}</span>{" "}
-          <span className="text-fg-muted">tokens</span>
-          <span className="px-1.5 text-fg-subtle">·</span>
-          <span className="font-bold text-fg">{formatCost(live.costUsd)}</span>
-        </div>
-
-        {statusMeta.active && (
-          <Button
-            variant="subtle"
-            size="sm"
-            className="text-danger"
-            onClick={() => void useChat.getState().stop(threadId)}
-          >
-            <Square size={14} className="fill-current" />
-            Arrêter
-          </Button>
-        )}
-      </div>
+      <Separator className="mt-1" />
     </header>
   );
 });

@@ -1,24 +1,29 @@
-import { type FormEvent, type KeyboardEvent, type RefObject, useEffect, useRef, useState } from "react";
+import { type FormEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import type { Provider } from "@/bindings/Provider";
 import type { QuotaUnit } from "@/bindings/QuotaUnit";
 import type { WindowKind } from "@/bindings/WindowKind";
-import { Button } from "@/components/legacy/Button";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { PopoverHeader, PopoverTitle } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ipcErrorMessage } from "@/lib/ipc";
 import { useDashboard } from "@/stores/dashboard";
 import { QUOTA_UNITS, UNIT_LABEL, WINDOW_KINDS, WINDOW_LABEL } from "./quotaFormat";
 
 interface QuotaEditorProps {
   provider: Provider;
-  onClose: () => void;
-  /** The element that toggles the editor: clicks on it are not "outside" (avoids close-then-reopen). */
-  anchorRef?: RefObject<HTMLElement | null>;
+  onDone: () => void;
 }
 
-const INPUT_CLASS =
-  "h-10 w-full rounded-md border border-line bg-surface px-3 text-sm text-fg outline-none transition-colors duration-fast focus:border-hl";
-
-export function QuotaEditor({ provider, onClose, anchorRef }: QuotaEditorProps) {
-  const panelRef = useRef<HTMLDivElement | null>(null);
+export function QuotaEditor({ provider, onDone }: QuotaEditorProps) {
+  const id = useId();
   const firstInputRef = useRef<HTMLInputElement | null>(null);
 
   const [label, setLabel] = useState(provider.label);
@@ -34,20 +39,9 @@ export function QuotaEditor({ provider, onClose, anchorRef }: QuotaEditorProps) 
     firstInputRef.current?.focus();
   }, []);
 
-  useEffect(() => {
-    const handleMouseDown = (e: MouseEvent) => {
-      if (!(e.target instanceof Node) || !panelRef.current) return;
-      if (panelRef.current.contains(e.target) || anchorRef?.current?.contains(e.target)) return;
-      onClose();
-    };
-    document.addEventListener("mousedown", handleMouseDown);
-    return () => document.removeEventListener("mousedown", handleMouseDown);
-  }, [onClose, anchorRef]);
-
-  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLFormElement>) => {
     if (e.key === "Escape") {
       e.stopPropagation();
-      onClose();
     }
   };
 
@@ -90,7 +84,7 @@ export function QuotaEditor({ provider, onClose, anchorRef }: QuotaEditorProps) 
         limitValue: parsedLimit,
         alertPct: clampedPct / 100,
       });
-      onClose();
+      onDone();
     } catch (err) {
       setError(ipcErrorMessage(err));
       setSaving(false);
@@ -98,120 +92,129 @@ export function QuotaEditor({ provider, onClose, anchorRef }: QuotaEditorProps) 
   };
 
   return (
-    <div
-      ref={panelRef}
-      role="dialog"
-      aria-label={`Configurer ${provider.label}`}
+    <form
+      onSubmit={(e) => void handleSubmit(e)}
       onKeyDown={handleKeyDown}
-      className="pop-in glass-overlay absolute right-0 top-full z-30 mt-2 w-[320px] p-4 shadow-2xl"
+      className="flex flex-col gap-3 p-1"
     >
-      <h3 className="mb-3 text-sm font-bold text-fg">Configurer {provider.label}</h3>
-      <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-3">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-fg-muted">Libellé</span>
-          <input
-            ref={firstInputRef}
-            type="text"
-            required
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            className={INPUT_CLASS}
-          />
-        </label>
+      <PopoverHeader>
+        <PopoverTitle>Configurer {provider.label}</PopoverTitle>
+      </PopoverHeader>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-fg-muted">Abonnement</span>
-          <input
-            type="text"
-            value={plan}
-            placeholder="Max, Pro, API…"
-            onChange={(e) => setPlan(e.target.value)}
-            className={INPUT_CLASS}
-          />
-        </label>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={`${id}-label`}>Libellé</Label>
+        <Input
+          ref={firstInputRef}
+          id={`${id}-label`}
+          type="text"
+          required
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+        />
+      </div>
 
-        <div className="grid grid-cols-2 gap-2.5">
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-bold text-fg-muted">Fenêtre</span>
-            <select
-              value={windowKind}
-              onChange={(e) => {
-                const found = WINDOW_KINDS.find((k) => k === e.target.value);
-                if (found) setWindowKind(found);
-              }}
-              className={INPUT_CLASS}
-            >
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={`${id}-plan`}>Abonnement</Label>
+        <Input
+          id={`${id}-plan`}
+          type="text"
+          value={plan}
+          placeholder="Max, Pro, API…"
+          onChange={(e) => setPlan(e.target.value)}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-2.5">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={`${id}-window`}>Fenêtre</Label>
+          <Select
+            value={windowKind}
+            onValueChange={(v) => {
+              const found = WINDOW_KINDS.find((k) => k === v);
+              if (found) setWindowKind(found);
+            }}
+          >
+            <SelectTrigger id={`${id}-window`} className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
               {WINDOW_KINDS.map((k) => (
-                <option key={k} value={k}>
+                <SelectItem key={k} value={k}>
                   {WINDOW_LABEL[k]}
-                </option>
+                </SelectItem>
               ))}
-            </select>
-          </label>
+            </SelectContent>
+          </Select>
+        </div>
 
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-bold text-fg-muted">Unité</span>
-            <select
-              value={unit}
-              onChange={(e) => {
-                const found = QUOTA_UNITS.find((u) => u === e.target.value);
-                if (found) setUnit(found);
-              }}
-              className={INPUT_CLASS}
-            >
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={`${id}-unit`}>Unité</Label>
+          <Select
+            value={unit}
+            onValueChange={(v) => {
+              const found = QUOTA_UNITS.find((u) => u === v);
+              if (found) setUnit(found);
+            }}
+          >
+            <SelectTrigger id={`${id}-unit`} className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
               {QUOTA_UNITS.map((u) => (
-                <option key={u} value={u}>
+                <SelectItem key={u} value={u}>
                   {UNIT_LABEL[u]}
-                </option>
+                </SelectItem>
               ))}
-            </select>
-          </label>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2.5">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={`${id}-limit`}>Limite</Label>
+          <Input
+            id={`${id}-limit`}
+            type="number"
+            min={0}
+            step="any"
+            placeholder="Aucune"
+            value={limit}
+            onChange={(e) => setLimit(e.target.value)}
+            className="tabular-nums"
+          />
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5">
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-bold text-fg-muted">Limite</span>
-            <input
-              type="number"
-              min={0}
-              step="any"
-              placeholder="Aucune"
-              value={limit}
-              onChange={(e) => setLimit(e.target.value)}
-              className={`${INPUT_CLASS} tabular-nums`}
-            />
-          </label>
-
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-bold text-fg-muted">Seuil d&apos;alerte (%)</span>
-            <input
-              type="number"
-              min={1}
-              max={100}
-              step={1}
-              required
-              value={pct}
-              onChange={(e) => setPct(e.target.value)}
-              className={`${INPUT_CLASS} tabular-nums`}
-            />
-          </label>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={`${id}-pct`}>Seuil d&apos;alerte (%)</Label>
+          <Input
+            id={`${id}-pct`}
+            type="number"
+            min={1}
+            max={100}
+            step={1}
+            required
+            value={pct}
+            onChange={(e) => setPct(e.target.value)}
+            className="tabular-nums"
+          />
         </div>
+      </div>
 
-        {error && (
-          <p role="alert" className="text-xs text-danger">
-            {error}
-          </p>
-        )}
+      {error && (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
 
-        <div className="mt-1 flex items-center justify-end gap-2">
-          <Button variant="ghost" size="sm" disabled={saving} onClick={onClose}>
-            Annuler
-          </Button>
-          <Button type="submit" variant="brand" size="sm" disabled={saving}>
-            {saving ? "Enregistrement…" : "Enregistrer"}
-          </Button>
-        </div>
-      </form>
-    </div>
+      <div className="mt-1 flex items-center justify-end gap-2">
+        <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={onDone}>
+          Annuler
+        </Button>
+        <Button type="submit" size="sm" disabled={saving}>
+          {saving ? "Enregistrement…" : "Enregistrer"}
+        </Button>
+      </div>
+    </form>
   );
 }

@@ -1,33 +1,36 @@
-import { create } from "zustand";
+/**
+ * Notification API used across the app, rendered by shadcn's <Toaster /> (sonner).
+ * Kept as a tiny facade so callers don't depend on the toast library.
+ */
+import { toast as sonner } from "sonner";
 
 export type ToastTone = "info" | "ok" | "warn" | "danger";
 
-export interface Toast {
-  id: number;
+export interface ToastInput {
   tone: ToastTone;
   title: string;
   description?: string;
-  /** Optional click action (e.g. focus the thread). */
+  /** Optional action (e.g. open the thread). */
   onClick?: () => void;
 }
 
-interface ToastState {
-  toasts: Toast[];
-  push: (toast: Omit<Toast, "id">, ttlMs?: number) => void;
-  dismiss: (id: number) => void;
+export function toast({ tone, title, description, onClick }: ToastInput, ttlMs = 5000): void {
+  const options = {
+    description,
+    duration: ttlMs,
+    ...(onClick ? { action: { label: "Ouvrir", onClick } } : {}),
+  };
+  switch (tone) {
+    case "ok":
+      sonner.success(title, options);
+      break;
+    case "warn":
+      sonner.warning(title, options);
+      break;
+    case "danger":
+      sonner.error(title, options);
+      break;
+    default:
+      sonner.info(title, options);
+  }
 }
-
-let nextId = 1;
-const MAX_TOASTS = 4;
-
-export const useToasts = create<ToastState>((set, get) => ({
-  toasts: [],
-  push: (toast, ttlMs = 5000) => {
-    const id = nextId++;
-    set((s) => ({ toasts: [...s.toasts, { ...toast, id }].slice(-MAX_TOASTS) }));
-    setTimeout(() => get().dismiss(id), ttlMs);
-  },
-  dismiss: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
-}));
-
-export const toast = (t: Omit<Toast, "id">, ttlMs?: number) => useToasts.getState().push(t, ttlMs);

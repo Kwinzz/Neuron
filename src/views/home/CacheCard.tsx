@@ -1,9 +1,25 @@
-import { Card } from "@/components/legacy/Card";
-import { RingGauge } from "@/components/ui/RingGauge";
+import { useMemo } from "react";
+import { Label, PolarAngleAxis, PolarRadiusAxis, RadialBar, RadialBarChart } from "recharts";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { type ChartConfig, ChartContainer } from "@/components/ui/chart";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatPercent, formatTokens } from "@/lib/format";
 import { useDashboard } from "@/stores/dashboard";
-import { Placeholder } from "./Placeholder";
 import { RANGE_LABEL } from "./rangeLabel";
+
+const CACHE_CHART_CONFIG: ChartConfig = {
+  cache: {
+    label: "Lecture cache",
+    color: "var(--primary)",
+  },
+};
 
 export function CacheCard() {
   const usage = useDashboard((s) => s.snapshot?.usage);
@@ -15,54 +31,98 @@ export function CacheCard() {
   const cacheWrite = usage?.totals.cacheWrite ?? 0;
   const input = usage?.totals.input ?? 0;
   const denom = cacheRead + input;
-  const hit = denom > 0 ? cacheRead / denom : 0;
+  const ratio = denom > 0 ? cacheRead / denom : null;
+  const pct = ratio != null ? Math.round(ratio * 100) : 0;
+  const pctText = ratio != null ? formatPercent(ratio) : "—";
+
+  const chartData = useMemo(
+    () => [{ name: "cache", value: pct, fill: "var(--color-cache)" }],
+    [pct],
+  );
 
   return (
-    <Card title="Efficacité du cache" subtitle={RANGE_LABEL[range]}>
-      <div className="flex flex-1 flex-col items-center gap-[18px] sm:flex-row">
-        <div className="flex w-full flex-1 flex-col gap-[18px]">
-          <Card variant="tile" as="div">
-            <p className="text-xs font-bold text-fg-muted">Cache lu</p>
-            {isLoading ? (
-              <Placeholder className="mt-1.5 h-5 w-20" />
-            ) : (
-              <p className="mt-1 text-lg font-bold tabular-nums text-fg">
-                {usage ? formatTokens(cacheRead) : "—"}
-              </p>
-            )}
-          </Card>
+    <Card>
+      <CardHeader>
+        <CardTitle>Efficacité du cache</CardTitle>
+        <CardDescription>{RANGE_LABEL[range]}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-1 flex-col justify-between gap-4">
+        {isLoading ? (
+          <>
+            <Skeleton className="mx-auto size-[180px] rounded-full" />
+            <div className="flex flex-col gap-3">
+              <Skeleton className="h-5 w-full" />
+              <Skeleton className="h-5 w-full" />
+            </div>
+          </>
+        ) : (
+          <>
+            <div
+              role="img"
+              aria-label={
+                ratio != null ? `Taux de lecture cache : ${pctText}` : "Aucune donnée de cache"
+              }
+            >
+              <ChartContainer
+                config={CACHE_CHART_CONFIG}
+                className="mx-auto aspect-square max-h-[200px]"
+              >
+                <RadialBarChart
+                  data={chartData}
+                  startAngle={90}
+                  endAngle={-270}
+                  innerRadius={70}
+                  outerRadius={95}
+                >
+                  <PolarAngleAxis type="number" domain={[0, 100]} tick={false} axisLine={false} />
+                  <RadialBar dataKey="value" background cornerRadius={10} />
+                  <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
+                    <Label
+                      content={({ viewBox }) => {
+                        if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                          const cx = viewBox.cx ?? 0;
+                          const cy = viewBox.cy ?? 0;
+                          return (
+                            <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
+                              <tspan
+                                x={cx}
+                                y={cy}
+                                className="fill-foreground text-3xl font-bold tabular-nums"
+                              >
+                                {pctText}
+                              </tspan>
+                              <tspan x={cx} y={cy + 24} className="fill-muted-foreground text-xs">
+                                lecture cache
+                              </tspan>
+                            </text>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                  </PolarRadiusAxis>
+                </RadialBarChart>
+              </ChartContainer>
+            </div>
 
-          <Card variant="tile" as="div">
-            <p className="text-xs font-bold text-fg-muted">Cache écrit</p>
-            {isLoading ? (
-              <Placeholder className="mt-1.5 h-5 w-20" />
-            ) : (
-              <p className="mt-1 text-lg font-bold tabular-nums text-fg">
-                {usage ? formatTokens(cacheWrite) : "—"}
-              </p>
-            )}
-          </Card>
-        </div>
-
-        <RingGauge
-          size={160}
-          thickness={8}
-          sweep={360}
-          color="var(--color-hl-2)"
-          value={isLoading ? 0 : hit}
-          label="Taux de lecture cache"
-        >
-          <span className="text-xs text-fg-muted">Taux</span>
-          {isLoading ? (
-            <Placeholder className="my-1 h-7 w-16" />
-          ) : (
-            <span className="text-[28px] font-bold leading-tight tabular-nums text-fg">
-              {denom > 0 ? formatPercent(hit) : "—"}
-            </span>
-          )}
-          <span className="text-xs text-fg-muted">de lecture cache</span>
-        </RingGauge>
-      </div>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Cache lu</span>
+                <span className="font-mono font-medium tabular-nums">
+                  {usage ? formatTokens(cacheRead) : "—"}
+                </span>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Cache écrit</span>
+                <span className="font-mono font-medium tabular-nums">
+                  {usage ? formatTokens(cacheWrite) : "—"}
+                </span>
+              </div>
+            </div>
+          </>
+        )}
+      </CardContent>
     </Card>
   );
 }

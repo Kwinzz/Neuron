@@ -1,19 +1,22 @@
+import { cn } from "cn";
 import { AlertTriangle, Settings2 } from "lucide-react";
-import { memo, useCallback, useRef, useState } from "react";
+import { memo, useState } from "react";
 import type { ProviderUsage } from "@/bindings/ProviderUsage";
-import { IconBox } from "@/components/ui/IconBox";
-import { Progress } from "@/components/legacy/Progress";
-import { AGENTS } from "@/lib/agents";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Progress } from "@/components/ui/progress";
+import { AGENT_ORDER } from "@/lib/agents";
 import { formatPercent } from "@/lib/format";
 import { QuotaEditor } from "./QuotaEditor";
 import {
+  effectiveRatio,
+  effectiveResetsAt,
   formatQuotaValue,
   LEVEL_FILL,
   LEVEL_TEXT,
   quotaLevel,
   WINDOW_LABEL,
-  effectiveRatio,
-  effectiveResetsAt,
 } from "./quotaFormat";
 import { ResetCountdown } from "./ResetCountdown";
 
@@ -22,92 +25,95 @@ interface QuotaRowProps {
 }
 
 export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
-  const [editing, setEditing] = useState(false);
-  const settingsRef = useRef<HTMLButtonElement | null>(null);
-
-  const closeEditor = useCallback(() => {
-    setEditing(false);
-    requestAnimationFrame(() => {
-      if (document.activeElement === document.body) settingsRef.current?.focus();
-    });
-  }, []);
+  const [open, setOpen] = useState(false);
 
   const { provider, used, live } = usage;
   const ratio = effectiveRatio(usage);
   const resetsAt = effectiveResetsAt(usage);
   const level = quotaLevel(ratio, provider.alertPct);
   const isAlert = level === "warn" || level === "danger";
-  const windowLabel = WINDOW_LABEL[provider.windowKind];
+  const agentColor = `var(--chart-${AGENT_ORDER.indexOf(provider.agent) + 1})`;
 
   return (
-    <div className="relative border-b border-line-chart/60 py-4 first:pt-0 last:border-b-0 last:pb-0">
+    <div className="py-4 first:pt-0 last:pb-0">
       <div className="flex items-center gap-3">
-        <IconBox size={30} tone="muted">
-          <span className={`size-2.5 rounded-[3px] ${AGENTS[provider.agent].bg}`} />
-        </IconBox>
+        <span
+          className="size-2.5 shrink-0 rounded-[3px]"
+          style={{ backgroundColor: agentColor }}
+          aria-hidden
+        />
 
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-2 text-sm font-bold text-fg">
-            <span className="truncate">{provider.label}</span>
-            <span className="shrink-0 rounded-sm bg-surface px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-hl">
-              {windowLabel}
-            </span>
-          </p>
-          {provider.plan && <p className="truncate text-xs text-fg-muted">{provider.plan}</p>}
+          <div className="flex items-center gap-2">
+            <span className="truncate font-medium">{provider.label}</span>
+            <Badge variant="secondary">{WINDOW_LABEL[provider.windowKind]}</Badge>
+          </div>
+          {provider.plan && (
+            <p className="truncate text-xs text-muted-foreground">{provider.plan}</p>
+          )}
         </div>
 
-        <div className="shrink-0 text-right text-sm font-bold tabular-nums text-fg">
+        <div className="shrink-0 text-right font-mono text-sm font-medium tabular-nums">
           {formatQuotaValue(used, provider.unit)}
           {provider.limitValue != null && (
-            <span className="font-normal text-fg-muted">
+            <span className="font-normal text-muted-foreground">
               {" "}
               / {formatQuotaValue(provider.limitValue, provider.unit)}
             </span>
           )}
         </div>
 
-        <button
-          ref={settingsRef}
-          type="button"
-          aria-label={`Configurer ${provider.label}`}
-          aria-expanded={editing}
-          onClick={() => setEditing((v) => !v)}
-          className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-fg-muted transition-colors duration-fast hover:bg-surface hover:text-fg"
-        >
-          <Settings2 size={16} />
-        </button>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Configurer ${provider.label}`}
+            >
+              <Settings2 className="size-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-80">
+            {open && <QuotaEditor provider={provider} onDone={() => setOpen(false)} />}
+          </PopoverContent>
+        </Popover>
       </div>
 
       {ratio != null && (
         <Progress
-          className="mt-3"
-          value={ratio}
-          fillClassName={LEVEL_FILL[level]}
-          label={`Quota ${provider.label}`}
+          value={Math.min(100, ratio * 100)}
+          className={cn("mt-3", LEVEL_FILL[level])}
+          aria-label={`Quota ${provider.label}`}
         />
       )}
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
         {isAlert ? (
-          <span className={`inline-flex items-center gap-1 font-bold ${LEVEL_TEXT[level]}`}>
-            <AlertTriangle size={12} className="shrink-0" />
+          <span className={cn("inline-flex items-center gap-1 font-medium", LEVEL_TEXT[level])}>
+            <AlertTriangle className="size-3.5 shrink-0" aria-hidden />
             <span>{level === "danger" ? "Quota dépassé" : "Seuil d'alerte atteint"}</span>
           </span>
         ) : live ? (
-          <span className="inline-flex items-center gap-1.5 text-fg-muted" title="Utilisation rapportée par Claude Code">
-            <span className="size-1.5 rounded-full bg-hl-2" aria-hidden />
+          <span
+            className="inline-flex items-center gap-1.5 text-muted-foreground"
+            title="Utilisation rapportée par Claude Code"
+          >
+            <span className="size-1.5 rounded-full bg-live" aria-hidden />
             Abonnement · source Claude
           </span>
         ) : provider.limitValue == null ? (
-          <span className="inline-flex items-center gap-1.5 text-fg-muted">
+          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
             <span>Aucune limite définie ·</span>
-            <button
+            <Button
               type="button"
-              onClick={() => setEditing(true)}
-              className="font-bold text-hl transition-colors duration-fast hover:text-hl-strong"
+              variant="link"
+              size="xs"
+              className="h-auto p-0"
+              onClick={() => setOpen(true)}
             >
               Configurer
-            </button>
+            </Button>
           </span>
         ) : (
           <span />
@@ -116,14 +122,12 @@ export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
         <div className="inline-flex items-center gap-2">
           {resetsAt != null && <ResetCountdown resetsAt={resetsAt} />}
           {ratio != null && (
-            <span className="font-bold tabular-nums text-fg">{formatPercent(ratio)}</span>
+            <span className="font-mono font-medium tabular-nums text-foreground">
+              {formatPercent(ratio)}
+            </span>
           )}
         </div>
       </div>
-
-      {editing && (
-        <QuotaEditor provider={provider} onClose={closeEditor} anchorRef={settingsRef} />
-      )}
     </div>
   );
 });

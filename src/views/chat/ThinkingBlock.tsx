@@ -1,6 +1,9 @@
 import { memo, useState } from "react";
+import { cn } from "cn";
 import { Brain, ChevronRight } from "lucide-react";
 import type { ChatItem } from "@/bindings/ChatItem";
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type ThinkingItem = Extract<ChatItem, { kind: "thinking" }>;
 
@@ -12,25 +15,21 @@ export const ThinkingBlock = memo(function ThinkingBlock({ item }: { item: Think
   const open = manual ?? item.streaming;
 
   return (
-    <div className="flex flex-col">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setManual(!open)}
-        className="inline-flex w-fit items-center gap-2 text-sm text-fg-muted transition-colors duration-fast hover:text-fg"
-      >
-        <Brain size={14} className="shrink-0" />
-        <span className="font-bold">Réflexion{item.streaming ? "…" : ""}</span>
-        <ChevronRight
-          size={14}
-          className={`shrink-0 transition-transform duration-fast ${open ? "rotate-90" : ""}`}
-        />
-      </button>
-      {open && (
-        <div className="mt-1.5 ml-[7px] max-h-[320px] overflow-auto border-l-2 border-line-strong pl-3 text-sm italic text-fg-muted whitespace-pre-wrap select-text">
-          {item.text}
-        </div>
-      )}
-    </div>
+    <Collapsible open={open} onOpenChange={setManual} className="flex flex-col">
+      <CollapsibleTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ml-2 w-fit text-muted-foreground hover:text-foreground"
+        >
+          <Brain />
+          <span>Réflexion{item.streaming ? "…" : ""}</span>
+          <ChevronRight className={cn("transition-transform", open && "rotate-90")} />
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-1 ml-2 max-h-80 overflow-auto border-l-2 pl-3 text-sm italic leading-6 text-muted-foreground whitespace-pre-wrap select-text">
+        {item.text}
+      </CollapsibleContent>
+    </Collapsible>
   );
 });

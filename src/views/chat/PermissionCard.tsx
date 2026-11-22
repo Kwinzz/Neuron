@@ -1,8 +1,9 @@
 import { type KeyboardEvent, memo, useEffect, useRef, useState } from "react";
 import { Check, ShieldAlert, X } from "lucide-react";
 import type { ChatItem } from "@/bindings/ChatItem";
-import { Button } from "@/components/legacy/Button";
-import { IconBox } from "@/components/ui/IconBox";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/Kbd";
 import { useChat } from "@/stores/chat";
 import { ToolBody } from "./ToolBody";
@@ -57,62 +58,55 @@ export const PermissionCard = memo(function PermissionCard({
   if (!isPending) {
     const allowed = item.state === "allowed";
     return (
-      <div className="glass-tile flex items-center gap-3 rounded-xl border border-line px-4 py-2.5">
-        <IconBox tone="muted" size={30}>
-          <ShieldAlert size={15} strokeWidth={2} />
-        </IconBox>
-        <span className="shrink-0 text-sm font-bold text-fg">{item.toolName}</span>
-        <span className="min-w-0 flex-1 truncate text-xs text-fg-muted" title={item.description}>
+      <div className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm">
+        <ShieldAlert className="size-4 shrink-0 text-muted-foreground" />
+        <span className="shrink-0 font-medium text-foreground">{item.toolName}</span>
+        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={item.description}>
           {item.description}
         </span>
         {allowed ? (
-          <span className="inline-flex shrink-0 items-center gap-1 text-sm font-bold text-ok">
-            <Check size={14} />
+          <Badge variant="outline" className="shrink-0 border-ok/30 text-ok">
+            <Check />
             Autorisé
-          </span>
+          </Badge>
         ) : (
-          <span className="inline-flex shrink-0 items-center gap-1 text-sm font-bold text-danger">
-            <X size={14} />
+          <Badge variant="outline" className="shrink-0 border-destructive/30 text-destructive">
+            <X />
             Refusé
-          </span>
+          </Badge>
         )}
       </div>
     );
   }
 
   return (
-    <div
+    <Alert
       tabIndex={-1}
       onKeyDown={onKeyDown}
-      className="glass-card pop-in rounded-xl border-l-2 border-warn p-5 outline-none"
+      className="border-warn/50 px-4 py-3 outline-none"
     >
-      <div className="flex items-start gap-3">
-        <IconBox tone="warn" size={36}>
-          <ShieldAlert size={17} strokeWidth={2} />
-        </IconBox>
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-bold text-warn">Autorisation requise</div>
-          <div className="text-base font-bold text-fg">{item.toolName}</div>
-          {item.description && (
-            <p className="mt-1 text-sm text-fg-muted whitespace-pre-wrap select-text">{item.description}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="mt-3">
+      <ShieldAlert className="text-warn" />
+      <AlertTitle className="font-semibold text-foreground">
+        Autorisation requise — {item.toolName}
+      </AlertTitle>
+      {item.description && (
+        <AlertDescription className="col-start-2 whitespace-pre-wrap select-text">
+          {item.description}
+        </AlertDescription>
+      )}
+      <div className="col-start-2 mt-2">
         <ToolBody name={item.toolName} input={item.input} output={null} />
       </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Button ref={allowRef} variant="brand" disabled={submitted} onClick={() => respond(true)}>
-          <Check size={15} />
+      <div className="col-start-2 mt-3 flex flex-wrap items-center gap-2">
+        <Button ref={allowRef} size="sm" disabled={submitted} onClick={() => respond(true)}>
+          <Check />
           Autoriser
         </Button>
-        <Button variant="ghost" disabled={submitted} onClick={() => respond(false)}>
-          <X size={15} />
+        <Button variant="outline" size="sm" disabled={submitted} onClick={() => respond(false)}>
+          <X />
           Refuser
         </Button>
-        <div className="ml-auto flex items-center gap-1.5 text-xs text-fg-subtle">
+        <div className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">
           <Kbd>Entrée</Kbd>
           <span>autoriser</span>
           <span>·</span>
@@ -120,6 +114,6 @@ export const PermissionCard = memo(function PermissionCard({
           <span>refuser</span>
         </div>
       </div>
-    </div>
+    </Alert>
   );
 });

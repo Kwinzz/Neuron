@@ -1,7 +1,5 @@
-import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import {
-  Activity,
-  CornerDownLeft,
   Database,
   FlaskConical,
   FolderGit2,
@@ -9,13 +7,21 @@ import {
   MessageSquare,
   PanelRight,
   Plus,
-  Search,
   Trash2,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { AgentBadge } from "@/components/ui/AgentBadge";
-import { IconBox } from "@/components/ui/IconBox";
-import { Kbd, MOD_LABEL } from "@/components/ui/Kbd";
+import {
+  Command as CommandRoot,
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandShortcut,
+} from "@/components/ui/command";
+import { MOD_LABEL } from "@/components/ui/Kbd";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { formatRelative } from "@/lib/format";
 import { fuzzyScore, normalize } from "@/lib/fuzzy";
@@ -43,7 +49,18 @@ const MAX_RESULTS = 40;
 
 export function CommandPalette() {
   const open = useUi((s) => s.paletteOpen);
-  return open ? <PaletteDialog /> : null;
+  const setOpen = useUi((s) => s.setPaletteOpen);
+  return (
+    <CommandDialog
+      open={open}
+      onOpenChange={setOpen}
+      title="Palette de commandes"
+      description="Rechercher un thread, un projet ou une action"
+      className="sm:max-w-xl"
+    >
+      {open && <PaletteContent />}
+    </CommandDialog>
+  );
 }
 
 function useCommands(): Command[] {
@@ -69,12 +86,7 @@ function useCommands(): Command[] {
         subtitle: "Lancer un agent dans un dossier",
         keywords: "nouveau chat créer lancer agent claude",
         icon: <Plus size={15} />,
-        hint: (
-          <span className="flex gap-1">
-            <Kbd>{MOD_LABEL}</Kbd>
-            <Kbd>N</Kbd>
-          </span>
-        ),
+        hint: <CommandShortcut>{MOD_LABEL}+N</CommandShortcut>,
         run: () => ui().setNewThreadOpen(true),
       },
       {
@@ -92,12 +104,7 @@ function useCommands(): Command[] {
         title: dockOpen ? "Masquer le dock des threads" : "Afficher le dock des threads",
         keywords: "dock threads live panneau",
         icon: <PanelRight size={15} />,
-        hint: (
-          <span className="flex gap-1">
-            <Kbd>{MOD_LABEL}</Kbd>
-            <Kbd>J</Kbd>
-          </span>
-        ),
+        hint: <CommandShortcut>{MOD_LABEL}+J</CommandShortcut>,
         run: () => ui().toggleDock(),
       },
     ];
@@ -125,7 +132,7 @@ function useCommands(): Command[] {
         title: p.name,
         subtitle: p.path,
         icon: <FolderGit2 size={15} />,
-        hint: <span className="font-mono text-[10px] tabular-nums text-fg-subtle">{p.threadCount} threads</span>,
+        hint: <CommandShortcut className="tracking-normal">{p.threadCount} threads</CommandShortcut>,
         run: () => {
           ui().selectProject(p.id);
           ui().setDockOpen(true);
@@ -204,151 +211,44 @@ function filterCommands(commands: Command[], query: string): Command[] {
     .map((r) => r.c);
 }
 
-function PaletteDialog() {
+function PaletteContent() {
   const setOpen = useUi((s) => s.setPaletteOpen);
   const commands = useCommands();
   const [query, setQuery] = useState("");
-  const [index, setIndex] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
-  const restoreFocus = useRef<HTMLElement | null>(null);
-
   const results = useMemo(() => filterCommands(commands, query), [commands, query]);
-  // Keep group headers in result order.
   const groups = useMemo(() => {
     const map = new Map<string, Command[]>();
     for (const c of results) map.set(c.group, [...(map.get(c.group) ?? []), c]);
     return [...map.entries()];
   }, [results]);
-  const flat = useMemo(() => groups.flatMap(([, items]) => items), [groups]);
-  const current = Math.min(index, Math.max(0, flat.length - 1));
 
-  useEffect(() => {
-    restoreFocus.current = document.activeElement as HTMLElement | null;
-    inputRef.current?.focus();
-    return () => restoreFocus.current?.focus?.();
-  }, []);
-
-  useEffect(() => {
-    listRef.current?.querySelector(`[data-index="${current}"]`)?.scrollIntoView({ block: "nearest" });
-  }, [current]);
-
-  const close = () => setOpen(false);
-
-  const run = (cmd: Command | undefined) => {
-    if (!cmd) return;
-    close();
+  const run = (cmd: Command) => {
+    setOpen(false);
     Promise.resolve(cmd.run()).catch((err: unknown) =>
       toast({ tone: "danger", title: "Commande échouée", description: ipcErrorMessage(err) }),
     );
   };
 
-  const onKeyDown = (e: KeyboardEvent) => {
-    switch (e.key) {
-      case "ArrowDown":
-        e.preventDefault();
-        setIndex((current + 1) % Math.max(1, flat.length));
-        break;
-      case "ArrowUp":
-        e.preventDefault();
-        setIndex((current - 1 + flat.length) % Math.max(1, flat.length));
-        break;
-      case "Enter":
-        e.preventDefault();
-        run(flat[current]);
-        break;
-      case "Escape":
-        e.preventDefault();
-        close();
-        break;
-    }
-  };
-
-  let i = -1;
   return (
-    <div
-      className="fade-in fixed inset-0 z-40 flex items-start justify-center bg-bg/60 pt-[14vh]"
-      onMouseDown={(e) => e.target === e.currentTarget && close()}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Palette de commandes"
-        className="glass-overlay pop-in flex max-h-[min(580px,72vh)] w-[640px] max-w-[calc(100vw-32px)] flex-col overflow-hidden shadow-2xl shadow-black/60"
-        onKeyDown={onKeyDown}
-      >
-        <div className="flex h-14 shrink-0 items-center gap-3 border-b border-line px-5">
-          <Search size={18} className="text-hl" />
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setIndex(0);
-            }}
-            placeholder="Rechercher un thread, un projet, une action…"
-            className="h-full flex-1 bg-transparent text-base text-fg outline-none placeholder:text-fg-subtle focus-visible:outline-none"
-            role="combobox"
-            aria-expanded="true"
-            aria-controls="palette-list"
-            aria-activedescendant={flat[current] ? `palette-${flat[current].id}` : undefined}
-          />
-          <Kbd>Esc</Kbd>
-        </div>
-
-        <div ref={listRef} id="palette-list" role="listbox" className="flex-1 overflow-y-auto p-2">
-          {flat.length === 0 && (
-            <p className="px-3 py-8 text-center text-fg-muted">Aucun résultat pour « {query} »</p>
-          )}
-          {groups.map(([group, items]) => (
-            <div key={group} className="pb-1">
-              <div className="px-3 pb-1.5 pt-2.5 text-xs font-bold uppercase tracking-wide text-fg-muted">{group}</div>
-              {items.map((cmd) => {
-                i += 1;
-                const idx = i;
-                const selected = idx === current;
-                return (
-                  <div
-                    key={cmd.id}
-                    id={`palette-${cmd.id}`}
-                    role="option"
-                    aria-selected={selected}
-                    data-index={idx}
-                    onMouseMove={() => idx !== current && setIndex(idx)}
-                    onClick={() => run(cmd)}
-                    className={`flex h-12 cursor-default items-center gap-3 rounded-[15px] px-2.5 ${
-                      selected ? "bg-surface text-fg" : "text-fg-muted"
-                    }`}
-                  >
-                    <IconBox tone={selected ? "brand" : "muted"} size={30}>
-                      {cmd.icon}
-                    </IconBox>
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-sm font-bold text-fg">{cmd.title}</span>
-                      {cmd.subtitle && <span className="truncate text-xs text-fg-muted">{cmd.subtitle}</span>}
-                    </span>
-                    {cmd.hint && <span className="shrink-0">{cmd.hint}</span>}
-                    {selected && <CornerDownLeft size={13} className="shrink-0 text-fg-subtle" />}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-
-        <div className="flex h-10 shrink-0 items-center gap-3 border-t border-line px-5 text-[11px] text-fg-muted">
-          <span className="flex items-center gap-1">
-            <Kbd>↑</Kbd>
-            <Kbd>↓</Kbd> naviguer
-          </span>
-          <span className="flex items-center gap-1">
-            <Kbd>↵</Kbd> ouvrir
-          </span>
-          <span className="ml-auto flex items-center gap-1.5">
-            <Activity size={11} /> {flat.length} résultat{flat.length > 1 ? "s" : ""}
-          </span>
-        </div>
-      </div>
-    </div>
+    <CommandRoot shouldFilter={false} loop>
+      <CommandInput value={query} onValueChange={setQuery} placeholder="Rechercher un thread, un projet, une action…" />
+      <CommandList className="max-h-[420px]">
+        <CommandEmpty>Aucun résultat pour « {query} »</CommandEmpty>
+        {groups.map(([group, items]) => (
+          <CommandGroup key={group} heading={group}>
+            {items.map((cmd) => (
+              <CommandItem key={cmd.id} value={cmd.id} onSelect={() => run(cmd)}>
+                {cmd.icon}
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate">{cmd.title}</span>
+                  {cmd.subtitle && <span className="truncate text-xs text-muted-foreground">{cmd.subtitle}</span>}
+                </div>
+                {cmd.hint}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        ))}
+      </CommandList>
+    </CommandRoot>
   );
 }

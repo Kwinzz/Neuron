@@ -1,5 +1,7 @@
 import { isValidElement, type ReactElement, type ReactNode, useEffect, useRef, useState } from "react";
+import { cn } from "cn";
 import { Check, Copy } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 type CodeChildProps = { className?: string; children?: ReactNode };
 
@@ -50,28 +52,27 @@ export function CodeBlock({ children }: { children?: ReactNode }) {
   };
 
   return (
-    <div className="chat-code glass-tile my-3 overflow-hidden rounded-lg border border-line">
-      <div className="flex items-center justify-between border-b border-line px-4 py-1.5 text-xs">
-        <span className="font-mono text-fg-subtle">{language ?? "texte"}</span>
-        <button
-          type="button"
+    <div className="chat-code my-3 overflow-hidden rounded-lg border bg-muted/40">
+      <div className="flex items-center justify-between border-b px-3 py-1">
+        <span className="font-mono text-xs text-muted-foreground">{language ?? "texte"}</span>
+        <Button
+          variant="ghost"
+          size="xs"
           onClick={handleCopy}
-          className={`inline-flex items-center gap-1.5 font-bold transition-colors duration-fast ${
-            copied ? "text-ok" : "text-fg-muted hover:text-fg"
-          }`}
+          className={cn(copied ? "text-ok hover:text-ok" : "text-muted-foreground hover:text-foreground")}
         >
           {copied ? (
             <>
-              <Check size={13} />
-              Copié ✓
+              <Check />
+              Copié
             </>
           ) : (
             <>
-              <Copy size={13} />
+              <Copy />
               Copier
             </>
           )}
-        </button>
+        </Button>
       </div>
       <pre className="overflow-x-auto px-4 py-3 font-mono text-[13px] leading-relaxed">{children}</pre>
     </div>

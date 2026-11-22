@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { cn } from "cn";
+import { Button } from "@/components/ui/button";
 
 const COLLAPSED_CHAR_CAP = 20_000;
 const EXPANDED_CHAR_CAP = 400_000;
@@ -40,22 +42,24 @@ export function OutputBlock({ text, maxLines = 60, tone = "default" }: OutputBlo
   return (
     <div className="flex flex-col gap-1.5">
       <pre
-        className={`max-h-[360px] overflow-auto rounded-md bg-bg/40 px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre select-text ${
-          tone === "danger" ? "text-danger" : "text-fg-muted"
-        }`}
+        className={cn(
+          "max-h-[360px] overflow-auto rounded-md border bg-muted/40 px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre select-text",
+          tone === "danger" ? "text-destructive" : "text-muted-foreground",
+        )}
       >
         {displayText}
         {hardTruncated && "\n\n(sortie tronquée)"}
       </pre>
       {canExpand && (
         <div>
-          <button
-            type="button"
+          <Button
+            variant="link"
+            size="xs"
             onClick={() => setExpanded((v) => !v)}
-            className="text-xs font-bold text-hl transition-colors duration-fast hover:text-hl-strong"
+            className="h-auto px-0 text-muted-foreground hover:text-foreground"
           >
             {expanded ? "Réduire" : `Afficher tout (${totalLines} lignes)`}
-          </button>
+          </Button>
         </div>
       )}
     </div>

@@ -42,10 +42,10 @@ export function toolIcon(name: string): LucideIcon {
 
 export const TOOL_STATUS: Record<
   ToolStatus,
-  { tone: "cyan" | "muted" | "danger" | "warn"; label: string; text: string }
+  { label: string; text: string; border: string }
 > = {
-  running: { tone: "cyan", label: "En cours", text: "text-hl-2" },
-  ok: { tone: "muted", label: "Terminé", text: "text-fg-subtle" },
-  error: { tone: "danger", label: "Échec", text: "text-danger" },
-  denied: { tone: "warn", label: "Refusé", text: "text-warn" },
+  running: { label: "En cours", text: "text-live", border: "border-live/30" },
+  ok: { label: "Terminé", text: "text-muted-foreground", border: "border-border" },
+  error: { label: "Erreur", text: "text-destructive", border: "border-destructive/40" },
+  denied: { label: "Refusé", text: "text-warn", border: "border-warn/40" },
 };
