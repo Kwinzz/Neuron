@@ -34,7 +34,7 @@ impl Default for CodexAdapter {
 }
 
 /// Arguments for one turn.
-pub fn turn_args(spec: &SessionSpec, thread: Option<&str>, prompt: &str) -> Vec<String> {
+pub fn turn_args(spec: &SessionSpec, thread: Option<&str>, turn: &crate::agents::UserTurn) -> Vec<String> {
     let mut args: Vec<String> = ["exec", "--json", "--skip-git-repo-check"].iter().map(|s| s.to_string()).collect();
     match spec.permission_mode.as_str() {
         "plan" => args.extend(["--sandbox".into(), "read-only".into()]),
@@ -55,10 +55,12 @@ pub fn turn_args(spec: &SessionSpec, thread: Option<&str>, prompt: &str) -> Vec<
         args.extend(["-c".into(), format!("mcp_servers.{SERVER_NAME}.command={}", lit(&mcp.command.display().to_string()))]);
         args.extend(["-c".into(), format!("mcp_servers.{SERVER_NAME}.args=[{list}]")]);
     }
+    // `--image=<path>`: the `=` form, because `-i` takes several values and would swallow the prompt.
+    args.extend(turn.attachments.iter().filter(|a| a.is_image).map(|a| format!("--image={}", a.path)));
     if let Some(thread) = thread.filter(|t| !t.is_empty()) {
         args.extend(["resume".into(), thread.into()]);
     }
-    args.extend(["--".into(), prompt.into()]);
+    args.extend(["--".into(), turn.text_with_note(|a| a.is_image)]);
     args
 }
 
@@ -88,7 +90,7 @@ async fn session_loop(
     events: mpsc::UnboundedSender<AdapterEvent>,
 ) {
     let mut thread = spec.resume.clone();
-    let mut queue: VecDeque<String> = VecDeque::new();
+    let mut queue: VecDeque<crate::agents::UserTurn> = VecDeque::new();
     let cwd: PathBuf = spec.cwd.clone();
 
     'session: loop {
@@ -216,15 +218,29 @@ mod tests {
 
     #[test]
     fn turn_args_first_and_resumed() {
-        let first = turn_args(&spec("manual"), None, "-hello").join(" ");
+        let first = turn_args(&spec("manual"), None, &"-hello".into()).join(" ");
         assert_eq!(
             first,
             "exec --json --skip-git-repo-check --sandbox workspace-write -m gpt-6-luna -c model_reasoning_effort=\"high\" -- -hello"
         );
-        let resumed = turn_args(&spec("plan"), Some("th-1"), "suite").join(" ");
+        let resumed = turn_args(&spec("plan"), Some("th-1"), &"suite".into()).join(" ");
         assert!(resumed.contains("--sandbox read-only"));
         assert!(resumed.ends_with("resume th-1 -- suite"));
-        let bypass = turn_args(&spec("bypassPermissions"), None, "x").join(" ");
+        let bypass = turn_args(&spec("bypassPermissions"), None, &"x".into()).join(" ");
+        let img = crate::attachments::Attachment {
+            id: "1".into(),
+            name: "a.png".into(),
+            path: "C:/n/a.png".into(),
+            mime: "image/png".into(),
+            size: 3,
+            is_image: true,
+        };
+        let doc = crate::attachments::Attachment { name: "b.pdf".into(), path: "C:/n/b.pdf".into(), is_image: false, ..img.clone() };
+        let turn = crate::agents::UserTurn { text: "regarde".into(), attachments: vec![img, doc] };
+        let with = turn_args(&spec("manual"), None, &turn);
+        assert!(with.contains(&"--image=C:/n/a.png".to_string()));
+        let prompt = with.last().unwrap();
+        assert!(prompt.starts_with("regarde") && prompt.contains("C:/n/b.pdf") && !prompt.contains("a.png"));
         assert!(bypass.contains("--dangerously-bypass-approvals-and-sandbox") && !bypass.contains("--sandbox"));
     }
 }

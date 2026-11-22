@@ -2,6 +2,7 @@
 
 pub mod agents;
 pub mod app_settings;
+pub mod attachments;
 pub mod commands;
 pub mod context;
 pub mod db;
@@ -34,6 +35,14 @@ pub fn run() {
                 db = %state.paths.db_path.display(),
                 "neuron ready"
             );
+            // Thumbnails of attachments are served through the asset protocol, limited to their folder.
+            let attachments_dir = attachments::root(&state.paths.data_dir);
+            if let Err(err) = std::fs::create_dir_all(&attachments_dir)
+                .map_err(|e| e.to_string())
+                .and_then(|()| app.asset_protocol_scope().allow_directory(&attachments_dir, true).map_err(|e| e.to_string()))
+            {
+                tracing::warn!(%err, "attachments folder not served");
+            }
             app.manage(state);
             commands::memory::spawn_memory_watcher(app.handle());
             commands::settings::spawn_idle_reaper(app.handle());
@@ -51,6 +60,8 @@ pub fn run() {
             commands::dashboard::get_thread,
             commands::threads::create_thread,
             commands::threads::send_message,
+            commands::threads::import_attachments,
+            commands::threads::paste_attachment,
             commands::threads::respond_permission,
             commands::threads::stop_thread,
             commands::threads::get_thread_history,

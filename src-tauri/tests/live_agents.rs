@@ -81,7 +81,7 @@ async fn codex_two_turns() {
 /// One turn; returns the concatenated completed text.
 async fn ask(adapter: &dyn AgentAdapter, spec: SessionSpec, prompt: String) -> String {
     let mut handle = adapter.start(&spec).expect("start");
-    handle.commands.send(SessionCommand::Prompt(prompt)).unwrap();
+    handle.commands.send(SessionCommand::Prompt(prompt.into())).unwrap();
     let mut out = String::new();
     while let Ok(Some(ev)) = tokio::time::timeout(Duration::from_secs(180), handle.events.recv()).await {
         match ev {
@@ -199,4 +199,83 @@ async fn memory_mcp_antigravity() {
     let (answer, tools) = ask_with_memory(&AntigravityAdapter::default(), spec("gemini-4-neon-low", None), "antigravity").await;
     println!("antigravity tools={tools:?} answer={answer}");
     assert!(answer.to_uppercase().contains("KIWI"));
+}
+
+/// A pasted image reaches each agent through Neuron's adapters (Claude inline, Codex --image, agy by path).
+#[tokio::test]
+#[ignore]
+async fn image_attachment_all_agents() {
+    use base64::Engine;
+    let dir = PathBuf::from(std::env::var("NEURON_LIVE_DIR").unwrap()).join("attachments");
+    // 32×32 solid red PNG.
+    let png = {
+        let w = 32u32;
+        // Each row: filter byte 0 then `w` red pixels.
+        let row: Vec<u8> = std::iter::once(0u8).chain([0xd0, 0x10, 0x10].repeat(w as usize)).collect();
+        let raw = row.repeat(w as usize);
+        fn chunk(out: &mut Vec<u8>, t: &[u8], d: &[u8]) {
+            out.extend_from_slice(&(d.len() as u32).to_be_bytes());
+            let mut c = t.to_vec();
+            c.extend_from_slice(d);
+            out.extend_from_slice(&c);
+            let mut crc = 0xffff_ffffu32;
+            for b in &c {
+                crc ^= u32::from(*b);
+                for _ in 0..8 {
+                    crc = if crc & 1 != 0 { (crc >> 1) ^ 0xedb8_8320 } else { crc >> 1 };
+                }
+            }
+            out.extend_from_slice(&(!crc).to_be_bytes());
+        }
+        // Stored (uncompressed) deflate block inside a zlib stream.
+        let mut z = vec![0x78, 0x01, 0x01];
+        let len = raw.len() as u16;
+        z.extend_from_slice(&len.to_le_bytes());
+        z.extend_from_slice(&(!len).to_le_bytes());
+        z.extend_from_slice(&raw);
+        let (mut a, mut b) = (1u32, 0u32);
+        for x in &raw {
+            a = (a + u32::from(*x)) % 65521;
+            b = (b + a) % 65521;
+        }
+        z.extend_from_slice(&((b << 16) | a).to_be_bytes());
+        let mut out = b"\x89PNG\r\n\x1a\n".to_vec();
+        let mut ihdr = w.to_be_bytes().to_vec();
+        ihdr.extend_from_slice(&w.to_be_bytes());
+        ihdr.extend_from_slice(&[8, 2, 0, 0, 0]);
+        chunk(&mut out, b"IHDR", &ihdr);
+        chunk(&mut out, b"IDAT", &z);
+        chunk(&mut out, b"IEND", &[]);
+        out
+    };
+    let data = base64::engine::general_purpose::STANDARD.encode(&png);
+    let image = neuron_lib::attachments::save_base64(&dir, "collée.png", "image/png", &data).unwrap();
+    let turn = neuron_lib::agents::UserTurn {
+        text: "Quelle est la couleur dominante de l'image jointe ? Réponds en un mot.".into(),
+        attachments: vec![image],
+    };
+    for (name, adapter, spec) in [
+        ("claude", Box::new(ClaudeCodeAdapter::default()) as Box<dyn AgentAdapter>, spec("claude-haiku-5-5", Some("low"))),
+        ("codex", Box::new(CodexAdapter::default()), spec("gpt-6-luna", Some("low"))),
+        ("antigravity", Box::new(AntigravityAdapter::default()), spec("gemini-4-neon-low", None)),
+    ] {
+        let mut handle = adapter.start(&spec).expect("start");
+        handle.commands.send(SessionCommand::Prompt(turn.clone())).unwrap();
+        let mut out = String::new();
+        while let Ok(Some(ev)) = tokio::time::timeout(Duration::from_secs(180), handle.events.recv()).await {
+            match ev {
+                AdapterEvent::BlockCompleted { text, channel: neuron_lib::agents::events::DeltaChannel::Text, .. } => {
+                    out.push_str(&text)
+                }
+                AdapterEvent::TurnComplete { error, .. } => {
+                    assert!(error.is_none(), "{name}: {error:?}");
+                    handle.commands.send(SessionCommand::Shutdown).unwrap();
+                }
+                AdapterEvent::Exited { .. } => break,
+                _ => {}
+            }
+        }
+        println!("{name}: {out}");
+        assert!(out.to_lowercase().contains("rouge") || out.to_lowercase().contains("red"), "{name}: {out}");
+    }
 }

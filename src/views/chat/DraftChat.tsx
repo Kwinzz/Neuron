@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DraftContextPreview } from "@/components/context/DraftContextPreview";
+import type { Attachment } from "@/bindings/Attachment";
 import { FolderGit2, FolderOpen, MessageSquarePlus } from "lucide-react";
 import { ChatSettingsBar } from "@/components/chat/ChatSettingsBar";
 import { Button } from "@/components/ui/button";
@@ -62,7 +63,7 @@ export function DraftChat({ projectId }: { projectId: string | null }) {
   }, [cwd]);
 
   const submit = useCallback(
-    async (text: string) => {
+    async (text: string, attachments: Attachment[]) => {
       try {
         const chat = await ipc.createThread({
           agent: settings.agent,
@@ -73,6 +74,7 @@ export function DraftChat({ projectId }: { projectId: string | null }) {
           title: null,
           projectId,
           prompt: text,
+          attachments,
         });
         useLive.getState().hydrate([chat]);
         useUi.getState().focusThread(chat.id);

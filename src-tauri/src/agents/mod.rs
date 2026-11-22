@@ -42,11 +42,38 @@ pub struct SessionSpec {
     pub generic: Option<crate::app_settings::GenericCliProfile>,
 }
 
+/// A user message: text plus attached files (Neuron's copies, see `attachments`).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct UserTurn {
+    pub text: String,
+    pub attachments: Vec<crate::attachments::Attachment>,
+}
+
+impl From<String> for UserTurn {
+    fn from(text: String) -> Self {
+        Self { text, attachments: Vec::new() }
+    }
+}
+
+impl From<&str> for UserTurn {
+    fn from(text: &str) -> Self {
+        Self { text: text.to_string(), attachments: Vec::new() }
+    }
+}
+
+impl UserTurn {
+    /// The text plus the paths of the attachments the agent does not receive natively.
+    pub fn text_with_note(&self, native: impl Fn(&crate::attachments::Attachment) -> bool) -> String {
+        let rest: Vec<&crate::attachments::Attachment> = self.attachments.iter().filter(|a| !native(a)).collect();
+        format!("{}{}", self.text, crate::attachments::note(&rest))
+    }
+}
+
 /// Commands sent to a running session.
 #[derive(Debug, Clone)]
 pub enum SessionCommand {
     /// A new user turn.
-    Prompt(String),
+    Prompt(UserTurn),
     /// Answer to a pending permission request.
     Permission(PermissionDecision),
     /// Ask the agent to stop the current turn (keeps the session alive when supported).

@@ -48,6 +48,7 @@ pub enum ChatItem {
         text: String,
         #[ts(type = "number")]
         ts: i64,
+        attachments: Vec<crate::attachments::Attachment>,
     },
     Text {
         id: String,
@@ -197,7 +198,16 @@ pub fn history(conn: &Connection, thread_id: &str) -> AppResult<Vec<ChatItem>> {
         let meta: Option<Value> = r.get::<_, Option<String>>(5)?.and_then(|s| serde_json::from_str(&s).ok());
         let ts: i64 = r.get(6)?;
         Ok(match role.as_str() {
-            "user" => ChatItem::User { id, text: content, ts },
+            "user" => ChatItem::User {
+                id,
+                text: content,
+                ts,
+                attachments: meta
+                    .as_ref()
+                    .and_then(|m| m.get("attachments"))
+                    .and_then(|a| serde_json::from_value(a.clone()).ok())
+                    .unwrap_or_default(),
+            },
             "thinking" => ChatItem::Thinking { id, text: content, streaming: false },
             "error" => ChatItem::Error { id, message: content },
             "turn" => {

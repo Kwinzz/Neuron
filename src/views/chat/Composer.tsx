@@ -1,5 +1,6 @@
 import {
   type ChangeEvent,
+  type ClipboardEvent,
   type KeyboardEvent,
   memo,
   useEffect,
@@ -8,7 +9,9 @@ import {
   useRef,
   useState,
 } from "react";
-import { ArrowUp, Square } from "lucide-react";
+import { ArrowUp, Plus, Square } from "lucide-react";
+import type { Attachment } from "@/bindings/Attachment";
+import { AttachmentTray } from "@/components/attachments/AttachmentTray";
 import {
   InputGroup,
   InputGroupAddon,
@@ -16,18 +19,37 @@ import {
   InputGroupTextarea,
 } from "@/components/ui/input-group";
 import { ThreadSettingsBar } from "@/components/chat/ThreadSettingsBar";
-import { ipc } from "@/lib/ipc";
+import { ipc, ipcErrorMessage } from "@/lib/ipc";
+import { toast } from "@/stores/toast";
 import { useChat } from "@/stores/chat";
 import { NewMessagesPill } from "./NewMessagesPill";
 
 const MAX_TEXTAREA_HEIGHT = 10 * 24 + 16;
+
+/** ArrayBuffer → base64, in chunks (no stack overflow on large images). */
+function toBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
+}
+
+/** Clipboard images are all called "image.png": give them a readable, unique name. */
+function pastedName(file: File): string {
+  if (file.name && file.name !== "image.png") return file.name;
+  const ext = file.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
+  const stamp = new Date().toLocaleTimeString("fr-FR").replace(/:/g, "-");
+  return `image-collee-${stamp}.${ext}`;
+}
 
 interface ComposerProps {
   /** null = draft chat (not created yet): `submit` handles the first message. */
   threadId: string | null;
   projectId: string | null;
   /** Custom submit (draft chat). Resolve true when the message was accepted. */
-  submit?: (text: string) => Promise<boolean>;
+  submit?: (text: string, attachments: Attachment[]) => Promise<boolean>;
   /** Left side of the bottom bar. Defaults to the chat's model / effort / permission selectors. */
   toolbar?: ReactNode;
   placeholder?: string;
@@ -51,6 +73,9 @@ export const Composer = memo(function Composer({
   onPillClick,
 }: ComposerProps) {
   const [value, setValue] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  /** Files being copied/saved (skeleton tiles; sending waits for them). */
+  const [importing, setImporting] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const historyRef = useRef<string[] | null>(null);
   const historyProjectRef = useRef<string | null>(projectId);
@@ -82,30 +107,76 @@ export const Composer = memo(function Composer({
     }
   }, [value]);
 
+  const canSend = (value.trim().length > 0 || attachments.length > 0) && importing === 0;
+
   const sendCurrent = async () => {
     const trimmed = value.trim();
-    if (!trimmed) return;
+    if (!canSend) return;
 
     const previous = value;
+    const sentAttachments = attachments;
     setValue("");
+    setAttachments([]);
     historyIndexRef.current = -1;
     draftRef.current = "";
     onSent();
 
     const ok = submit
-      ? await submit(trimmed)
+      ? await submit(trimmed, sentAttachments)
       : threadId
-        ? await useChat.getState().send(threadId, trimmed)
+        ? await useChat.getState().send(threadId, trimmed, sentAttachments)
         : false;
     if (!ok) {
       setValue((current) => (current === "" ? previous : current));
+      setAttachments((current) => (current.length === 0 ? sentAttachments : current));
       return;
     }
 
-    if (historyRef.current !== null && historyRef.current[0] !== trimmed) {
+    if (trimmed && historyRef.current !== null && historyRef.current[0] !== trimmed) {
       historyRef.current = [trimmed, ...historyRef.current];
     }
   };
+
+  /** Run an import, showing `count` skeleton tiles meanwhile. */
+  const addAttachments = async (count: number, load: () => Promise<Attachment[]>) => {
+    setImporting((n) => n + count);
+    try {
+      const added = await load();
+      setAttachments((current) => [...current, ...added]);
+    } catch (err) {
+      toast({ tone: "danger", title: "Pièce jointe refusée", description: ipcErrorMessage(err) });
+    } finally {
+      setImporting((n) => Math.max(0, n - count));
+      textareaRef.current?.focus();
+    }
+  };
+
+  const pickFiles = async () => {
+    let paths: string[];
+    try {
+      paths = await ipc.pickFiles();
+    } catch (err) {
+      toast({ tone: "danger", title: "Sélection impossible", description: ipcErrorMessage(err) });
+      return;
+    }
+    if (paths.length > 0) void addAttachments(paths.length, () => ipc.importAttachments(paths));
+  };
+
+  // Pasted images (screenshots) and files copied from the explorer become attachments; text pastes normally.
+  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(e.clipboardData.files);
+    if (files.length === 0) return;
+    e.preventDefault();
+    void addAttachments(files.length, () =>
+      Promise.all(
+        files.map(async (file) =>
+          ipc.pasteAttachment(pastedName(file), file.type, toBase64(await file.arrayBuffer())),
+        ),
+      ),
+    );
+  };
+
+  const removeAttachment = (id: string) => setAttachments((current) => current.filter((a) => a.id !== id));
 
   const recallOlder = async () => {
     if (historyRef.current === null) {
@@ -154,7 +225,7 @@ export const Composer = memo(function Composer({
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
-      if (value.trim()) {
+      if (canSend) {
         void sendCurrent();
       }
       return;
@@ -192,6 +263,11 @@ export const Composer = memo(function Composer({
           </div>
         )}
         <InputGroup className="rounded-xl bg-card shadow-sm transition-[border-color,box-shadow,background-color] duration-200 ease-snappy dark:bg-card">
+          {(attachments.length > 0 || importing > 0) && (
+            <InputGroupAddon align="block-start" className="p-0">
+              <AttachmentTray items={attachments} pending={importing} onRemove={removeAttachment} />
+            </InputGroupAddon>
+          )}
           <InputGroupTextarea
             ref={textareaRef}
             data-composer
@@ -199,12 +275,23 @@ export const Composer = memo(function Composer({
             value={value}
             onChange={onChange}
             onKeyDown={onKeyDown}
+            onPaste={onPaste}
             aria-label="Message"
             placeholder={placeholder ?? "Demandez quelque chose à l'agent… (Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne, ↑ historique)"}
             className="min-h-0 max-h-[256px] overflow-y-auto px-3.5 pt-3 text-sm leading-6 field-sizing-fixed"
           />
           <InputGroupAddon align="block-end">
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+              <InputGroupButton
+                variant="ghost"
+                size="icon-sm"
+                className="rounded-full text-muted-foreground hover:text-foreground"
+                aria-label="Joindre des fichiers"
+                title="Joindre des fichiers (ou coller une image)"
+                onClick={() => void pickFiles()}
+              >
+                <Plus />
+              </InputGroupButton>
               {toolbar ?? (threadId ? <ThreadSettingsBar threadId={threadId} /> : null)}
             </div>
             <div className="ml-auto flex items-center gap-1.5">
@@ -225,7 +312,7 @@ export const Composer = memo(function Composer({
                 size="icon-sm"
                 className="rounded-full active:scale-95"
                 aria-label="Envoyer"
-                disabled={!value.trim()}
+                disabled={!canSend}
                 onClick={() => void sendCurrent()}
               >
                 <ArrowUp />

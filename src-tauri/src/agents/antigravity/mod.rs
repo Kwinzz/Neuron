@@ -65,9 +65,10 @@ pub fn build_args(spec: &SessionSpec) -> Vec<String> {
 
 fn encode(command: &SessionCommand) -> Delivery {
     match command {
-        SessionCommand::Prompt(text) => Delivery::Line(json!({
+        // agy only accepts text blocks: attachments (images included) are given as paths it opens itself.
+        SessionCommand::Prompt(turn) => Delivery::Line(json!({
             "event": "user",
-            "message": { "role": "user", "content": text },
+            "message": { "role": "user", "content": turn.text_with_note(|_| false) },
         })),
         SessionCommand::Interrupt => Delivery::Kill,
         SessionCommand::Permission(_) | SessionCommand::Shutdown => Delivery::Ignore,

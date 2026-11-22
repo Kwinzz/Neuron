@@ -88,6 +88,20 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Pièces jointes : bouton « + » et images collées
+- **Composer** : bouton « + » (sélecteur de fichiers natif, plusieurs fichiers) et collage d'images / de fichiers
+  (Ctrl+V) ; vignettes et puces au-dessus du champ, retrait « × », tuiles de chargement ; envoi possible sans texte.
+- **Stockage** (`attachments.rs`) : chaque pièce jointe est copiée dans `<data_dir>/attachments/<id>/<nom>` (50 Mo max) ;
+  le front ne renvoie que des copies de Neuron (chemins vérifiés). Métadonnées dans `messages.meta_json`
+  (`ChatItem::User.attachments`) → affichées dans l'historique. Vignettes via le protocole `asset` limité à ce dossier.
+- **Transmission, vérifiée en live sur les 3 agents (image rouge → « Rouge »)** : Claude reçoit les images en blocs
+  base64 (≤ 3,7 Mo), Codex via `--image=<chemin>` (forme `=` obligatoire : `-i` est variadique et avale le prompt),
+  Antigravity n'accepte que du texte en entrée → chemins listés dans le message, il ouvre le fichier lui-même. Les
+  autres fichiers sont toujours donnés par leur chemin.
+- **UI (neon / Gemini 4 Neon High)** : `components/attachments` — `AttachmentTray`, `MessageAttachments` (visionneuse
+  plein écran avec ←/→), `fileMeta`.
+
+
 ### 2026-11-23 — Quotas : barre lisible + quotas du fournisseur dans l'en-tête du chat
 - **Accueil** : nouvelle barre de quota (`QuotaBar`, 24 px) avec le pourcentage dedans à gauche et le temps avant
   reset dedans à droite ; remplissage translucide pour garder le texte lisible.

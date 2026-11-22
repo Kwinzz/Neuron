@@ -208,7 +208,7 @@ async fn session_loop(
     events: mpsc::UnboundedSender<AdapterEvent>,
 ) {
     let _ = events.send(AdapterEvent::SessionInit { session_ref: format!("generic-{}", profile.id), model: Some(profile.id.clone()) });
-    let mut queue: VecDeque<String> = VecDeque::new();
+    let mut queue: VecDeque<crate::agents::UserTurn> = VecDeque::new();
     'session: loop {
         let prompt = match queue.pop_front() {
             Some(p) => p,
@@ -218,6 +218,7 @@ async fn session_loop(
                 Some(_) => continue,
             },
         };
+        let prompt = prompt.text_with_note(|_| false);
         let started = Instant::now();
         let elapsed = || Some(i64::try_from(started.elapsed().as_millis()).unwrap_or(i64::MAX));
         let turn = if profile.pty { start_pty(&profile, &spec, &prompt) } else { start_pipe(&profile, &spec, &prompt) };

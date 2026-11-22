@@ -86,10 +86,24 @@ pub fn build_args(spec: &SessionSpec) -> Vec<String> {
 /// JSON line written to stdin for a command, or `None` for commands handled otherwise.
 pub fn encode_command(command: &SessionCommand) -> Option<Value> {
     match command {
-        SessionCommand::Prompt(text) => Some(json!({
-            "type": "user",
-            "message": { "role": "user", "content": text },
-        })),
+        SessionCommand::Prompt(turn) => {
+            let inline: Vec<(&crate::attachments::Attachment, String)> = turn
+                .attachments
+                .iter()
+                .filter_map(|a| crate::attachments::inline_base64(a).map(|data| (a, data)))
+                .collect();
+            let text = turn.text_with_note(|a| inline.iter().any(|(i, _)| i.id == a.id));
+            let content = if inline.is_empty() {
+                json!(text)
+            } else {
+                let mut blocks = vec![json!({ "type": "text", "text": text })];
+                blocks.extend(inline.iter().map(|(a, data)| {
+                    json!({ "type": "image", "source": { "type": "base64", "media_type": a.mime, "data": data } })
+                }));
+                json!(blocks)
+            };
+            Some(json!({ "type": "user", "message": { "role": "user", "content": content } }))
+        }
         SessionCommand::Permission(d) => {
             let response = if d.allow {
                 json!({ "behavior": "allow", "updatedInput": d.input })

@@ -7,6 +7,7 @@
  */
 import { create } from "zustand";
 import type { AgentEventEnvelope } from "@/bindings/AgentEventEnvelope";
+import type { Attachment } from "@/bindings/Attachment";
 import type { ChatItem } from "@/bindings/ChatItem";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { toast } from "@/stores/toast";
@@ -22,7 +23,7 @@ interface ChatState {
   threads: Record<string, ChatThread>;
   /** Load history once (no-op when already loaded or loading). */
   load: (threadId: string, force?: boolean) => Promise<void>;
-  send: (threadId: string, text: string) => Promise<boolean>;
+  send: (threadId: string, text: string, attachments?: Attachment[]) => Promise<boolean>;
   respondPermission: (threadId: string, requestId: string, allow: boolean) => Promise<void>;
   stop: (threadId: string) => Promise<void>;
   /** Called by the agent-event bridge for every event. */
@@ -165,15 +166,15 @@ export const useChat = create<ChatState>((set, get) => {
       }
     },
 
-    send: async (threadId, text) => {
+    send: async (threadId, text, attachments = []) => {
       const trimmed = text.trim();
-      if (!trimmed) return false;
+      if (!trimmed && attachments.length === 0) return false;
       patch(threadId, (t) => ({
         ...t,
-        items: [...t.items, { kind: "user", id: localId("user"), text: trimmed, ts: Date.now() }],
+        items: [...t.items, { kind: "user", id: localId("user"), text: trimmed, ts: Date.now(), attachments }],
       }));
       try {
-        await ipc.sendMessage(threadId, trimmed);
+        await ipc.sendMessage(threadId, trimmed, attachments);
         return true;
       } catch (err) {
         const message = ipcErrorMessage(err);

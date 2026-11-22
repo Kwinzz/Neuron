@@ -109,9 +109,16 @@ impl AgentRegistry {
     }
 
     /// Send a user turn, spawning (or resuming) the session if needed.
-    pub async fn send_prompt(self: &Arc<Self>, app: &AppHandle, db: &Db, thread_id: &str, text: &str) -> AppResult<()> {
+    pub async fn send_prompt(
+        self: &Arc<Self>,
+        app: &AppHandle,
+        db: &Db,
+        thread_id: &str,
+        text: &str,
+        attachments: Vec<crate::attachments::Attachment>,
+    ) -> AppResult<()> {
         let text = text.trim().to_string();
-        if text.is_empty() {
+        if text.is_empty() && attachments.is_empty() {
             return Err(AppError::Invalid("message vide".into()));
         }
 
@@ -124,12 +131,20 @@ impl AgentRegistry {
         // Persist the user message first so it is never lost, even if the spawn fails.
         let first_message = {
             let (id, t, project) = (thread_id.to_string(), text.clone(), runtime.project_id.clone());
+            let meta = (!attachments.is_empty()).then(|| json!({ "attachments": attachments }));
+            let first_name = attachments.first().map(|a| a.name.clone());
             db.call(move |c| {
                 let now = now_ms();
                 let first = threads::user_message_count(c, &id)? == 0;
-                chat::insert_message(c, &uuid::Uuid::new_v4().to_string(), &id, "user", &t, None, now)?;
-                chat::record_prompt(c, project.as_deref(), &t, now)?;
-                threads::set_title_if_empty(c, &id, &title_from_prompt(&t))?;
+                chat::insert_message(c, &uuid::Uuid::new_v4().to_string(), &id, "user", &t, meta.as_ref(), now)?;
+                if !t.is_empty() {
+                    chat::record_prompt(c, project.as_deref(), &t, now)?;
+                }
+                let title = match (&t, first_name) {
+                    (t, Some(name)) if t.is_empty() => name,
+                    (t, _) => title_from_prompt(t),
+                };
+                threads::set_title_if_empty(c, &id, &title)?;
                 threads::set_status(c, &id, ThreadStatus::Starting, now)?;
                 Ok(first)
             })
@@ -146,7 +161,8 @@ impl AgentRegistry {
 
         for attempt in 0..2 {
             let sender = self.ensure_session(app, db, &runtime).await?;
-            if sender.send(SessionCommand::Prompt(text.clone())).is_ok() {
+            let turn = crate::agents::UserTurn { text: text.clone(), attachments: attachments.clone() };
+            if sender.send(SessionCommand::Prompt(turn)).is_ok() {
                 if let Some(s) = self.lock().get_mut(thread_id) {
                     s.busy = true;
                 }

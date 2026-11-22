@@ -30,6 +30,9 @@ pub struct NewThreadInput {
     pub project_id: Option<String>,
     /// First message, sent right after creation.
     pub prompt: Option<String>,
+    /// Files attached to the first message (from `import_attachments` / `paste_attachment`).
+    #[serde(default)]
+    pub attachments: Vec<crate::attachments::Attachment>,
 }
 
 #[tauri::command]
@@ -111,8 +114,11 @@ pub async fn create_thread(
             .await?
     };
 
-    if let Some(prompt) = input.prompt.filter(|p| !p.trim().is_empty()) {
-        state.agents.send_prompt(&app, &state.db, &id, &prompt).await?;
+    let prompt = input.prompt.unwrap_or_default();
+    if !prompt.trim().is_empty() || !input.attachments.is_empty() {
+        let root = crate::attachments::root(&state.paths.data_dir);
+        let attachments = crate::attachments::validate(&root, &input.attachments)?;
+        state.agents.send_prompt(&app, &state.db, &id, &prompt, attachments).await?;
     }
     Ok(summary)
 }
@@ -123,8 +129,36 @@ pub async fn send_message(
     state: State<'_, AppState>,
     thread_id: String,
     text: String,
+    attachments: Option<Vec<crate::attachments::Attachment>>,
 ) -> AppResult<()> {
-    state.agents.send_prompt(&app, &state.db, &thread_id, &text).await
+    let root = crate::attachments::root(&state.paths.data_dir);
+    let attachments = crate::attachments::validate(&root, &attachments.unwrap_or_default())?;
+    state.agents.send_prompt(&app, &state.db, &thread_id, &text, attachments).await
+}
+
+/// Copy files picked with the « + » button into Neuron's attachments folder.
+#[tauri::command]
+pub async fn import_attachments(
+    state: State<'_, AppState>,
+    paths: Vec<String>,
+) -> AppResult<Vec<crate::attachments::Attachment>> {
+    let root = crate::attachments::root(&state.paths.data_dir);
+    tokio::task::spawn_blocking(move || {
+        paths.iter().map(|p| crate::attachments::import_file(&root, std::path::Path::new(p))).collect()
+    })
+    .await?
+}
+
+/// Save an image pasted from the clipboard (base64).
+#[tauri::command]
+pub async fn paste_attachment(
+    state: State<'_, AppState>,
+    name: String,
+    mime: String,
+    data: String,
+) -> AppResult<crate::attachments::Attachment> {
+    let root = crate::attachments::root(&state.paths.data_dir);
+    tokio::task::spawn_blocking(move || crate::attachments::save_base64(&root, &name, &mime, &data)).await?
 }
 
 #[tauri::command]

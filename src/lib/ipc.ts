@@ -2,7 +2,7 @@
  * The ONLY module allowed to call Tauri `invoke` / `listen`.
  * Every command and event is typed with bindings generated from Rust (`src/bindings`, via ts-rs).
  */
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
@@ -15,6 +15,7 @@ import type { AppInfo } from "@/bindings/AppInfo";
 import type { ChatItem } from "@/bindings/ChatItem";
 import type { AgyMcpStatus } from "@/bindings/AgyMcpStatus";
 import type { AppSettings } from "@/bindings/AppSettings";
+import type { Attachment } from "@/bindings/Attachment";
 import type { PricingStatus } from "@/bindings/PricingStatus";
 import type { GenericCliProfile } from "@/bindings/GenericCliProfile";
 import type { GenericCliTest } from "@/bindings/GenericCliTest";
@@ -78,7 +79,19 @@ export const ipc = {
 
   // Threads & chat
   createThread: (input: NewThreadInput) => invoke<ThreadSummary>("create_thread", { input }),
-  sendMessage: (threadId: string, text: string) => invoke<void>("send_message", { threadId, text }),
+  sendMessage: (threadId: string, text: string, attachments: Attachment[] = []) =>
+    invoke<void>("send_message", { threadId, text, attachments }),
+  /** Copy files into Neuron's attachments folder (« + » button). */
+  importAttachments: (paths: string[]) => invoke<Attachment[]>("import_attachments", { paths }),
+  /** Save a pasted image (base64 without the data: prefix). */
+  pasteAttachment: (name: string, mime: string, data: string) =>
+    invoke<Attachment>("paste_attachment", { name, mime, data }),
+  /** Native file picker (several files); resolves to [] when cancelled. */
+  pickFiles: async (): Promise<string[]> => {
+    const picked = await openDialog({ multiple: true, directory: false });
+    if (Array.isArray(picked)) return picked;
+    return typeof picked === "string" ? [picked] : [];
+  },
   respondPermission: (threadId: string, requestId: string, allow: boolean) =>
     invoke<void>("respond_permission", { threadId, requestId, allow }),
   stopThread: (threadId: string) => invoke<void>("stop_thread", { threadId }),
@@ -151,3 +164,8 @@ export const notify = {
     if (isTauri()) sendNotification({ title, body });
   },
 };
+
+/** URL of a local file (attachment thumbnails) through Tauri's asset protocol, scoped to the attachments folder. */
+export function assetUrl(path: string): string {
+  return isTauri() ? convertFileSrc(path) : path;
+}
