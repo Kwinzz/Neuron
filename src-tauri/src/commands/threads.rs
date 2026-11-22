@@ -136,6 +136,23 @@ pub async fn send_message(
     state.agents.send_prompt(&app, &state.db, &thread_id, &text, attachments).await
 }
 
+/// Slash commands of a provider in a working directory (the « / » menu). Cached 15 min.
+#[tauri::command]
+pub async fn list_slash_commands(
+    state: State<'_, AppState>,
+    agent: AgentKind,
+    cwd: Option<String>,
+) -> AppResult<Vec<crate::agents::slash::SlashCommand>> {
+    let cwd = match cwd.filter(|c| !c.trim().is_empty()) {
+        Some(c) => std::path::PathBuf::from(c),
+        None => std::path::PathBuf::from(default_cwd_inner(&state).await?),
+    };
+    if !cwd.is_dir() {
+        return Ok(Vec::new());
+    }
+    Ok(crate::agents::slash::list(agent, &cwd).await)
+}
+
 /// Copy files picked with the « + » button into Neuron's attachments folder.
 #[tauri::command]
 pub async fn import_attachments(

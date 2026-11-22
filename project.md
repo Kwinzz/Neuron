@@ -88,6 +88,20 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Slash commands de chaque fournisseur (menu « / »)
+- **Liste par fournisseur et dossier** (`agents/slash.rs`, commande `list_slash_commands`, cache 15 min) :
+  Claude Code via la requête de contrôle `initialize` (≈ 96 commandes : intégrées, skills, plugins, avec
+  descriptions ; aucun token consommé) ; Antigravity via `agy acp` → `available_commands_update` (13 commandes :
+  /goal, /compact, /plan, /swarm…) ; Codex (pas de slash en `exec`) : `/review` + ses skills (`~/.codex/skills`,
+  `~/.agents/skills`, `<cwd>/.agents/skills`, `<cwd>/.codex/skills`).
+- **Exécution** : Claude et Antigravity reçoivent la commande telle quelle et l'exécutent (vérifié : `/context`
+  renvoie le tableau du contexte). Codex : `/review [instructions]` → `codex exec review --json` (sans changer le fil
+  repris ensuite), `/<skill>` → instruction explicite `$skill` + chemin du `SKILL.md`.
+- **Composer** : menu au-dessus du champ dès qu'on tape « / » (filtrage flou, ↑/↓, Tab ou Entrée pour compléter,
+  Entrée sur une commande complète pour l'envoyer, Échap pour fermer sans arrêter l'agent). Composant `SlashMenu`
+  par neon (Gemini 4 Neon High).
+
+
 ### 2026-11-23 — Pièces jointes : bouton « + » et images collées
 - **Composer** : bouton « + » (sélecteur de fichiers natif, plusieurs fichiers) et collage d'images / de fichiers
   (Ctrl+V) ; vignettes et puces au-dessus du champ, retrait « × », tuiles de chargement ; envoi possible sans texte.

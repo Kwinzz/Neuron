@@ -279,3 +279,16 @@ async fn image_attachment_all_agents() {
         assert!(out.to_lowercase().contains("rouge") || out.to_lowercase().contains("red"), "{name}: {out}");
     }
 }
+
+/// The « / » menu lists real commands for Claude (initialize) and Antigravity (ACP).
+#[tokio::test]
+#[ignore]
+async fn slash_command_lists() {
+    use neuron_lib::agents::events::AgentKind;
+    let dir = PathBuf::from(std::env::var("NEURON_LIVE_DIR").unwrap());
+    for agent in [AgentKind::ClaudeCode, AgentKind::Antigravity, AgentKind::Codex] {
+        let list = neuron_lib::agents::slash::list(agent, &dir).await;
+        println!("{agent:?}: {} commands, e.g. {:?}", list.len(), list.iter().take(6).map(|c| &c.name).collect::<Vec<_>>());
+        assert!(!list.is_empty(), "{agent:?}");
+    }
+}

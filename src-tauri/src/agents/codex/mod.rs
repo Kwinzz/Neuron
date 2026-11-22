@@ -64,6 +64,22 @@ pub fn turn_args(spec: &SessionSpec, thread: Option<&str>, turn: &crate::agents:
     args
 }
 
+/// `/review [instructions]` → `codex exec review` (uncommitted changes, or the given instructions).
+pub fn review_args(spec: &SessionSpec, instructions: Option<&str>) -> Vec<String> {
+    let mut args: Vec<String> = ["exec", "review", "--json"].iter().map(|s| s.to_string()).collect();
+    if let Some(model) = spec.model.as_deref().filter(|m| !m.trim().is_empty()) {
+        args.extend(["-m".into(), model.trim().into()]);
+    }
+    if let Some(effort) = spec.effort.as_deref().filter(|e| EFFORT_LEVELS.contains(e)) {
+        args.extend(["-c".into(), format!("model_reasoning_effort=\"{effort}\"")]);
+    }
+    match instructions {
+        Some(text) => args.extend(["--".into(), text.into()]),
+        None => args.push("--uncommitted".into()),
+    }
+    args
+}
+
 impl AgentAdapter for CodexAdapter {
     fn kind(&self) -> AgentKind {
         AgentKind::Codex
@@ -103,7 +119,15 @@ async fn session_loop(
             },
         };
 
-        let args = turn_args(&spec, thread.as_deref(), &prompt);
+        // Slash commands: `/review` is its own Codex command; `/<skill>` becomes an explicit instruction.
+        let (args, is_review) = match crate::agents::slash::codex_rewrite(&cwd, &prompt.text) {
+            Some(crate::agents::slash::CodexSlash::Review(instructions)) => (review_args(&spec, instructions.as_deref()), true),
+            Some(crate::agents::slash::CodexSlash::Prompt(text)) => {
+                let turn = crate::agents::UserTurn { text, attachments: prompt.attachments.clone() };
+                (turn_args(&spec, thread.as_deref(), &turn), false)
+            }
+            None => (turn_args(&spec, thread.as_deref(), &prompt), false),
+        };
         let mut child = match command(&binary, &args, &cwd)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
@@ -135,6 +159,8 @@ async fn session_loop(
                     Ok(Some(line)) => {
                         for event in parser.feed(&line) {
                             match &event {
+                                // A review runs in its own Codex thread: the conversation keeps resuming the chat's.
+                                AdapterEvent::SessionInit { .. } if is_review => continue,
                                 AdapterEvent::SessionInit { session_ref, .. } => thread = Some(session_ref.clone()),
                                 AdapterEvent::Warning(w) => {
                                     tracing::debug!(thread = %spec.thread_id, "codex: {w}");
@@ -227,6 +253,9 @@ mod tests {
         assert!(resumed.contains("--sandbox read-only"));
         assert!(resumed.ends_with("resume th-1 -- suite"));
         let bypass = turn_args(&spec("bypassPermissions"), None, &"x".into()).join(" ");
+        let review = review_args(&spec("manual"), None).join(" ");
+        assert!(review.starts_with("exec review --json") && review.ends_with("--uncommitted"));
+        assert!(review_args(&spec("manual"), Some("perf")).join(" ").ends_with("-- perf"));
         let img = crate::attachments::Attachment {
             id: "1".into(),
             name: "a.png".into(),

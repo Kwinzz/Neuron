@@ -3,14 +3,23 @@ import {
   type ClipboardEvent,
   type KeyboardEvent,
   memo,
+  useCallback,
   useEffect,
+  useMemo,
   useLayoutEffect,
   type ReactNode,
   useRef,
   useState,
 } from "react";
 import { ArrowUp, Plus, Square } from "lucide-react";
+import type { AgentKind } from "@/bindings/AgentKind";
 import type { Attachment } from "@/bindings/Attachment";
+import type { SlashCommand } from "@/bindings/SlashCommand";
+import { SlashMenu } from "@/components/chat/SlashMenu";
+import { AGENTS } from "@/lib/agents";
+import { fuzzyScore, normalize } from "@/lib/fuzzy";
+import { useLive } from "@/stores/live";
+import { EMPTY_COMMANDS, slashKey, useSlash } from "@/stores/slash";
 import { AttachmentTray } from "@/components/attachments/AttachmentTray";
 import {
   InputGroup,
@@ -58,6 +67,23 @@ interface ComposerProps {
   /** Show the floating "Nouveaux messages" pill above the input. */
   showPill: boolean;
   onPillClick: () => void;
+  /** Provider + folder for the « / » menu (draft chat). Existing chats read them from the live store. */
+  slashAgent?: AgentKind;
+  slashCwd?: string | null;
+}
+
+/** Max rows in the « / » menu. */
+const SLASH_LIMIT = 50;
+
+function rankCommands(commands: SlashCommand[], query: string): SlashCommand[] {
+  if (!query) return commands.slice(0, SLASH_LIMIT);
+  const q = normalize(query);
+  return commands
+    .map((c) => ({ c, score: fuzzyScore(q, normalize(c.name)) }))
+    .filter((r): r is { c: SlashCommand; score: number } => r.score !== null)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, SLASH_LIMIT)
+    .map((r) => r.c);
 }
 
 /** Sticky message input. Memoized: the parent re-renders on every streamed frame, this must not. */
@@ -71,12 +97,42 @@ export const Composer = memo(function Composer({
   onSent,
   showPill,
   onPillClick,
+  slashAgent,
+  slashCwd,
 }: ComposerProps) {
   const [value, setValue] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   /** Files being copied/saved (skeleton tiles; sending waits for them). */
   const [importing, setImporting] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // « / » menu: provider commands while the message is a single « /word ».
+  const liveAgent = useLive((st) => (threadId ? st.threads[threadId]?.agent : undefined));
+  const liveCwd = useLive((st) => (threadId ? (st.threads[threadId]?.cwd ?? null) : null));
+  const agent = slashAgent ?? liveAgent;
+  const cwd = slashCwd !== undefined ? slashCwd : liveCwd;
+  const slashQuery = /^\/\S*$/.test(value) ? value.slice(1) : null;
+  const [slashDismissedAt, setSlashDismissedAt] = useState<string | null>(null);
+  const [slashIndex, setSlashIndex] = useState(0);
+  const slashOpen = slashQuery !== null && agent !== undefined && agent !== "generic" && slashDismissedAt !== value;
+  const slashEntry = useSlash((st) => (agent ? st.entries[slashKey(agent, cwd)] : undefined));
+  const slashCommands = slashEntry?.commands ?? EMPTY_COMMANDS;
+  const slashFiltered = useMemo(
+    () => (slashOpen ? rankCommands(slashCommands, slashQuery ?? "") : EMPTY_COMMANDS),
+    [slashOpen, slashCommands, slashQuery],
+  );
+  useEffect(() => {
+    if (slashOpen && agent) useSlash.getState().load(agent, cwd);
+  }, [slashOpen, agent, cwd]);
+  useEffect(() => setSlashIndex(0), [slashQuery]);
+
+  // Stable: the menu rows are memoized.
+  const pickSlash = useCallback((command: SlashCommand) => {
+    pendingCaretEndRef.current = true;
+    setValue(`/${command.name} `);
+    textareaRef.current?.focus();
+  }, []);
+
   const historyRef = useRef<string[] | null>(null);
   const historyProjectRef = useRef<string | null>(projectId);
   const historyIndexRef = useRef(-1);
@@ -223,6 +279,27 @@ export const Composer = memo(function Composer({
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (slashOpen) {
+      const active = slashFiltered[slashIndex];
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation(); // Échap closes the menu, it must not stop the agent
+        setSlashDismissedAt(value);
+        return;
+      }
+      if (active && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+        e.preventDefault();
+        const n = slashFiltered.length;
+        setSlashIndex((i) => (e.key === "ArrowDown" ? (i + 1) % n : (i - 1 + n) % n));
+        return;
+      }
+      // Tab completes; Entrée completes too, unless the command is already fully typed (then it sends).
+      if (active && (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey && value !== `/${active.name}`))) {
+        e.preventDefault();
+        pickSlash(active);
+        return;
+      }
+    }
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       if (canSend) {
@@ -257,6 +334,19 @@ export const Composer = memo(function Composer({
   return (
     <div className="sticky bottom-0 z-10 -mx-4 bg-linear-to-t from-background via-background/90 to-transparent px-4 pb-4 pt-6 md:-mx-6 md:px-6">
       <div className="relative mx-auto w-full max-w-3xl">
+        {slashOpen && agent && (
+          <div className="absolute inset-x-0 bottom-full z-20 mb-2">
+            <SlashMenu
+              commands={slashFiltered}
+              query={slashQuery ?? ""}
+              activeIndex={slashIndex}
+              loading={slashEntry?.loading ?? true}
+              providerLabel={AGENTS[agent].label}
+              onPick={pickSlash}
+              onHover={setSlashIndex}
+            />
+          </div>
+        )}
         {showPill && (
           <div className="absolute -top-10 left-1/2 -translate-x-1/2">
             <NewMessagesPill onClick={onPillClick} />
@@ -276,6 +366,9 @@ export const Composer = memo(function Composer({
             onChange={onChange}
             onKeyDown={onKeyDown}
             onPaste={onPaste}
+            aria-expanded={slashOpen}
+            aria-controls={slashOpen ? "slash-menu-listbox" : undefined}
+            aria-activedescendant={slashOpen && slashFiltered.length > 0 ? `slash-option-${slashIndex}` : undefined}
             aria-label="Message"
             placeholder={placeholder ?? "Demandez quelque chose à l'agent… (Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne, ↑ historique)"}
             className="min-h-0 max-h-[256px] overflow-y-auto px-3.5 pt-3 text-sm leading-6 field-sizing-fixed"

@@ -14,6 +14,7 @@ pub mod generic;
 pub mod events;
 pub mod process;
 pub mod registry;
+pub mod slash;
 
 use std::path::PathBuf;
 

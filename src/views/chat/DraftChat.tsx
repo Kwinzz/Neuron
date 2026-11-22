@@ -144,6 +144,8 @@ export function DraftChat({ projectId }: { projectId: string | null }) {
       <Composer
         threadId={null}
         projectId={projectId}
+        slashAgent={settings.agent}
+        slashCwd={project ? project.path : cwd || null}
         submit={submit}
         toolbar={toolbar}
         placeholder="Que doit faire l'agent ? (Entrée pour démarrer le chat)"

@@ -16,6 +16,8 @@ import type { ChatItem } from "@/bindings/ChatItem";
 import type { AgyMcpStatus } from "@/bindings/AgyMcpStatus";
 import type { AppSettings } from "@/bindings/AppSettings";
 import type { Attachment } from "@/bindings/Attachment";
+import type { AgentKind } from "@/bindings/AgentKind";
+import type { SlashCommand } from "@/bindings/SlashCommand";
 import type { PricingStatus } from "@/bindings/PricingStatus";
 import type { GenericCliProfile } from "@/bindings/GenericCliProfile";
 import type { GenericCliTest } from "@/bindings/GenericCliTest";
@@ -81,6 +83,9 @@ export const ipc = {
   createThread: (input: NewThreadInput) => invoke<ThreadSummary>("create_thread", { input }),
   sendMessage: (threadId: string, text: string, attachments: Attachment[] = []) =>
     invoke<void>("send_message", { threadId, text, attachments }),
+  /** Slash commands of a provider in a folder (« / » menu; cached 15 min server-side). */
+  listSlashCommands: (agent: AgentKind, cwd: string | null) =>
+    invoke<SlashCommand[]>("list_slash_commands", { agent, cwd }),
   /** Copy files into Neuron's attachments folder (« + » button). */
   importAttachments: (paths: string[]) => invoke<Attachment[]>("import_attachments", { paths }),
   /** Save a pasted image (base64 without the data: prefix). */
