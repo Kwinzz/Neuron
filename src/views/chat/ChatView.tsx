@@ -24,6 +24,7 @@ export function ChatView({ threadId }: { threadId: string }) {
     return t ? STATUS[t.status].active : false;
   });
   const projectId = useLive((s) => s.threads[threadId]?.projectId ?? null);
+  const agent = useLive((s) => s.threads[threadId]?.agent ?? "claude_code");
 
   const scrollRoot = useScrollRoot();
   const contentRef = useRef<HTMLDivElement>(null);
@@ -95,7 +96,7 @@ export function ChatView({ threadId }: { threadId: string }) {
             </p>
           </div>
         ) : (
-          <Timeline items={items} threadId={threadId} />
+          <Timeline items={items} threadId={threadId} agent={agent} />
         )}
         {loaded && working && <WorkingIndicator threadId={threadId} />}
       </div>

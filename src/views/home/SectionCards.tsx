@@ -31,7 +31,7 @@ export function SectionCards() {
         label="Coût estimé"
         value={totals ? formatCost(totals.costUsd) : "—"}
         delta={totals && prev ? computeDelta(totals.costUsd, prev.costUsd) : null}
-        detail="Estimation au tarif API"
+        detail="Claude Code uniquement · Codex et Antigravity inclus dans l'abonnement"
         loading={isLoading}
       />
       <KpiCard

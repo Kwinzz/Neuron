@@ -88,6 +88,18 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-22 — Logo OpenAI, coûts honnêtes, texte fluide, logo qui suit l'écriture
+- Logo **OpenAI** pour Codex (LobeHub Icons, MIT ; monochrome, suit la couleur du texte).
+- Coûts : Codex et Antigravity ne renvoient que des tokens (usage inclus dans l'abonnement) → plus de « 0 $ »
+  trompeur : « inclus (abonnement) » avec explication au survol (fin de tour, en-tête) ; la carte « Coût estimé »
+  précise « Claude Code uniquement ».
+- **Apparition fluide du texte** : révélation progressive à chaque frame (accélère s'il y a du retard), y compris pour
+  Codex qui envoie ses messages d'un bloc ; chaque nouveau bloc apparaît en fondu ; l'historique s'affiche d'un coup.
+- **Logo de l'IA qui descend ligne par ligne** dans une marge à gauche pendant l'écriture (glisse en suivant la dernière
+  ligne), puis s'efface ; aligné avec l'indicateur « Working » qui le précède.
+- « Working » : les trois points sont sur la ligne de base du mot.
+
+
 ### 2026-11-22 — Chat : en-tête fixe, indicateur « Working », animations
 - En-tête du chat **toujours visible** (collant en haut, fond translucide flouté) et restylé : logo de l'agent
   (point animé quand il travaille), titre renommable, « agent · modèle · raisonnement · dossier », statut en badge

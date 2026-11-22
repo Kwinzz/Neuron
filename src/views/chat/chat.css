@@ -305,3 +305,15 @@
 .chat-working-logo {
   animation: chat-breathe 1.8s ease-in-out infinite;
 }
+
+/* ---- Text appearance: each new block of a fresh answer fades/rises in (existing blocks stay put) ---- */
+@keyframes chat-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+    filter: blur(2px);
+  }
+}
+.chat-reveal > * {
+  animation: chat-rise 0.35s ease-out both;
+}

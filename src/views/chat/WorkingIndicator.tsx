@@ -15,18 +15,21 @@ export const WorkingIndicator = memo(function WorkingIndicator({ threadId }: { t
 
   return (
     <div
-      className="flex items-center gap-2.5 py-1 animate-in fade-in-0 slide-in-from-bottom-1 duration-300"
+      className="flex items-center gap-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-300"
       role="status"
       aria-live="polite"
     >
       <span className="chat-working-logo flex size-7 shrink-0 items-center justify-center rounded-lg border bg-card">
         <AgentLogo agent={agent} size={15} />
       </span>
-      <span className="chat-working-text text-sm font-medium">Working</span>
-      <span className="flex items-end gap-0.5 pb-0.5" aria-hidden>
-        <span className="chat-working-dot" />
-        <span className="chat-working-dot" />
-        <span className="chat-working-dot" />
+      {/* Dots sit on the word's baseline ("Working..."), not centered next to it. */}
+      <span className="inline-flex items-end gap-1">
+        <span className="chat-working-text text-sm leading-none font-medium">Working</span>
+        <span className="flex items-end gap-[3px] pb-px" aria-hidden>
+          <span className="chat-working-dot" />
+          <span className="chat-working-dot" />
+          <span className="chat-working-dot" />
+        </span>
       </span>
       {activity && (
         <span className="min-w-0 truncate text-xs text-muted-foreground animate-in fade-in-0 duration-200" key={activity}>

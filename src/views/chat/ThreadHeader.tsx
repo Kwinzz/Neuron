@@ -14,7 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { AGENTS } from "@/lib/agents";
+import { AGENTS, COST_NOT_REPORTED, reportsCost } from "@/lib/agents";
 import { formatCost, formatTokens } from "@/lib/format";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { describeStatus, STATUS, TONE_TEXT } from "@/lib/status";
@@ -159,7 +159,12 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
             {statusMeta.active && <LiveTimer startedAt={live.runStartedAt} className="font-sans text-muted-foreground" />}
           </Badge>
           <span className="hidden text-xs text-muted-foreground tabular-nums lg:inline">
-            {formatTokens(live.tokens)} tokens · {formatCost(live.costUsd)}
+            {formatTokens(live.tokens)} tokens ·{" "}
+            {reportsCost(live.agent) ? (
+              formatCost(live.costUsd)
+            ) : (
+              <span title={COST_NOT_REPORTED}>inclus (abonnement)</span>
+            )}
           </span>
           {statusMeta.active && (
             <Button variant="outline" size="sm" onClick={() => void useChat.getState().stop(threadId)}>
