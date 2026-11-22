@@ -54,3 +54,14 @@ pub async fn app_info(state: State<'_, AppState>) -> AppResult<AppInfo> {
         neuron_home: state.paths.neuron_home.display().to_string(),
     })
 }
+
+/// Frontend diagnostics (uncaught errors, error boundary) forwarded to the backend log.
+#[tauri::command]
+pub fn frontend_log(level: String, message: String) {
+    let message: String = message.chars().take(4000).collect();
+    match level.as_str() {
+        "error" => tracing::error!(target: "frontend", "{message}"),
+        "warn" => tracing::warn!(target: "frontend", "{message}"),
+        _ => tracing::info!(target: "frontend", "{message}"),
+    }
+}

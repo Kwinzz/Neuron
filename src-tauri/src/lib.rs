@@ -34,6 +34,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::system::app_info,
+            commands::system::frontend_log,
             commands::dashboard::dashboard_snapshot,
             commands::dashboard::usage_report,
             commands::dashboard::update_provider,
@@ -69,7 +70,7 @@ pub fn run() {
 
 fn init_tracing() {
     let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("warn,neuron_lib=info"));
+        .unwrap_or_else(|_| EnvFilter::new("warn,neuron_lib=info,frontend=info"));
     // `try_init` so tests or re-entrant calls never panic.
     let _ = tracing_subscriber::fmt().with_env_filter(filter).try_init();
 }

@@ -43,6 +43,9 @@ export function ipcErrorMessage(err: unknown): string {
 
 export const ipc = {
   appInfo: () => invoke<AppInfo>("app_info"),
+  /** Forward a frontend diagnostic to the backend log (never throws). */
+  log: (level: "error" | "warn" | "info", message: string) =>
+    invoke<void>("frontend_log", { level, message }).catch(() => undefined),
 
   // Mission Control / dock / palette
   dashboardSnapshot: (range?: UsageRange) => invoke<DashboardSnapshot>("dashboard_snapshot", { range }),

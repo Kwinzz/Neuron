@@ -137,10 +137,11 @@ function RecentThreadsNav() {
   const openId = useUi((s) => (s.view.kind === "thread" ? s.view.id : null));
   const threads = useLive(
     useShallow((s) =>
+      // Return the store's own objects (stable references): mapping to new objects here would make
+      // useShallow see a "new" result on every read and loop forever.
       Object.values(s.threads)
         .sort((a, b) => b.updatedAt - a.updatedAt)
-        .slice(0, RECENT_LIMIT)
-        .map((t) => ({ id: t.id, title: t.title, status: t.status })),
+        .slice(0, RECENT_LIMIT),
     ),
   );
   if (threads.length === 0) return null;
