@@ -4,6 +4,7 @@ import {
   ChevronRight,
   CirclePlus,
   Database,
+  FileText,
   Folder,
   FolderOpen,
   FolderPlus,
@@ -195,6 +196,7 @@ const ProjectFolder = memo(function ProjectFolder({ project, chats }: { project:
   const open = useNav((s) => s.openProjects[project.id] ?? false);
   const [showAll, setShowAll] = useState(false);
   const draftHere = useUi((s) => s.view.kind === "draft" && s.view.projectId === project.id);
+  const pageHere = useUi((s) => s.view.kind === "project" && s.view.id === project.id);
   const activeCount = useLive((s) => chats.filter((c) => STATUS[s.threads[c.id]?.status ?? c.status].active).length);
   const visible = showAll ? chats : chats.slice(0, PAGE);
 
@@ -239,6 +241,10 @@ const ProjectFolder = memo(function ProjectFolder({ project, chats }: { project:
               <Plus />
               Nouveau chat ici
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => useUi.getState().openProject(project.id, "context")}>
+              <FileText />
+              Contexte du projet
+            </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => {
                 useUi.getState().selectProject(project.id);
@@ -266,6 +272,16 @@ const ProjectFolder = memo(function ProjectFolder({ project, chats }: { project:
               >
                 <Plus />
                 <span>Nouveau chat</span>
+              </SidebarMenuSubButton>
+            </SidebarMenuSubItem>
+            <SidebarMenuSubItem>
+              <SidebarMenuSubButton
+                isActive={pageHere}
+                onClick={() => useUi.getState().openProject(project.id, "context")}
+                className="text-muted-foreground"
+              >
+                <FileText />
+                <span>Contexte & projet</span>
               </SidebarMenuSubButton>
             </SidebarMenuSubItem>
             {visible.map((c, i) => (

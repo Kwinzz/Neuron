@@ -8,6 +8,9 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { AgentEventEnvelope } from "@/bindings/AgentEventEnvelope";
 import type { AppInfo } from "@/bindings/AppInfo";
 import type { ChatItem } from "@/bindings/ChatItem";
+import type { ContextBundle } from "@/bindings/ContextBundle";
+import type { ProjectContextFile } from "@/bindings/ProjectContextFile";
+import type { ProjectOverview } from "@/bindings/ProjectOverview";
 import type { NewThreadInput } from "@/bindings/NewThreadInput";
 import type { ProviderCatalog } from "@/bindings/ProviderCatalog";
 import type { ThreadSettingsInput } from "@/bindings/ThreadSettingsInput";
@@ -74,6 +77,12 @@ export const ipc = {
   createProject: (path: string, name?: string) =>
     invoke<ProjectSummary[]>("create_project", { path, name: name ?? null }),
   deleteProject: (projectId: string) => invoke<ProjectSummary[]>("delete_project", { projectId }),
+  // Project context (.neuron/context.md) & injected context
+  projectContext: (projectId: string) => invoke<ProjectContextFile>("project_context", { projectId }),
+  saveProjectContext: (projectId: string, content: string) =>
+    invoke<void>("save_project_context", { projectId, content }),
+  projectOverview: (projectId: string) => invoke<ProjectOverview>("project_overview", { projectId }),
+  threadContext: (threadId: string) => invoke<ContextBundle | null>("thread_context", { threadId }),
   /** Models per provider, read from the installed CLIs (cached 10 min server-side). */
   listModels: (refresh = false) => invoke<ProviderCatalog[]>("list_models", { refresh }),
   /** Native folder picker; resolves to null when cancelled. */

@@ -114,17 +114,26 @@ impl AgentRegistry {
         .ok_or_else(|| AppError::NotFound(format!("thread {thread_id}")))?;
 
         // Persist the user message first so it is never lost, even if the spawn fails.
-        {
+        let first_message = {
             let (id, t, project) = (thread_id.to_string(), text.clone(), runtime.project_id.clone());
             db.call(move |c| {
                 let now = now_ms();
+                let first = threads::user_message_count(c, &id)? == 0;
                 chat::insert_message(c, &uuid::Uuid::new_v4().to_string(), &id, "user", &t, None, now)?;
                 chat::record_prompt(c, project.as_deref(), &t, now)?;
                 threads::set_title_if_empty(c, &id, &title_from_prompt(&t))?;
-                threads::set_status(c, &id, ThreadStatus::Starting, now)
+                threads::set_status(c, &id, ThreadStatus::Starting, now)?;
+                Ok(first)
             })
-            .await?;
-        }
+            .await?
+        };
+        // Agents without a system-prompt option get the project context in front of the first message
+        // (the stored message stays what the user typed).
+        let supports_system = self.adapters.get(&runtime.agent).is_some_and(|a| a.supports_system_prompt());
+        let text = match (&runtime.context, first_message && !supports_system) {
+            (Some(ctx), true) => crate::context::as_preamble(ctx, &text),
+            _ => text,
+        };
         emit(app, thread_id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::Starting, detail: None });
 
         for attempt in 0..2 {
@@ -175,7 +184,8 @@ impl AgentRegistry {
             effort: runtime.effort.clone(),
             permission_mode: runtime.permission_mode.clone(),
             resume: runtime.session_ref.clone(),
-            append_system_prompt: None,
+            // Project context: system prompt when the CLI supports it (re-applied on every restart/resume).
+            append_system_prompt: runtime.context.clone().filter(|_| adapter.supports_system_prompt()),
         };
         let handle = adapter.start(&spec)?;
         *generation += 1;

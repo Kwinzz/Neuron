@@ -45,6 +45,26 @@ pub async fn create_thread(
     let mode = input.permission_mode.clone().unwrap_or_else(|| "manual".into());
     validate_settings(&mode, input.effort.as_deref())?;
 
+    // Project chats get the project context (context.md + git + recent files), frozen with the chat.
+    let context = match input.project_id.clone() {
+        Some(project_id) => {
+            let project = state.db.call(move |c| projects::get(c, &project_id)).await?;
+            match project {
+                // Missing folder (moved project, demo data): no context rather than failing the chat.
+                Some(p) if std::path::Path::new(&p.path).is_dir() => Some(
+                    tokio::task::spawn_blocking(move || {
+                        let root = std::path::PathBuf::from(&p.path);
+                        crate::context::ensure_context_file(&root, &p.name)?;
+                        crate::context::build(&root, &p.name, now_ms())
+                    })
+                    .await??,
+                ),
+                _ => None,
+            }
+        }
+        None => None,
+    };
+
     let id = uuid::Uuid::new_v4().to_string();
     let summary = {
         let (id, input, cwd, mode) = (id.clone(), input.clone(), cwd.clone(), mode.clone());
@@ -63,6 +83,7 @@ pub async fn create_thread(
                         cwd: &cwd,
                         permission_mode: &mode,
                         effort: input.effort.as_deref().filter(|e| !e.is_empty()),
+                        context: context.as_ref(),
                         now: now_ms(),
                     },
                 )?;
@@ -235,6 +256,9 @@ pub async fn create_project(
         .filter(|n| !n.is_empty())
         .or_else(|| dir.file_name().map(|n| n.to_string_lossy().into_owned()))
         .unwrap_or_else(|| path.clone());
+    let root = std::path::PathBuf::from(&path);
+    let project_name = name.clone();
+    tokio::task::spawn_blocking(move || crate::context::ensure_context_file(&root, &project_name)).await??;
     state
         .db
         .call(move |c| {

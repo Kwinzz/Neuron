@@ -29,6 +29,7 @@ src-tauri/
     db/                     connexion, PRAGMAs, migrations (PRAGMA user_version) + requêtes par domaine
                             (projects, threads, providers, usage) — fonctions sync `fn(&Connection, ...)`
     util.rs                 now_ms, constantes de durée
+    context.rs              contexte projet : .neuron/context.md, instantané git, fichiers récents, assemblage
     commands/               commandes #[tauri::command] groupées par domaine
     agents/                 trait AgentAdapter, adaptateurs, registre de processus, events normalisés
 src/
@@ -42,6 +43,8 @@ src/
   components/ui/            primitives partagées (AgentBadge, StatusDot, Kbd, LiveTimer)
   views/home/               Accueil (dashboard)
   views/chat/               ChatView (chat existant) + DraftChat (nouveau chat vide, créé au 1er message)
+  views/project/            page projet (éditeur context.md, git, fichiers récents, chats du projet)
+  components/context/       indicateur de contexte injecté (en-tête de chat, nouveau chat)
   styles/index.css          design tokens Tailwind v4 (@theme)
 scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
 .claude/agents/neon.md      définition du sous-agent neon
@@ -123,6 +126,9 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
 - Plomberie commune des process NDJSON : `agents/process.rs`. Catalogue de modèles (`list_models`) lu depuis les CLI
   (`codex debug models`, `agy models`), cache 10 min. Tests live (ignorés par défaut) :
   `NEURON_LIVE_DIR=<dossier jetable> cargo test --test live_agents -- --ignored`.
+- **Contexte projet (Phase 3)** : figé dans `threads.context` à la création d'un chat de projet. Claude reçoit
+  `--append-system-prompt` (adaptateur `supports_system_prompt() = true`) ; les autres CLI reçoivent
+  `context::as_preamble` devant le premier message uniquement. Ne jamais créer `.neuron/` dans un dossier absent.
 - `rate_limit_event` (fenêtres 5h / 7j de l'abonnement Claude) → `settings.claude.rate_limits` → `ProviderUsage.live`.
 - Front : `useChat` (timeline par thread, événements appliqués **une fois par frame**), `ChatItem` = même type
   pour l'historique et le live.

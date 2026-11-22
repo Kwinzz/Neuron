@@ -82,11 +82,32 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 - [x] **Phase 0** — Init Tauri v2 + React/TS/Tailwind v4, CLAUDE.md, project.md, neon, bridge, schéma SQLite
 - [x] **Phase 1** — Shell (sidebar, dock live, palette Ctrl+K) + Mission Control sur SQLite
 - [x] **Phase 2** — `AgentAdapter`, registre multi-threads, `ClaudeCodeAdapter`, chat streaming
-- [ ] **Phase 3** — Projets, `.neuron/context.md`, injection de contexte
+- [x] **Phase 3** — Projets, `.neuron/context.md`, injection de contexte (page projet, indicateur de contexte, aperçu dans le nouveau chat)
 - [ ] **Phase 4** — Mémoire globale (`~/.neuron/memory.md` + SQLite), vue Mémoire, serveur MCP embarqué
 - [ ] **Phase 5** — ~~Adaptateurs Antigravity / Codex~~ (faits), Generic PTY, paramètres, raccourcis, fluidité
 
 ## Journal des changements
+
+### 2026-11-22 — Phase 3 : projets & injection de contexte
+- **Backend** (`context.rs`) : `.neuron/context.md` créé depuis un modèle à l'ajout du projet (jamais écrasé, jamais
+  créé dans un dossier absent), instantané git (branche, `status --porcelain` ≤ 30, 5 derniers commits, timeout 5 s,
+  sans fenêtre console), fichiers modifiés depuis 7 jours (crate `ignore`, respecte `.gitignore`, ignore `.neuron/`).
+  Le contexte assemblé est **figé dans le chat** à sa création (migration `0005_thread_context` : `context`,
+  `context_sources` ; `ThreadSummary.hasContext`).
+- **Injection** : Claude Code → `--append-system-prompt` (réappliqué à chaque reprise `--resume`) ; Codex et
+  Antigravity (pas d'option système) → préambule `<contexte_neuron>` devant le **premier** message seulement (le
+  message stocké reste celui de l'utilisateur). Vérifié en live sur les 3 CLI (mot de code retrouvé).
+- **Commandes** : `project_context`, `save_project_context`, `project_overview` (git + récents + aperçu exact du
+  contexte d'un nouveau chat), `thread_context`.
+- **UI (neon / Gemini 4 Neon High)** : page projet (vue `project`, onglets Contexte / Chats) — éditeur `context.md`
+  avec aperçu markdown, Ctrl+S, indicateur de modifications, « Ce que recevra un nouveau chat » ; cartes Git et
+  Fichiers récents ; liste des chats du projet. Indicateur « Contexte » dans l'en-tête du chat (popover : sources +
+  markdown injecté, « Modifier context.md »). Bandeau « Contexte injecté au démarrage » dans le nouveau chat d'un
+  projet. Entrées « Contexte & projet » dans la sidebar et le menu du dossier ; la palette ouvre la page projet.
+- **Correctifs chat** : curseur d'agent en lissage exponentiel (plus de rebond à chaque ligne) ; la zone de saisie
+  ne bouge plus entre « remonté » et « en bas » (padding bas retiré de la racine du chat).
+- Limite connue : un brouillon non enregistré de `context.md` est perdu si on quitte la page projet.
+
 
 ### 2026-11-22 — Transitions partout (neon) + curseur d'agent fluide
 - **Curseur d'agent** : le logo n'est plus attaché au bloc de texte ; un curseur unique par conversation, dans la

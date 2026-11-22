@@ -13,6 +13,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ),
     ("0003_thread_runtime", include_str!("../../migrations/0003_thread_runtime.sql")),
     ("0004_thread_effort", include_str!("../../migrations/0004_thread_effort.sql")),
+    ("0005_thread_context", include_str!("../../migrations/0005_thread_context.sql")),
 ];
 
 /// Schema version after all embedded migrations are applied.

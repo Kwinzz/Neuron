@@ -33,11 +33,13 @@ pub struct ThreadSummary {
     pub permission_mode: String,
     /// Reasoning effort (None = CLI default).
     pub effort: Option<String>,
+    /// A project context was injected when the chat was created.
+    pub has_context: bool,
 }
 
 const SELECT: &str = "SELECT t.id, t.project_id, p.name, t.agent, t.model, t.title, t.status,
             t.created_at, t.updated_at, t.ended_at,
-            COALESCE(u.tokens, 0), COALESCE(u.cost, 0.0), t.cwd, t.permission_mode, t.effort
+            COALESCE(u.tokens, 0), COALESCE(u.cost, 0.0), t.cwd, t.permission_mode, t.effort, t.context IS NOT NULL
      FROM threads t
      LEFT JOIN projects p ON p.id = t.project_id
      LEFT JOIN (SELECT thread_id, SUM(input_tokens + output_tokens) AS tokens, SUM(cost_usd) AS cost
@@ -60,6 +62,7 @@ fn from_row(row: &Row<'_>) -> rusqlite::Result<ThreadSummary> {
         cwd: row.get(12)?,
         permission_mode: row.get(13)?,
         effort: row.get(14)?,
+        has_context: row.get(15)?,
     })
 }
 
@@ -74,6 +77,8 @@ pub struct ThreadRuntime {
     pub permission_mode: String,
     pub effort: Option<String>,
     pub session_ref: Option<String>,
+    /// Frozen project context (markdown) injected into this chat.
+    pub context: Option<String>,
     pub title: String,
 }
 
@@ -86,21 +91,35 @@ pub struct NewThread<'a> {
     pub cwd: &'a str,
     pub permission_mode: &'a str,
     pub effort: Option<&'a str>,
+    pub context: Option<&'a crate::context::ContextBundle>,
     pub now: i64,
 }
 
 pub fn create(conn: &Connection, t: &NewThread<'_>) -> AppResult<()> {
     conn.execute(
-        "INSERT INTO threads (id, project_id, agent, model, title, status, created_at, updated_at, cwd, permission_mode, effort)
-         VALUES (?1, ?2, ?3, ?4, ?5, 'idle', ?6, ?6, ?7, ?8, ?9)",
-        rusqlite::params![t.id, t.project_id, t.agent, t.model, t.title, t.now, t.cwd, t.permission_mode, t.effort],
+        "INSERT INTO threads (id, project_id, agent, model, title, status, created_at, updated_at, cwd, permission_mode, effort,
+                              context, context_sources)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'idle', ?6, ?6, ?7, ?8, ?9, ?10, ?11)",
+        rusqlite::params![
+            t.id,
+            t.project_id,
+            t.agent,
+            t.model,
+            t.title,
+            t.now,
+            t.cwd,
+            t.permission_mode,
+            t.effort,
+            t.context.map(|c| c.markdown.as_str()),
+            t.context.map(|c| serde_json::to_string(&c.sources)).transpose()?,
+        ],
     )?;
     Ok(())
 }
 
 pub fn runtime(conn: &Connection, id: &str) -> AppResult<Option<ThreadRuntime>> {
     let mut stmt = conn.prepare_cached(
-        "SELECT id, agent, project_id, model, cwd, permission_mode, session_ref, title, effort FROM threads WHERE id = ?1",
+        "SELECT id, agent, project_id, model, cwd, permission_mode, session_ref, title, effort, context FROM threads WHERE id = ?1",
     )?;
     Ok(stmt
         .query_row([id], |r| {
@@ -114,9 +133,28 @@ pub fn runtime(conn: &Connection, id: &str) -> AppResult<Option<ThreadRuntime>> 
                 session_ref: r.get(6)?,
                 title: r.get(7)?,
                 effort: r.get(8)?,
+                context: r.get(9)?,
             })
         })
         .optional()?)
+}
+
+/// The context injected into a chat, if any.
+pub fn context(conn: &Connection, id: &str) -> AppResult<Option<crate::context::ContextBundle>> {
+    let row: Option<(Option<String>, Option<String>)> = conn
+        .query_row("SELECT context, context_sources FROM threads WHERE id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?)))
+        .optional()?;
+    Ok(row.and_then(|(markdown, sources)| {
+        Some(crate::context::ContextBundle {
+            markdown: markdown?,
+            sources: sources.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default(),
+        })
+    }))
+}
+
+/// Number of user messages already stored for a chat.
+pub fn user_message_count(conn: &Connection, id: &str) -> AppResult<i64> {
+    Ok(conn.query_row("SELECT COUNT(*) FROM messages WHERE thread_id = ?1 AND role = 'user'", [id], |r| r.get(0))?)
 }
 
 pub fn set_status(conn: &Connection, id: &str, status: ThreadStatus, now: i64) -> AppResult<()> {

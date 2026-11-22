@@ -14,8 +14,12 @@ function useViewTitle(view: View): { section: string; title: string } {
   const draftProject = useNav((s) =>
     view.kind === "draft" && view.projectId ? s.projects.find((p) => p.id === view.projectId)?.name : undefined,
   );
+  const pageProject = useNav((s) =>
+    view.kind === "project" ? s.projects.find((p) => p.id === view.id)?.name : undefined,
+  );
   if (view.kind === "thread") return { section: projectName ?? "Chats", title: chatTitle || "Chat" };
   if (view.kind === "draft") return { section: draftProject ?? "Chats", title: "Nouveau chat" };
+  if (view.kind === "project") return { section: "Projets", title: pageProject ?? "Projet" };
   return { section: "Neuron", title: "Accueil" };
 }
 

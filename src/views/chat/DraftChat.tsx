@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { DraftContextPreview } from "@/components/context/DraftContextPreview";
 import { FolderGit2, FolderOpen, MessageSquarePlus } from "lucide-react";
 import { ChatSettingsBar } from "@/components/chat/ChatSettingsBar";
 import { Button } from "@/components/ui/button";
@@ -136,6 +137,7 @@ export function DraftChat({ projectId }: { projectId: string | null }) {
             "Choisis le modèle (Claude, Codex, Antigravity…) et le niveau de raisonnement, puis écris ton premier message."
           )}
         </p>
+        {projectId && <DraftContextPreview projectId={projectId} />}
       </div>
       <Composer
         threadId={null}

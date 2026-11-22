@@ -134,7 +134,7 @@ function useCommands(): Command[] {
         icon: <FolderGit2 size={15} />,
         hint: <CommandShortcut className="tracking-normal">{p.threadCount} chats</CommandShortcut>,
         run: () => {
-          ui().startChat(p.id);
+          ui().openProject(p.id, "context");
         },
       });
     }

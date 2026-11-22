@@ -13,6 +13,7 @@ import { useUi } from "@/stores/ui";
 import { ChatView } from "@/views/chat/ChatView";
 import { DraftChat } from "@/views/chat/DraftChat";
 import { MissionControl } from "@/views/home/MissionControl";
+import { ProjectView } from "@/views/project/ProjectView";
 import { AppSidebar } from "./AppSidebar";
 import { LiveDock } from "./LiveDock";
 import { ScrollRootContext } from "./ScrollRoot";
@@ -57,7 +58,9 @@ export function AppShell() {
       ? `thread-${view.id}`
       : view.kind === "draft"
         ? `draft-${view.projectId ?? ""}`
-        : "home";
+        : view.kind === "project"
+          ? `project-${view.id}`
+          : "home";
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -77,6 +80,7 @@ export function AppShell() {
                 {view.kind === "home" && <MissionControl />}
                 {view.kind === "draft" && <DraftChat key={`draft-${view.projectId ?? ""}`} projectId={view.projectId} />}
                 {view.kind === "thread" && <ChatView key={view.id} threadId={view.id} />}
+                {view.kind === "project" && <ProjectView key={view.id} projectId={view.id} tab={view.tab} />}
               </div>
             </div>
           </ScrollRootContext.Provider>

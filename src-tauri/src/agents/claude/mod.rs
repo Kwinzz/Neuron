@@ -106,6 +106,10 @@ impl AgentAdapter for ClaudeCodeAdapter {
         AgentKind::ClaudeCode
     }
 
+    fn supports_system_prompt(&self) -> bool {
+        true
+    }
+
     fn start(&self, spec: &SessionSpec) -> AppResult<SessionHandle> {
         let mut parser = ClaudeParser::new();
         spawn_stream_session(

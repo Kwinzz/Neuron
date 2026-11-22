@@ -14,4 +14,8 @@ cwd: string | null, permissionMode: string,
 /**
  * Reasoning effort (None = CLI default).
  */
-effort: string | null, };
+effort: string | null, 
+/**
+ * A project context was injected when the chat was created.
+ */
+hasContext: boolean, };

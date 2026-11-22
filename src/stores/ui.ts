@@ -4,8 +4,13 @@ import { create } from "zustand";
  * - home: Accueil (dashboard)
  * - draft: empty chat, created on its first message (optionally inside a project)
  * - thread: an existing chat
+ * - project: a project page (context.md editor, git snapshot, chats)
  */
-export type View = { kind: "home" } | { kind: "draft"; projectId: string | null } | { kind: "thread"; id: string };
+export type View =
+  | { kind: "home" }
+  | { kind: "draft"; projectId: string | null }
+  | { kind: "thread"; id: string }
+  | { kind: "project"; id: string; tab?: "context" | "chats" };
 
 const DOCK_KEY = "neuron.dockOpen";
 
@@ -41,6 +46,8 @@ interface UiState {
   toggleDock: () => void;
   /** Open an empty chat (inside `projectId` when given). No dialog: the chat is created on send. */
   startChat: (projectId?: string | null) => void;
+  /** Open a project page. */
+  openProject: (id: string, tab?: "context" | "chats") => void;
   /** Open an existing chat (null = back to Accueil). */
   focusThread: (id: string | null) => void;
   selectProject: (id: string | null) => void;
@@ -62,6 +69,7 @@ export const useUi = create<UiState>((set, get) => ({
   },
   toggleDock: () => get().setDockOpen(!get().dockOpen),
   startChat: (projectId = null) => get().navigate({ kind: "draft", projectId }),
+  openProject: (id, tab) => get().navigate(tab ? { kind: "project", id, tab } : { kind: "project", id }),
   focusThread: (id) => get().navigate(id ? { kind: "thread", id } : { kind: "home" }),
   selectProject: (selectedProjectId) => set({ selectedProjectId }),
 }));

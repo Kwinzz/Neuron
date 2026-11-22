@@ -75,3 +75,48 @@ async fn codex_two_turns() {
     println!("codex: {texts:?}");
     assert!(texts.iter().any(|t| t.contains("ONE")) && texts.iter().any(|t| t.contains("TWO")));
 }
+
+/// One turn; returns the concatenated completed text.
+async fn ask(adapter: &dyn AgentAdapter, spec: SessionSpec, prompt: String) -> String {
+    let mut handle = adapter.start(&spec).expect("start");
+    handle.commands.send(SessionCommand::Prompt(prompt)).unwrap();
+    let mut out = String::new();
+    while let Ok(Some(ev)) = tokio::time::timeout(Duration::from_secs(180), handle.events.recv()).await {
+        match ev {
+            AdapterEvent::BlockCompleted { text, channel: neuron_lib::agents::events::DeltaChannel::Text, .. } => {
+                out.push_str(&text)
+            }
+            AdapterEvent::TurnComplete { error, .. } => {
+                assert!(error.is_none(), "turn error: {error:?}");
+                handle.commands.send(SessionCommand::Shutdown).unwrap();
+            }
+            AdapterEvent::Exited { .. } => break,
+            _ => {}
+        }
+    }
+    out
+}
+
+const CONTEXT: &str = "# Contexte du projet\nLe mot de code de ce projet est PAPAYE.";
+const QUESTION: &str = "Quel est le mot de code du projet ? Réponds avec ce seul mot.";
+
+#[tokio::test]
+#[ignore]
+async fn claude_receives_system_context() {
+    let mut s = spec("claude-haiku-5-5", Some("low"));
+    s.append_system_prompt = Some(CONTEXT.into());
+    let answer = ask(&ClaudeCodeAdapter::default(), s, QUESTION.into()).await;
+    println!("claude: {answer}");
+    assert!(answer.to_uppercase().contains("PAPAYE"));
+}
+
+#[tokio::test]
+#[ignore]
+async fn codex_and_antigravity_receive_preamble() {
+    let prompt = neuron_lib::context::as_preamble(CONTEXT, QUESTION);
+    let codex = ask(&CodexAdapter::default(), spec("gpt-6-luna", Some("low")), prompt.clone()).await;
+    println!("codex: {codex}");
+    let agy = ask(&AntigravityAdapter::default(), spec("gemini-4-neon-low", None), prompt).await;
+    println!("antigravity: {agy}");
+    assert!(codex.to_uppercase().contains("PAPAYE") && agy.to_uppercase().contains("PAPAYE"));
+}

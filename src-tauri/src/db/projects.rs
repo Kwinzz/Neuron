@@ -64,6 +64,10 @@ pub fn create(conn: &Connection, name: &str, path: &str, now: i64) -> AppResult<
     Ok(id)
 }
 
+pub fn get(conn: &Connection, id: &str) -> AppResult<Option<ProjectSummary>> {
+    Ok(list(conn)?.into_iter().find(|p| p.id == id))
+}
+
 pub fn path_of(conn: &Connection, id: &str) -> AppResult<Option<String>> {
     Ok(conn
         .query_row("SELECT path FROM projects WHERE id = ?1", [id], |r| r.get(0))

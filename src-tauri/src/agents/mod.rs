@@ -106,6 +106,11 @@ pub struct SessionHandle {
 /// A CLI agent integration.
 pub trait AgentAdapter: Send + Sync {
     fn kind(&self) -> AgentKind;
+    /// The CLI accepts extra system instructions (`SessionSpec::append_system_prompt`). Otherwise the project
+    /// context is sent as a preamble of the first message.
+    fn supports_system_prompt(&self) -> bool {
+        false
+    }
     /// Spawn the agent process for `spec`. Must not block: I/O runs on background tasks.
     fn start(&self, spec: &SessionSpec) -> AppResult<SessionHandle>;
 }

@@ -2,6 +2,7 @@
 
 pub mod agents;
 pub mod commands;
+pub mod context;
 pub mod db;
 pub mod error;
 pub mod state;
@@ -53,6 +54,10 @@ pub fn run() {
             commands::threads::default_cwd,
             commands::threads::update_thread_settings,
             commands::threads::list_models,
+            commands::projects::project_context,
+            commands::projects::save_project_context,
+            commands::projects::project_overview,
+            commands::projects::thread_context,
             commands::threads::create_project,
             commands::threads::delete_project,
             commands::dev::dev_seed_demo,

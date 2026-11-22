@@ -1,5 +1,6 @@
 import { type KeyboardEvent, memo, useEffect, useRef, useState } from "react";
 import { cn } from "cn";
+import { ContextIndicator } from "@/components/context/ContextIndicator";
 import { FolderOpen, Pencil, Square } from "lucide-react";
 import { AgentLogo } from "@/components/ui/AgentLogo";
 import { Badge } from "@/components/ui/badge";
@@ -166,6 +167,7 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
               <span title={COST_NOT_REPORTED}>inclus (abonnement)</span>
             )}
           </span>
+          {live.hasContext && <ContextIndicator threadId={threadId} projectId={live.projectId} />}
           {statusMeta.active && (
             <Button
               variant="outline"
