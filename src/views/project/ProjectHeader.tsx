@@ -37,7 +37,7 @@ export function ProjectHeader({
 
   return (
     <Card className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
-      <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <CardContent className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
             <FolderOpen className="size-5" aria-hidden />
@@ -59,27 +59,29 @@ export function ProjectHeader({
                     <TooltipTrigger asChild>
                       <span
                         tabIndex={0}
-                        className="block max-w-full truncate font-mono text-xs text-muted-foreground outline-none transition-colors duration-150 focus-visible:text-foreground"
+                        className="block min-w-0 max-w-full truncate rounded-sm font-mono text-xs text-muted-foreground outline-none transition-colors duration-150 focus-visible:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
                       >
                         {path}
                       </span>
                     </TooltipTrigger>
-                    <TooltipContent className="max-w-md font-mono wrap-anywhere">{path}</TooltipContent>
+                    <TooltipContent className="max-w-md font-mono wrap-anywhere">
+                      {path}
+                    </TooltipContent>
                   </Tooltip>
                 )}
               </>
             )}
 
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
               {git ? (
                 <>
-                  <Badge variant="outline" className="max-w-52 min-w-0">
+                  <Badge variant="outline" className="max-w-52 min-w-0 gap-1.5">
                     <GitBranch className="shrink-0 text-muted-foreground" aria-hidden />
                     <span className="truncate font-mono">{git.branch ?? "HEAD détachée"}</span>
                   </Badge>
                   {changedCount > 0 && (
                     <Badge variant="outline" className="gap-1.5 text-warn">
-                      <span className="size-1.5 rounded-full bg-warn" aria-hidden />
+                      <span className="size-1.5 shrink-0 rounded-full bg-warn" aria-hidden />
                       <span className="font-mono tabular-nums">{changedCount}</span>
                       <span>{changedCount === 1 ? "modifié" : "modifiés"}</span>
                     </Badge>
@@ -96,8 +98,10 @@ export function ProjectHeader({
 
               {project && (
                 <Badge variant="outline" className="gap-1.5 text-muted-foreground">
-                  <MessageSquare aria-hidden />
-                  <span className="font-mono tabular-nums text-foreground">{project.threadCount}</span>
+                  <MessageSquare className="shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="font-mono tabular-nums text-foreground">
+                    {project.threadCount}
+                  </span>
                   <span>{project.threadCount <= 1 ? "chat" : "chats"}</span>
                   {project.activeCount > 0 && (
                     <>

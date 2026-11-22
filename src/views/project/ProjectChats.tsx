@@ -1,7 +1,14 @@
 import { useMemo } from "react";
 import { MessageSquare, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useNav } from "@/stores/nav";
 import { useUi } from "@/stores/ui";
@@ -23,7 +30,26 @@ export function ProjectChats({ projectId }: ProjectChatsProps) {
   );
 
   return (
-    <Card className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
+    <Card size="sm" className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
+      <CardHeader>
+        <CardTitle>Chats du projet</CardTitle>
+        <CardDescription className="text-xs">
+          Chaque nouveau chat reçoit le contexte du projet.
+        </CardDescription>
+        {projectChats.length > 0 && (
+          <CardAction>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => useUi.getState().startChat(projectId)}
+            >
+              <Plus aria-hidden />
+              <span>Nouveau chat</span>
+            </Button>
+          </CardAction>
+        )}
+      </CardHeader>
+
       <CardContent>
         {projectChats.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">

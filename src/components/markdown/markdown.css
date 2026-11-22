@@ -1,0 +1,342 @@
+/* Shared markdown prose & syntax highlighting.
+ * Uses ONLY design tokens from src/styles/index.css (no hex, no rgb literals). */
+
+.md-prose {
+  overflow-wrap: anywhere;
+  min-width: 0;
+  color: var(--foreground);
+}
+
+.md-prose > :first-child {
+  margin-top: 0;
+}
+
+.md-prose > :last-child {
+  margin-bottom: 0;
+}
+
+.md-prose p {
+  margin: 0.75em 0;
+}
+
+.md-prose h1,
+.md-prose h2,
+.md-prose h3,
+.md-prose h4,
+.md-prose h5,
+.md-prose h6 {
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--foreground);
+}
+
+.md-prose h1 {
+  font-size: 1.35em;
+  margin: 1.25em 0 0.5em;
+}
+
+.md-prose h2 {
+  font-size: 1.15em;
+  margin: 1.4em 0 0.5em;
+}
+
+.md-prose h3 {
+  font-size: 1.05em;
+  margin: 1.1em 0 0.4em;
+}
+
+.md-prose h4 {
+  font-size: 1em;
+  margin: 1.1em 0 0.4em;
+}
+
+.md-prose h5,
+.md-prose h6 {
+  font-size: 0.95em;
+  margin: 1.1em 0 0.4em;
+  color: var(--muted-foreground);
+}
+
+.md-prose ul {
+  list-style-type: disc;
+  padding-left: 1.4em;
+  margin: 0.75em 0;
+}
+
+.md-prose ol {
+  list-style-type: decimal;
+  padding-left: 1.4em;
+  margin: 0.75em 0;
+}
+
+.md-prose ul ul,
+.md-prose ol ol,
+.md-prose ul ol,
+.md-prose ol ul {
+  margin: 0.25em 0;
+}
+
+.md-prose li {
+  margin: 0.25em 0;
+}
+
+.md-prose li::marker {
+  color: var(--muted-foreground);
+}
+
+.md-prose li > p {
+  margin: 0.25em 0;
+}
+
+/* Task lists (remark-gfm) */
+.md-prose ul.contains-task-list {
+  list-style: none;
+  padding-left: 0.25em;
+}
+
+.md-prose li.task-list-item {
+  list-style: none;
+}
+
+.md-prose li.task-list-item input[type="checkbox"] {
+  margin: 0 0.5em 0 0;
+  vertical-align: -0.1em;
+  accent-color: var(--foreground);
+}
+
+/* Blockquote callout */
+.md-prose blockquote {
+  margin: 0.9em 0;
+  padding: 0.6em 0.9em;
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--muted-foreground);
+  border-radius: var(--radius-md);
+  background-color: color-mix(in oklch, var(--muted) 45%, transparent);
+  color: var(--muted-foreground);
+}
+
+.md-prose blockquote > :first-child {
+  margin-top: 0;
+}
+
+.md-prose blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.md-prose blockquote p {
+  margin: 0.35em 0;
+}
+
+.md-prose hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 1.5em 0;
+}
+
+/* Inline code */
+.md-prose :not(pre) > code {
+  background-color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.1em 0.35em;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--foreground);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Tables (wrapped in .md-table) */
+.md-prose .md-table {
+  margin: 0.9em 0;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.md-prose .md-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92em;
+}
+
+.md-prose .md-table th,
+.md-prose .md-table td {
+  padding: 0.45em 0.75em;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.md-prose .md-table th {
+  background-color: color-mix(in oklch, var(--muted) 50%, transparent);
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+
+.md-prose .md-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.md-prose .md-table td + td,
+.md-prose .md-table th + th {
+  border-left: 1px solid var(--border);
+}
+
+/* Links & inline semantics */
+.md-prose a {
+  font-weight: 500;
+  color: var(--foreground);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: var(--muted-foreground);
+  transition: color 150ms var(--ease-out-quick);
+}
+
+.md-prose a:hover {
+  color: var(--muted-foreground);
+}
+
+.md-prose strong {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.md-prose em {
+  font-style: italic;
+}
+
+.md-prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+}
+
+/* Compact size (popovers & dense previews) */
+.md-prose.md-xs {
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+.md-prose.md-xs p {
+  margin: 0.6em 0;
+}
+
+.md-prose.md-xs h1,
+.md-prose.md-xs h2,
+.md-prose.md-xs h3,
+.md-prose.md-xs h4,
+.md-prose.md-xs h5,
+.md-prose.md-xs h6 {
+  margin: 1em 0 0.35em;
+}
+
+.md-prose.md-xs h1 {
+  font-size: 1.15em;
+}
+
+.md-prose.md-xs h2 {
+  font-size: 1.08em;
+}
+
+.md-prose.md-xs h3 {
+  font-size: 1em;
+}
+
+.md-prose.md-xs .md-code pre {
+  font-size: 11.5px;
+}
+
+/* Document mode (context previews only, never chat): annotate empty template headings */
+/* An h2 is empty when the next block is another h2 (an h1 right after one is the context bundle nesting
+ * context.md, not an empty section); an h3 is empty when followed by an h2/h3; a trailing heading is empty. */
+.md-prose.md-doc h2:has(+ h2)::after,
+.md-prose.md-doc h3:has(+ :is(h2, h3))::after,
+.md-prose.md-doc :is(h2, h3):last-child::after {
+  content: "Section vide";
+  display: block;
+  margin-top: 0.35em;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  font-style: italic;
+  color: var(--muted-foreground);
+  opacity: 0.7;
+}
+
+.md-prose.md-doc.md-xs h2:has(+ h2)::after,
+.md-prose.md-doc.md-xs h3:has(+ :is(h2, h3))::after,
+.md-prose.md-doc.md-xs :is(h2, h3):last-child::after {
+  font-size: 0.6875rem;
+}
+
+/* highlight.js theme scoped to code blocks */
+.md-code .hljs {
+  color: var(--foreground);
+  background: transparent;
+}
+
+.md-code .hljs-keyword,
+.md-code .hljs-selector-tag,
+.md-code .hljs-built_in,
+.md-code .hljs-type,
+.md-code .hljs-tag,
+.md-code .hljs-name,
+.md-code .hljs-selector-class,
+.md-code .hljs-selector-id {
+  color: var(--live);
+}
+
+.md-code .hljs-string,
+.md-code .hljs-regexp,
+.md-code .hljs-addition,
+.md-code .hljs-template-tag {
+  color: var(--ok);
+}
+
+.md-code .hljs-number,
+.md-code .hljs-literal,
+.md-code .hljs-symbol,
+.md-code .hljs-bullet,
+.md-code .hljs-link {
+  color: var(--warn);
+}
+
+.md-code .hljs-comment,
+.md-code .hljs-quote,
+.md-code .hljs-meta,
+.md-code .hljs-doctag {
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+.md-code .hljs-title,
+.md-code .hljs-title.function_,
+.md-code .hljs-title.class_,
+.md-code .hljs-function,
+.md-code .hljs-section {
+  color: var(--chart-2);
+}
+
+.md-code .hljs-attr,
+.md-code .hljs-attribute,
+.md-code .hljs-variable,
+.md-code .hljs-template-variable,
+.md-code .hljs-property,
+.md-code .hljs-params,
+.md-code .hljs-subst {
+  color: var(--chart-3);
+}
+
+.md-code .hljs-deletion {
+  color: var(--destructive);
+}
+
+.md-code .hljs-emphasis {
+  font-style: italic;
+}
+
+.md-code .hljs-strong {
+  font-weight: 600;
+}

@@ -1,48 +1,43 @@
 import {
-  type ComponentProps,
+  type ChangeEvent,
   type KeyboardEvent,
+  type UIEvent,
   useCallback,
   useDeferredValue,
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
+import { cn } from "cn";
 import {
   AlertCircle,
+  Check,
   ChevronDown,
+  Columns2,
+  Eye,
   FileText,
   Info,
   Layers,
+  PencilLine,
   Save,
   Undo2,
 } from "lucide-react";
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
 import type { ContextBundle } from "@/bindings/ContextBundle";
 import type { ProjectContextFile } from "@/bindings/ProjectContextFile";
-import { ContextMarkdown } from "@/components/context/ContextMarkdown";
-import { SourceBadge } from "@/components/context/SourceBadge";
+import { ContextBundleView } from "@/components/context/ContextBundleView";
+import { Markdown } from "@/components/markdown/Markdown";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Kbd, MOD_LABEL } from "@/components/ui/Kbd";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { toast } from "@/stores/toast";
-import "@/views/chat/chat.css";
 
-type MarkdownProps = ComponentProps<typeof ReactMarkdown>;
-
-const REMARK: MarkdownProps["remarkPlugins"] = [remarkGfm];
-
-const COMPONENTS: Components = {
-  a: ({ href, children }) => (
-    <a href={href} target="_blank" rel="noreferrer">
-      {children}
-    </a>
-  ),
-};
+type EditorViewMode = "edit" | "split" | "preview";
 
 interface ContextEditorProps {
   projectId: string;
@@ -69,35 +64,68 @@ export function ContextEditor({
   const [savedContent, setSavedContent] = useState(file?.content ?? "");
   const [draft, setDraft] = useState(file?.content ?? "");
   const [saving, setSaving] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
+  const [viewMode, setViewMode] = useState<EditorViewMode>("split");
+
+  const previewRef = useRef<HTMLDivElement | null>(null);
+  const escapeTabRef = useRef(false);
+  const savedTimerRef = useRef<number | null>(null);
 
   if (syncedFile !== file) {
     setSyncedFile(file);
     setSavedContent(file?.content ?? "");
     setDraft(file?.content ?? "");
+    setJustSaved(false);
   }
+
+  const clearSavedTimer = useCallback(() => {
+    if (savedTimerRef.current !== null) {
+      window.clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    clearSavedTimer();
+  }, [file, clearSavedTimer]);
+
+  useEffect(() => () => clearSavedTimer(), [clearSavedTimer]);
 
   const dirty = file !== null && draft !== savedContent;
   const deferredDraft = useDeferredValue(draft);
 
   const renderedPreview = useMemo(
-    () => (
-      <div className="chat-prose select-text text-sm leading-6 text-foreground">
-        <ReactMarkdown remarkPlugins={REMARK} components={COMPONENTS}>
-          {deferredDraft}
-        </ReactMarkdown>
-      </div>
-    ),
+    () => <Markdown doc>{deferredDraft}</Markdown>,
     [deferredDraft],
   );
+
+  const updateDraft = useCallback(
+    (next: string) => {
+      setDraft(next);
+      setJustSaved(false);
+      clearSavedTimer();
+    },
+    [clearSavedTimer],
+  );
+
+  const handleDraftChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    updateDraft(e.target.value);
+  };
 
   const save = useCallback(async () => {
     if (!file || !dirty || saving) return;
     setSaving(true);
+    setJustSaved(false);
+    clearSavedTimer();
     const contentToSave = draft;
     try {
       await ipc.saveProjectContext(projectId, contentToSave);
       setSavedContent(contentToSave);
-      toast({ tone: "ok", title: "context.md enregistré" });
+      setJustSaved(true);
+      savedTimerRef.current = window.setTimeout(() => {
+        savedTimerRef.current = null;
+        setJustSaved(false);
+      }, 2000);
       onSaved();
     } catch (err: unknown) {
       toast({
@@ -108,7 +136,7 @@ export function ContextEditor({
     } finally {
       setSaving(false);
     }
-  }, [dirty, draft, file, onSaved, projectId, saving]);
+  }, [clearSavedTimer, dirty, draft, file, onSaved, projectId, saving]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
@@ -117,19 +145,65 @@ export function ContextEditor({
     }
   };
 
+  const handleTextareaKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Escape") {
+      escapeTabRef.current = true;
+      return;
+    }
+
+    if (e.key === "Tab") {
+      if (escapeTabRef.current || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) {
+        escapeTabRef.current = false;
+        return;
+      }
+
+      e.preventDefault();
+      const inserted = document.execCommand("insertText", false, "  ");
+      if (!inserted) {
+        const el = e.currentTarget;
+        el.setRangeText("  ", el.selectionStart, el.selectionEnd, "end");
+        updateDraft(el.value);
+      }
+      return;
+    }
+
+    escapeTabRef.current = false;
+  };
+
+  const handleEditorScroll = (e: UIEvent<HTMLTextAreaElement>) => {
+    if (viewMode !== "split") return;
+    const previewEl = previewRef.current;
+    if (!previewEl) return;
+
+    const editorEl = e.currentTarget;
+    const maxEditor = editorEl.scrollHeight - editorEl.clientHeight;
+    if (maxEditor <= 0) return;
+
+    const maxPreview = previewEl.scrollHeight - previewEl.clientHeight;
+    if (maxPreview <= 0) return;
+
+    previewEl.scrollTop = (editorEl.scrollTop / maxEditor) * maxPreview;
+  };
+
   if (loading && !file) {
     return (
       <div className="flex min-w-0 flex-col gap-4">
-        <div className="flex items-center justify-between gap-2">
-          <Skeleton className="h-5 w-64 max-w-full" />
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-7 w-28" />
-            <Skeleton className="h-7 w-28" />
+        <div className="@container overflow-hidden rounded-xl border bg-card">
+          <div className="flex h-11 items-center justify-between gap-2 border-b px-3">
+            <Skeleton className="h-4 w-56 max-w-full" />
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-7 w-32" />
+              <Skeleton className="h-7 w-24" />
+            </div>
           </div>
-        </div>
-        <div className="grid gap-4 xl:grid-cols-2">
-          <Skeleton className="h-[420px] w-full rounded-lg" />
-          <Skeleton className="h-[420px] w-full rounded-lg" />
+          <div className="grid @3xl:grid-cols-2">
+            <div className="h-[clamp(22rem,62vh,44rem)] p-4">
+              <Skeleton className="h-full w-full rounded-lg" />
+            </div>
+            <div className="h-[clamp(22rem,62vh,44rem)] border-t p-4 @3xl:border-t-0 @3xl:border-l">
+              <Skeleton className="h-full w-full rounded-lg" />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -157,57 +231,17 @@ export function ContextEditor({
     return null;
   }
 
+  const lineCount = draft.length === 0 ? 0 : draft.split("\n").length;
+  const charCount = draft.length;
   const previewSourceCount = preview?.sources.length ?? 0;
+  const showEditor = viewMode === "edit" || viewMode === "split";
+  const showPreview = viewMode === "preview" || viewMode === "split";
 
   return (
     <div
       onKeyDown={handleKeyDown}
       className="flex min-w-0 flex-col gap-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-200"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex max-w-full min-w-0 flex-1 basis-48 items-center gap-1.5">
-          <FileText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span
-                tabIndex={0}
-                className="min-w-0 truncate font-mono text-xs text-muted-foreground outline-none transition-colors duration-150 focus-visible:text-foreground"
-              >
-                {file.path}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-md font-mono wrap-anywhere">{file.path}</TooltipContent>
-          </Tooltip>
-        </div>
-
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {dirty && (
-            <span className="inline-flex items-center gap-1.5 text-xs text-warn animate-in fade-in-0 duration-150">
-              <span className="size-1.5 rounded-full bg-warn" aria-hidden />
-              <span>Modifications non enregistrées</span>
-            </span>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={!dirty || saving}
-            onClick={() => setDraft(savedContent)}
-          >
-            <Undo2 aria-hidden />
-            <span>Annuler les modifications</span>
-          </Button>
-          <Button size="sm" disabled={!dirty || saving} onClick={() => void save()}>
-            <Save aria-hidden />
-            <span>{saving ? "Enregistrement…" : "Enregistrer"}</span>
-            {!saving && (
-              <Kbd className="ml-1 border-primary-foreground/25 bg-primary-foreground/15 text-primary-foreground">
-                {MOD_LABEL} S
-              </Kbd>
-            )}
-          </Button>
-        </div>
-      </div>
-
       {file.created && (
         <Alert className="animate-in fade-in-0 duration-150">
           <Info aria-hidden />
@@ -218,31 +252,150 @@ export function ContextEditor({
         </Alert>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <span className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-            Markdown
-          </span>
-          <Textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            spellCheck={false}
-            aria-label="Contenu de context.md"
-            className="min-h-[420px] resize-y font-mono text-[13px] leading-6"
-          />
+      <div className="@container overflow-hidden rounded-xl border bg-card">
+        <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
+          <div className="flex min-w-0 flex-1 basis-48 items-center gap-2">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    tabIndex={0}
+                    className="min-w-0 truncate rounded-sm font-mono text-xs text-muted-foreground outline-none transition-colors duration-150 focus-visible:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  >
+                    {file.path}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-md font-mono wrap-anywhere">
+                  {file.path}
+                </TooltipContent>
+              </Tooltip>
+            </div>
+
+            <div className="flex shrink-0 items-center text-xs" aria-live="polite">
+              {saving ? (
+                <span className="text-muted-foreground">Enregistrement…</span>
+              ) : dirty ? (
+                <span className="inline-flex items-center gap-1.5 text-warn">
+                  <span className="size-1.5 shrink-0 rounded-full bg-warn" aria-hidden />
+                  <span>Non enregistré</span>
+                </span>
+              ) : (
+                <span
+                  aria-hidden={!justSaved}
+                  className={cn(
+                    "inline-flex items-center gap-1 text-muted-foreground transition-opacity duration-150",
+                    justSaved ? "opacity-100" : "pointer-events-none opacity-0",
+                  )}
+                >
+                  <Check className="size-3.5 text-ok" aria-hidden />
+                  <span>Enregistré</span>
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <ToggleGroup
+              type="single"
+              size="sm"
+              variant="outline"
+              spacing={0}
+              value={viewMode}
+              onValueChange={(value) => {
+                if (value === "edit" || value === "split" || value === "preview") {
+                  setViewMode(value);
+                }
+              }}
+            >
+              <ToggleGroupItem value="edit" aria-label="Éditer">
+                <PencilLine aria-hidden />
+                <span className="hidden @md:inline">Éditer</span>
+              </ToggleGroupItem>
+              <ToggleGroupItem value="split" aria-label="Partagé">
+                <Columns2 aria-hidden />
+                <span className="hidden @md:inline">Partagé</span>
+              </ToggleGroupItem>
+              <ToggleGroupItem value="preview" aria-label="Aperçu">
+                <Eye aria-hidden />
+                <span className="hidden @md:inline">Aperçu</span>
+              </ToggleGroupItem>
+            </ToggleGroup>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={!dirty || saving}
+              aria-label="Annuler les modifications"
+              onClick={() => updateDraft(savedContent)}
+            >
+              <Undo2 aria-hidden />
+              <span>Annuler</span>
+            </Button>
+
+            <Button size="sm" disabled={!dirty || saving} onClick={() => void save()}>
+              <Save aria-hidden />
+              <span>Enregistrer</span>
+              <Kbd className="ml-1 border-primary-foreground/25 bg-primary-foreground/15 text-primary-foreground">
+                {MOD_LABEL} S
+              </Kbd>
+            </Button>
+          </div>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <span className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-            Aperçu
-          </span>
-          <div className="min-h-[420px] min-w-0 overflow-auto rounded-lg border bg-card p-4">
-            {deferredDraft.trim().length > 0 ? (
-              renderedPreview
-            ) : (
-              <p className="text-sm text-muted-foreground">Aucun contenu à prévisualiser.</p>
-            )}
-          </div>
+        <div className={cn("grid", viewMode === "split" && "@3xl:grid-cols-2")}>
+          {showEditor && (
+            <div className="flex min-w-0 flex-col">
+              <div className="flex h-9 items-center justify-between gap-2 border-b px-3">
+                <span className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+                  Markdown
+                </span>
+                <span className="font-mono text-xs text-muted-foreground tabular-nums">
+                  {lineCount} {lineCount <= 1 ? "ligne" : "lignes"} · {charCount} car.
+                </span>
+              </div>
+              <div className="h-[clamp(22rem,62vh,44rem)] focus-within:ring-2 focus-within:ring-ring/50 focus-within:ring-inset">
+                <textarea
+                  value={draft}
+                  onChange={handleDraftChange}
+                  onKeyDown={handleTextareaKeyDown}
+                  onFocus={() => {
+                    escapeTabRef.current = false;
+                  }}
+                  onScroll={handleEditorScroll}
+                  spellCheck={false}
+                  aria-label="Contenu de context.md"
+                  placeholder="# Contexte du projet…"
+                  className="size-full resize-none bg-transparent p-4 font-mono text-[13px] leading-6 text-foreground outline-none placeholder:text-muted-foreground selection:bg-accent"
+                />
+              </div>
+            </div>
+          )}
+
+          {showPreview && (
+            <div
+              className={cn(
+                "flex min-w-0 flex-col",
+                viewMode === "split" && "border-t @3xl:border-t-0 @3xl:border-l",
+              )}
+            >
+              <div className="flex h-9 items-center justify-between gap-2 border-b px-3">
+                <span className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+                  Aperçu
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Rendu en direct
+                </span>
+              </div>
+              <div ref={previewRef} className="h-[clamp(22rem,62vh,44rem)] overflow-y-auto p-4">
+                {deferredDraft.trim().length > 0 ? (
+                  renderedPreview
+                ) : (
+                  <p className="text-sm text-muted-foreground">Aucun contenu à prévisualiser.</p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -250,11 +403,18 @@ export function ContextEditor({
         <CollapsibleTrigger asChild>
           <Button
             variant="ghost"
-            className="group flex h-auto w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-left"
+            className="group flex h-auto w-full items-center justify-between gap-3 rounded-xl px-4 py-3 text-left"
           >
-            <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-foreground">
+            <span className="flex min-w-0 items-center gap-2.5">
               <Layers className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-              <span className="truncate">Ce que recevra un nouveau chat</span>
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-sm font-medium text-foreground">
+                  Ce que recevra un nouveau chat
+                </span>
+                <span className="truncate text-xs font-normal text-muted-foreground">
+                  Contexte figé à la création de chaque chat
+                </span>
+              </span>
             </span>
             <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
               {preview && (
@@ -270,7 +430,7 @@ export function ContextEditor({
           </Button>
         </CollapsibleTrigger>
 
-        <CollapsibleContent className="border-t p-3.5 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-150">
+        <CollapsibleContent className="border-t p-4 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-150">
           {previewLoading && !preview ? (
             <div className="flex flex-col gap-2">
               <Skeleton className="h-5 w-48" />
@@ -279,16 +439,7 @@ export function ContextEditor({
           ) : !preview ? (
             <p className="text-xs text-muted-foreground">Aperçu indisponible.</p>
           ) : (
-            <div className="flex min-w-0 flex-col gap-3">
-              {preview.sources.length > 0 && (
-                <div className="flex min-w-0 flex-wrap gap-1.5">
-                  {preview.sources.map((source, index) => (
-                    <SourceBadge key={`${source.kind}-${source.label}-${index}`} source={source} />
-                  ))}
-                </div>
-              )}
-              <ContextMarkdown markdown={preview.markdown} className="max-h-[480px]" />
-            </div>
+            <ContextBundleView bundle={preview} size="sm" className="max-h-[480px]" />
           )}
         </CollapsibleContent>
       </Collapsible>

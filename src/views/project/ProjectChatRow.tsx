@@ -36,7 +36,7 @@ export const ProjectChatRow = memo(function ProjectChatRow({ thread }: ProjectCh
       aria-label={`Ouvrir ${t.title || "Chat sans titre"}`}
       onClick={openChat}
       onKeyDown={handleKeyDown}
-      className="cursor-pointer transition-colors duration-150 outline-none focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+      className="cursor-pointer transition-colors duration-150 outline-none hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
     >
       {/* w-full + max-w-0: the title column absorbs the free width and truncates instead of overflowing. */}
       <TableCell className="w-full max-w-0">

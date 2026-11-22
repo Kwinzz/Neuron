@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Eye, Layers, Pencil } from "lucide-react";
+import { Clock, Eye, Layers, Pencil } from "lucide-react";
 import type { ContextBundle } from "@/bindings/ContextBundle";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
+  PopoverDescription,
   PopoverHeader,
   PopoverTitle,
   PopoverTrigger,
@@ -12,8 +13,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ipc } from "@/lib/ipc";
 import { useUi } from "@/stores/ui";
-import { ContextMarkdown } from "./ContextMarkdown";
-import { SourceBadge } from "./SourceBadge";
+import { ContextBundleView } from "./ContextBundleView";
 import { SourceList } from "./SourceList";
 
 interface DraftContextPreviewProps {
@@ -60,19 +60,20 @@ export function DraftContextPreview({ projectId }: DraftContextPreviewProps) {
 
   const { bundle } = state;
 
+  const handleEdit = () => {
+    setOpen(false);
+    useUi.getState().openProject(projectId, "context");
+  };
+
   return (
-    <div className="flex w-full max-w-2xl flex-wrap items-center gap-2 rounded-lg border bg-card/50 px-3 py-2 text-left text-xs animate-in fade-in-0 slide-in-from-top-1 duration-200">
+    <div className="flex w-full max-w-2xl flex-wrap items-center gap-2 rounded-xl border bg-card px-3 py-2 text-left text-xs animate-in fade-in-0 slide-in-from-top-1 duration-200">
       <span className="inline-flex items-center gap-1.5 text-muted-foreground">
         <Layers className="size-3.5 shrink-0" aria-hidden />
         <span>Contexte injecté au démarrage</span>
       </span>
 
       {bundle.sources.length > 0 ? (
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          {bundle.sources.map((source, index) => (
-            <SourceBadge key={`${source.kind}-${source.label}-${index}`} source={source} />
-          ))}
-        </div>
+        <SourceList sources={bundle.sources} />
       ) : (
         <span className="text-muted-foreground">aucune source</span>
       )}
@@ -85,12 +86,25 @@ export function DraftContextPreview({ projectId }: DraftContextPreviewProps) {
               <span>Voir</span>
             </Button>
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-[460px] max-w-[calc(100vw-2rem)] gap-3 p-3">
-            <PopoverHeader>
+          <PopoverContent align="end" className="w-[460px] max-w-[calc(100vw-2rem)] gap-0 p-0">
+            <PopoverHeader className="border-b p-3">
               <PopoverTitle>Ce que recevra le chat</PopoverTitle>
+              <PopoverDescription className="flex items-center gap-1.5 text-xs">
+                <Clock className="size-3 shrink-0" aria-hidden />
+                <span>Calculé maintenant, figé à l'envoi du premier message</span>
+              </PopoverDescription>
             </PopoverHeader>
-            <SourceList sources={bundle.sources} />
-            <ContextMarkdown markdown={bundle.markdown} size="xs" className="max-h-80" />
+
+            <div className="min-w-0 p-3">
+              <ContextBundleView bundle={bundle} size="xs" className="max-h-80" />
+            </div>
+
+            <div className="flex justify-end border-t p-2">
+              <Button variant="ghost" size="sm" onClick={handleEdit}>
+                <Pencil aria-hidden />
+                <span>Modifier context.md</span>
+              </Button>
+            </div>
           </PopoverContent>
         </Popover>
 

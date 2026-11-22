@@ -124,7 +124,7 @@ export function ProjectView({ projectId, tab }: ProjectViewProps) {
               previewLoading={loadingOverview}
               onSaved={reloadOverview}
             />
-            <div className="flex min-w-0 flex-col gap-4">
+            <div className="flex min-w-0 flex-col gap-4 md:gap-6">
               <GitCard git={overview?.git ?? null} loading={loadingOverview} error={errorOverview} />
               <RecentFilesCard
                 files={overview?.recentFiles ?? []}

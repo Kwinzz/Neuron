@@ -13,8 +13,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ipc } from "@/lib/ipc";
 import { useUi } from "@/stores/ui";
-import { ContextMarkdown } from "./ContextMarkdown";
-import { SourceList } from "./SourceList";
+import { ContextBundleView } from "./ContextBundleView";
 
 interface ContextIndicatorProps {
   threadId: string;
@@ -84,7 +83,7 @@ export function ContextIndicator({ threadId, projectId }: ContextIndicatorProps)
         <TooltipContent>Contexte injecté dans ce chat</TooltipContent>
       </Tooltip>
 
-      <PopoverContent align="end" className="w-[420px] max-w-[calc(100vw-2rem)] gap-0 p-0">
+      <PopoverContent align="end" className="w-[460px] max-w-[calc(100vw-2rem)] gap-0 p-0">
         <PopoverHeader className="border-b p-3">
           <PopoverTitle>Contexte injecté</PopoverTitle>
           <PopoverDescription className="flex items-center gap-1.5 text-xs">
@@ -93,9 +92,8 @@ export function ContextIndicator({ threadId, projectId }: ContextIndicatorProps)
           </PopoverDescription>
         </PopoverHeader>
 
-        <div className="flex min-w-0 flex-col gap-3 p-3">
-          <SourceList sources={bundle.sources} />
-          <ContextMarkdown markdown={bundle.markdown} size="xs" className="max-h-80" />
+        <div className="min-w-0 p-3">
+          <ContextBundleView bundle={bundle} size="xs" className="max-h-80" />
         </div>
 
         {projectId != null && (

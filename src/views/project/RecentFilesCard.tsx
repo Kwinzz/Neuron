@@ -1,7 +1,17 @@
-import { History } from "lucide-react";
+import { AlertCircle, History } from "lucide-react";
 import type { RecentFile } from "@/bindings/RecentFile";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CardEmpty } from "./CardEmpty";
+import { fileIcon } from "./fileIcon";
 import { RelativeTime } from "./RelativeTime";
 
 const MAX_FILES = 10;
@@ -34,6 +44,14 @@ export function RecentFilesCard({ files, loading, error }: RecentFilesCardProps)
           <History className="size-4 shrink-0 text-muted-foreground" aria-hidden />
           <span>Fichiers récents</span>
         </CardTitle>
+        <CardDescription className="text-xs">Modifiés dans le dossier du projet</CardDescription>
+        {files.length > 0 && (
+          <CardAction>
+            <Badge variant="outline" className="font-mono tabular-nums">
+              {files.length}
+            </Badge>
+          </CardAction>
+        )}
       </CardHeader>
 
       <CardContent className="min-w-0">
@@ -44,22 +62,26 @@ export function RecentFilesCard({ files, loading, error }: RecentFilesCardProps)
             ))}
           </div>
         ) : error && visible.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Liste des fichiers indisponible.</p>
+          <CardEmpty icon={AlertCircle}>Liste des fichiers indisponible.</CardEmpty>
         ) : visible.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Aucun fichier modifié récemment</p>
+          <CardEmpty icon={History}>Aucun fichier modifié récemment</CardEmpty>
         ) : (
-          <ul className="flex min-w-0 flex-col gap-1.5">
+          <ul className="flex min-w-0 flex-col gap-2">
             {visible.map((file) => {
               const { name, dir } = splitFilePath(file.path);
+              const Icon = fileIcon(name);
               return (
                 <li
                   key={file.path}
                   title={file.path}
-                  className="flex min-w-0 items-center justify-between gap-2"
+                  className="flex min-w-0 items-center gap-2.5"
                 >
+                  <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                   <div className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-sm text-foreground">{name}</span>
-                    {dir && <span className="truncate font-mono text-xs text-muted-foreground">{dir}</span>}
+                    {dir && (
+                      <span className="truncate font-mono text-xs text-muted-foreground">{dir}</span>
+                    )}
                   </div>
                   <RelativeTime
                     ts={file.modifiedAt}
