@@ -317,3 +317,22 @@
 .chat-reveal > * {
   animation: chat-rise 0.35s ease-out both;
 }
+
+/* ---- Long content never pushes the layout sideways ---- */
+.chat-prose {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.chat-prose :not(pre) > code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.chat-prose table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.chat-prose img {
+  max-width: 100%;
+  height: auto;
+}

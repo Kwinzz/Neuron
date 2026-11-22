@@ -1,5 +1,6 @@
 //! Models available per agent, read from the installed CLIs (cached), with static fallbacks.
 
+use std::collections::BTreeMap;
 use std::process::Stdio;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -27,6 +28,9 @@ pub struct ModelInfo {
     /// Reasoning levels this model accepts (empty = no reasoning control).
     pub efforts: Vec<String>,
     pub default_effort: Option<String>,
+    /// Model families whose reasoning level is a separate model id (Antigravity: `gemini-4-neon-high`):
+    /// effort -> concrete model id. The picker shows the family once and the level picks the variant.
+    pub effort_models: Option<BTreeMap<String, String>>,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]
@@ -68,6 +72,7 @@ fn model(id: &str, label: &str, hint: Option<&str>, efforts: &[&str], default_ef
         vendor: vendor_of(id).into(),
         efforts: strings(efforts),
         default_effort: default_effort.map(str::to_string),
+        effort_models: None,
     }
 }
 
@@ -126,6 +131,7 @@ pub fn parse_codex_models(raw: &str) -> Vec<ModelInfo> {
                         vendor: "openai".into(),
                         efforts,
                         default_effort: m.get("default_reasoning_level").and_then(Value::as_str).map(str::to_string),
+                        effort_models: None,
                     })
                 })
                 .collect()
@@ -148,24 +154,69 @@ async fn codex() -> ProviderCatalog {
     }
 }
 
-/// Parse `agy models` (`id<TAB>Label` lines).
+/// Effort suffixes used by Antigravity model ids, weakest first.
+const AGY_LEVELS: &[&str] = &["low", "medium", "high", "xhigh", "max"];
+
+/// `gemini-4-neon-high` -> (`gemini-4-neon`, `high`); ids without a level suffix -> None.
+fn split_level(id: &str) -> Option<(&str, &str)> {
+    let (base, level) = id.rsplit_once('-')?;
+    AGY_LEVELS.contains(&level).then_some((base, level))
+}
+
+/// "Gemini 4 Neon (High)" -> "Gemini 4 Neon".
+fn strip_level_label(label: &str) -> String {
+    match label.rsplit_once(" (") {
+        Some((name, rest)) if rest.ends_with(')') => name.to_string(),
+        _ => label.to_string(),
+    }
+}
+
+/// Parse `agy models` (`id<TAB>Label` lines) and fold per-level variants into one family each:
+/// `gemini-4-neon-{low,medium,high,xhigh}` -> "Gemini 4 Neon" with 4 reasoning levels.
 pub fn parse_agy_models(raw: &str) -> Vec<ModelInfo> {
     const EFFORTS: &[&str] = crate::agents::antigravity::EFFORT_LEVELS;
-    raw.lines()
-        .filter_map(|line| {
-            let (id, label) = line.split_once('\t')?;
-            let (id, label) = (id.trim(), label.trim());
-            if id.is_empty() || id.contains(' ') {
-                return None;
+    let mut families: Vec<ModelInfo> = Vec::new();
+    for line in raw.lines() {
+        let Some((id, label)) = line.split_once('\t') else { continue };
+        let (id, label) = (id.trim(), label.trim());
+        if id.is_empty() || id.contains(' ') {
+            continue;
+        }
+        let hint = match vendor_of(id) {
+            "anthropic" => Some("Anthropic via Antigravity"),
+            "google" => Some("Google"),
+            "openai" => Some("OpenAI via Antigravity"),
+            _ => None,
+        };
+        match split_level(id) {
+            Some((base, level)) => {
+                let idx = match families.iter().position(|f| f.id == base) {
+                    Some(i) => i,
+                    None => {
+                        let mut family = model(base, &strip_level_label(label), hint, &[], None);
+                        family.effort_models = Some(BTreeMap::new());
+                        families.push(family);
+                        families.len() - 1
+                    }
+                };
+                if let Some(map) = families[idx].effort_models.as_mut() {
+                    map.insert(level.to_string(), id.to_string());
+                }
             }
-            let hint = match vendor_of(id) {
-                "anthropic" => Some("Anthropic via Antigravity"),
-                "google" => Some("Google"),
-                _ => None,
-            };
-            Some(model(id, label, hint, EFFORTS, None))
-        })
-        .collect()
+            // No level in the id: a single model; reasoning goes through `--effort`.
+            None => families.push(model(id, label, hint, EFFORTS, None)),
+        }
+    }
+    for family in &mut families {
+        if let Some(map) = &family.effort_models {
+            family.efforts = AGY_LEVELS.iter().filter(|l| map.contains_key(**l)).map(|l| l.to_string()).collect();
+            family.default_effort = ["medium", "high", "low", "xhigh", "max"]
+                .iter()
+                .find(|l| map.contains_key(**l))
+                .map(|l| l.to_string());
+        }
+    }
+    families
 }
 
 async fn antigravity() -> ProviderCatalog {
@@ -214,10 +265,24 @@ mod tests {
         assert_eq!(codex[0].efforts, ["low", "high"]);
         assert_eq!(codex[0].vendor, "openai");
 
-        let agy = parse_agy_models("Fetching available models...\ngemini-4-neon-high\tGemini 4 Neon (High)\nclaude-opus-5-5-low\tClaude Opus 5.5 (Low)\n");
-        assert_eq!(agy.len(), 2);
-        assert_eq!(agy[0].vendor, "google");
-        assert_eq!(agy[1].vendor, "anthropic");
-        assert_eq!(agy[1].label, "Claude Opus 5.5 (Low)");
+        let agy = parse_agy_models(concat!(
+            "Fetching available models...\n",
+            "gemini-4-neon-high\tGemini 4 Neon (High)\n",
+            "gemini-4-neon-low\tGemini 4 Neon (Low)\n",
+            "gemini-4-neon-xhigh\tGemini 4 Neon (XHigh)\n",
+            "gemini-pro-orchestrator-neon\tOrchestrator (Neon)\n",
+            "claude-opus-5-5-low\tClaude Opus 5.5 (Low)\n",
+            "claude-opus-5-5-high\tClaude Opus 5.5 (High)\n",
+        ));
+        assert_eq!(agy.len(), 3, "variants folded into families");
+        let neon = &agy[0];
+        assert_eq!((neon.id.as_str(), neon.label.as_str(), neon.vendor.as_str()), ("gemini-4-neon", "Gemini 4 Neon", "google"));
+        assert_eq!(neon.efforts, ["low", "high", "xhigh"], "ordered weakest first");
+        assert_eq!(neon.default_effort.as_deref(), Some("high"));
+        assert_eq!(neon.effort_models.as_ref().unwrap()["xhigh"], "gemini-4-neon-xhigh");
+        let orchestrator = &agy[1];
+        assert!(orchestrator.effort_models.is_none() && !orchestrator.efforts.is_empty());
+        assert_eq!(agy[2].label, "Claude Opus 5.5");
+        assert_eq!(agy[2].vendor, "anthropic");
     }
 }

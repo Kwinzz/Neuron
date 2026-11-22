@@ -88,6 +88,16 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-22 — Débordements corrigés, modèles Antigravity regroupés par famille
+- **Texte qui dépasse à droite** : cause principale dans le dock « Threads live » — le `ScrollArea` Radix enveloppe le
+  contenu dans un bloc `display: table` qui s'élargit avec le texte et neutralise `truncate` → remplacé par un simple
+  conteneur défilant. Chat : longs mots/chemins/URL coupés (`overflow-wrap: anywhere`), tableaux défilants dans leur
+  cadre, badges d'outils qui passent à la ligne, colonnes `min-w-0`, zone principale sans défilement horizontal.
+- **Antigravity** : un modèle par niveau (`gemini-4-neon-low/medium/high/xhigh`) → le catalogue les regroupe en
+  familles (« Gemini 4 Neon ») avec leurs niveaux ; choisir un niveau sélectionne la variante (`effortModels`), comme
+  pour Claude et Codex. Les chats existants affichent le niveau de leur variante.
+
+
 ### 2026-11-22 — Logo OpenAI, coûts honnêtes, texte fluide, logo qui suit l'écriture
 - Logo **OpenAI** pour Codex (LobeHub Icons, MIT ; monochrome, suit la couleur du texte).
 - Coûts : Codex et Antigravity ne renvoient que des tokens (usage inclus dans l'abonnement) → plus de « 0 $ »

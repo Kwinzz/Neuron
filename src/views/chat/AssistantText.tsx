@@ -56,7 +56,7 @@ export const AssistantText = memo(function AssistantText({ item, fresh, agent }:
   }, [writing]);
 
   return (
-    <div className="relative pl-10">
+    <div className="relative min-w-0 pl-10">
       <span
         aria-hidden
         className={cn(

@@ -12,4 +12,9 @@ vendor: string,
 /**
  * Reasoning levels this model accepts (empty = no reasoning control).
  */
-efforts: Array<string>, defaultEffort: string | null, };
+efforts: Array<string>, defaultEffort: string | null, 
+/**
+ * Model families whose reasoning level is a separate model id (Antigravity: `gemini-4-neon-high`):
+ * effort -> concrete model id. The picker shows the family once and the level picks the variant.
+ */
+effortModels: { [key in string]: string } | null, };

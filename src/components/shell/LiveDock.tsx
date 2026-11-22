@@ -3,7 +3,6 @@ import { useShallow } from "zustand/react/shallow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MOD_LABEL } from "@/components/ui/Kbd";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useNow } from "@/hooks/useNow";
 import { STATUS } from "@/lib/status";
@@ -61,8 +60,10 @@ function DockPanel() {
 
       {projectId && <ProjectFilterNote />}
 
-      <ScrollArea className="min-h-0 flex-1">
-        <div className="p-2">
+      {/* Plain scroller on purpose: Radix ScrollArea wraps content in a `display: table` box that grows with
+          the text, which defeats `truncate` and makes long titles overflow to the right. */}
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="min-w-0 p-2">
           {ids.length === 0 ? (
             <div className="flex flex-col items-center gap-1 px-6 py-12 text-center">
               <p className="text-sm font-medium">Aucun thread actif</p>
@@ -80,7 +81,7 @@ function DockPanel() {
             </ul>
           )}
         </div>
-      </ScrollArea>
+      </div>
     </aside>
   );
 }

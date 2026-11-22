@@ -35,7 +35,7 @@ export const DockThreadRow = memo(function DockThreadRow({ id }: { id: string })
       }}
       aria-current={focused ? "true" : undefined}
       className={cn(
-        "flex w-full flex-col gap-1.5 rounded-lg border border-transparent px-3 py-2.5 text-left text-sm transition-colors",
+        "flex w-full min-w-0 flex-col gap-1.5 overflow-hidden rounded-lg border border-transparent px-3 py-2.5 text-left text-sm transition-colors",
         "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         focused && "border-border bg-sidebar-accent",
       )}

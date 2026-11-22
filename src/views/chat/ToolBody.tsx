@@ -101,12 +101,12 @@ function renderInput(name: string, input: JsonValue): ReactNode {
         <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
           <span className="text-foreground select-text">{filePath}</span>
           {offset !== null && (
-            <Badge variant="secondary" className="font-mono">
+            <Badge variant="secondary" className="h-auto max-w-full font-mono whitespace-normal wrap-anywhere text-left">
               offset {offset}
             </Badge>
           )}
           {limit !== null && (
-            <Badge variant="secondary" className="font-mono">
+            <Badge variant="secondary" className="h-auto max-w-full font-mono whitespace-normal wrap-anywhere text-left">
               limit {limit}
             </Badge>
           )}
@@ -121,7 +121,7 @@ function renderInput(name: string, input: JsonValue): ReactNode {
       const path = str(obj, "path");
       return (
         <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
-          <Badge variant="secondary" className="font-mono select-text">
+          <Badge variant="secondary" className="h-auto max-w-full font-mono whitespace-normal wrap-anywhere text-left select-text">
             {pattern}
           </Badge>
           {path && <span className="text-muted-foreground select-text">{path}</span>}
@@ -137,12 +137,12 @@ function renderInput(name: string, input: JsonValue): ReactNode {
       const glob = str(obj, "glob");
       return (
         <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
-          <Badge variant="secondary" className="font-mono select-text">
+          <Badge variant="secondary" className="h-auto max-w-full font-mono whitespace-normal wrap-anywhere text-left select-text">
             {pattern}
           </Badge>
           {path && <span className="text-muted-foreground select-text">{path}</span>}
           {glob && (
-            <Badge variant="secondary" className="font-mono">
+            <Badge variant="secondary" className="h-auto max-w-full font-mono whitespace-normal wrap-anywhere text-left">
               {glob}
             </Badge>
           )}

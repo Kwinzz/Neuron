@@ -27,7 +27,20 @@ export const useModels = create<ModelsState>((set, get) => ({
   },
 }));
 
+/** Model (or model family) for a stored id — a family also matches its per-level variant ids. */
 export function findModel(providers: ProviderCatalog[], agent: AgentKind, id: string | null): ModelInfo | undefined {
   if (!id) return undefined;
-  return providers.find((p) => p.agent === agent)?.models.find((m) => m.id === id);
+  return providers
+    .find((p) => p.agent === agent)
+    ?.models.find((m) => m.id === id || (m.effortModels != null && Object.values(m.effortModels).includes(id)));
+}
+
+/**
+ * Concrete id to send to the CLI. Families whose reasoning level is a separate model (Antigravity
+ * `gemini-4-neon-high`) resolve to the variant of the chosen level (or the default level).
+ */
+export function resolveModelId(info: ModelInfo, effort: string | null): string {
+  if (!info.effortModels) return info.id;
+  const level = effort ?? info.defaultEffort;
+  return (level ? info.effortModels[level] : undefined) ?? Object.values(info.effortModels)[0] ?? info.id;
 }

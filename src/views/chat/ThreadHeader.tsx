@@ -193,7 +193,11 @@ const HeaderMeta = memo(function HeaderMeta({
   cwd: string | null;
 }) {
   const modelInfo = useModels((s) => findModel(s.providers, agent, model));
-  const parts = [agentLabel, modelInfo?.label ?? model ?? "modèle par défaut", effort ? `raisonnement ${effortLabel(effort).toLowerCase()}` : null].filter(
+  // Antigravity families: the level is the selected variant's.
+  const level =
+    (modelInfo?.effortModels ? Object.entries(modelInfo.effortModels).find(([, id]) => id === model)?.[0] : undefined) ??
+    effort;
+  const parts = [agentLabel, modelInfo?.label ?? model ?? "modèle par défaut", level ? `raisonnement ${effortLabel(level).toLowerCase()}` : null].filter(
     (p): p is string => Boolean(p),
   );
   return (

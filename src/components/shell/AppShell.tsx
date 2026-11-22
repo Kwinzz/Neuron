@@ -58,7 +58,7 @@ export function AppShell() {
         <SidebarInset className="min-w-0 overflow-hidden md:peer-data-[variant=inset]:mr-0">
           <SiteHeader />
           <ScrollRootContext.Provider value={scrollRoot}>
-            <div ref={setScrollRoot} className="min-h-0 flex-1 overflow-y-auto">
+            <div ref={setScrollRoot} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
               {view.kind === "home" && <MissionControl />}
               {view.kind === "draft" && <DraftChat key={`draft-${view.projectId ?? ""}`} projectId={view.projectId} />}
               {view.kind === "thread" && <ChatView key={view.id} threadId={view.id} />}

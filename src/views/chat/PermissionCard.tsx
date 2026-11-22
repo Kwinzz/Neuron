@@ -90,7 +90,7 @@ export const PermissionCard = memo(function PermissionCard({
         Autorisation requise — {item.toolName}
       </AlertTitle>
       {item.description && (
-        <AlertDescription className="col-start-2 whitespace-pre-wrap select-text">
+        <AlertDescription className="col-start-2 min-w-0 whitespace-pre-wrap wrap-anywhere select-text">
           {item.description}
         </AlertDescription>
       )}

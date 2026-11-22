@@ -9,7 +9,7 @@ export const ErrorItem = memo(function ErrorItem({ item }: { item: ErrorChatItem
   return (
     <Alert variant="destructive" className="px-4 py-3">
       <XCircle />
-      <AlertDescription className="col-start-2 whitespace-pre-wrap break-words select-text text-destructive/90">
+      <AlertDescription className="col-start-2 min-w-0 whitespace-pre-wrap wrap-anywhere select-text text-destructive/90">
         {item.message}
       </AlertDescription>
     </Alert>

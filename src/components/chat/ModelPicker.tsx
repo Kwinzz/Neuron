@@ -2,6 +2,7 @@ import { memo, useEffect, useState } from "react";
 import { Check, ChevronDown, RefreshCw } from "lucide-react";
 import { cn } from "cn";
 import type { AgentKind } from "@/bindings/AgentKind";
+import type { ModelInfo } from "@/bindings/ModelInfo";
 import { AgentLogo, VendorLogo } from "@/components/ui/AgentLogo";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +21,8 @@ import { findModel, useModels } from "@/stores/models";
 interface ModelPickerProps {
   agent: AgentKind;
   model: string | null;
-  onChange: (agent: AgentKind, model: string | null) => void;
+  /** `model` null = provider default. */
+  onChange: (agent: AgentKind, model: ModelInfo | null) => void;
   /** Existing chat: the provider can't change (a different CLI = a new chat). */
   lockAgent?: boolean;
   disabled?: boolean;
@@ -39,7 +41,7 @@ export const ModelPicker = memo(function ModelPicker({ agent, model, onChange, l
   const current = findModel(providers, agent, model);
   const label = current?.label ?? model ?? `${AGENTS[agent].label} · par défaut`;
 
-  const pick = (a: AgentKind, m: string | null) => {
+  const pick = (a: AgentKind, m: ModelInfo | null) => {
     onChange(a, m);
     setOpen(false);
   };
@@ -93,14 +95,20 @@ export const ModelPicker = memo(function ModelPicker({ agent, model, onChange, l
                         key={m.id}
                         value={`${p.label} ${m.label} ${m.id}`}
                         disabled={locked || !p.available}
-                        onSelect={() => pick(p.agent, m.id)}
+                        onSelect={() => pick(p.agent, m)}
                       >
                         <VendorLogo vendor={m.vendor} size={14} />
                         <div className="flex min-w-0 flex-1 flex-col">
                           <span className="truncate">{m.label}</span>
-                          {m.hint && <span className="truncate text-xs text-muted-foreground">{m.hint}</span>}
+                          {(m.hint || m.effortModels) && (
+                            <span className="truncate text-xs text-muted-foreground">
+                              {[m.hint, m.effortModels ? `${m.efforts.length} niveaux de raisonnement` : null]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </span>
+                          )}
                         </div>
-                        <Check className={cn("size-4", p.agent === agent && model === m.id ? "opacity-100" : "opacity-0")} />
+                        <Check className={cn("size-4", p.agent === agent && current?.id === m.id ? "opacity-100" : "opacity-0")} />
                       </CommandItem>
                     ))}
                   </CommandGroup>

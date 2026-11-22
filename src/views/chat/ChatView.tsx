@@ -60,12 +60,12 @@ export function ChatView({ threadId }: { threadId: string }) {
   }, [scrollToBottom]);
 
   return (
-    <div className="flex min-h-full flex-col gap-4 px-4 pb-4 md:px-6">
+    <div className="flex min-h-full min-w-0 flex-col gap-4 px-4 pb-4 md:px-6">
       <ThreadHeader threadId={threadId} />
 
       <div
         ref={contentRef}
-        className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4"
+        className="mx-auto flex w-full min-w-0 max-w-3xl flex-1 flex-col gap-4"
       >
         {!loaded && (loading || thread === undefined) ? (
           <TimelineSkeleton />
