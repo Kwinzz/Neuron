@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
-import { PanelRight, Search } from "lucide-react";
+import { PanelRight, Plus, Search } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import { Kbd, MOD_LABEL } from "@/components/ui/Kbd";
 import { useLive } from "@/stores/live";
 import { useUi, type View } from "@/stores/ui";
 
-const VIEW_TITLE: Record<View["kind"], string> = {
-  home: "Mission Control",
-};
+/** Breadcrumb section + page title for the current view. */
+function useViewTitle(view: View): { section: string; title: string } {
+  const threadTitle = useLive((s) => (view.kind === "thread" ? s.threads[view.id]?.title : undefined));
+  if (view.kind === "thread") return { section: "Threads", title: threadTitle || "Thread" };
+  return { section: "Pages", title: "Mission Control" };
+}
 
 interface NavbarProps {
   /** Scroll container the navbar floats over (glass effect once scrolled). */
@@ -26,7 +30,7 @@ export function Navbar({ scrollRoot }: NavbarProps) {
     return () => scrollRoot.removeEventListener("scroll", onScroll);
   }, [scrollRoot]);
 
-  const title = VIEW_TITLE[view.kind];
+  const { section, title } = useViewTitle(view);
 
   return (
     <div className="sticky top-0 z-20 px-4 pb-4 pt-1">
@@ -37,14 +41,22 @@ export function Navbar({ scrollRoot }: NavbarProps) {
             : "border-transparent"
         }`}
       >
-        <div className="min-w-0">
-          <nav aria-label="Fil d'Ariane" className="text-xs text-fg-muted">
-            Pages <span className="px-1">/</span> <span className="text-fg">{title}</span>
+        <div className="min-w-0 flex-1">
+          <nav aria-label="Fil d'Ariane" className="truncate text-xs text-fg-muted">
+            {section} <span className="px-1">/</span> <span className="text-fg">{title}</span>
           </nav>
           <h1 className="truncate text-sm font-bold text-fg">{title}</h1>
         </div>
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex shrink-0 items-center gap-3">
+          <Button
+            className="whitespace-nowrap"
+            onClick={() => useUi.getState().setNewThreadOpen(true)}
+            title={`Nouveau thread (${MOD_LABEL}+N)`}
+          >
+            <Plus size={16} />
+            Nouveau thread
+          </Button>
           <SearchPill />
           <DockToggle />
         </div>

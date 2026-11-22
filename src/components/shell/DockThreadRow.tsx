@@ -2,7 +2,8 @@ import { memo } from "react";
 import { AgentBadge } from "@/components/ui/AgentBadge";
 import { LiveTimer } from "@/components/ui/LiveTimer";
 import { StatusIconBox } from "@/components/ui/StatusIconBox";
-import { formatTokens } from "@/lib/format";
+import { useNow } from "@/hooks/useNow";
+import { formatRelative, formatTokens } from "@/lib/format";
 import { STATUS, TONE_TEXT, describeStatus } from "@/lib/status";
 import { type Attention, useLive } from "@/stores/live";
 import { useUi } from "@/stores/ui";
@@ -67,13 +68,19 @@ export const DockThreadRow = memo(function DockThreadRow({ id }: { id: string })
           <span className="font-mono tabular-nums text-fg-muted" title="Tokens (entrée + sortie)">
             {formatTokens(thread.tokens)} tok
           </span>
-          <LiveTimer
-            startedAt={thread.runStartedAt}
-            endedAt={meta.active ? null : (thread.endedAt ?? thread.updatedAt)}
-            className="text-fg-muted"
-          />
+          {meta.active ? (
+            <LiveTimer startedAt={thread.runStartedAt} className="text-fg-muted" />
+          ) : (
+            <EndedAgo ts={thread.endedAt ?? thread.updatedAt} />
+          )}
         </div>
       </div>
     </button>
   );
 });
+
+/** "il y a 3 min" — leaf component with its own slow clock. */
+function EndedAgo({ ts }: { ts: number }) {
+  const now = useNow(30_000);
+  return <span className="text-fg-muted">{formatRelative(ts, now)}</span>;
+}

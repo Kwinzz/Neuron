@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   MessageSquare,
   PanelRight,
+  Plus,
   Search,
   Trash2,
 } from "lucide-react";
@@ -61,6 +62,21 @@ function useCommands(): Command[] {
     };
 
     const list: Command[] = [
+      {
+        id: "thread:new",
+        group: "Actions",
+        title: "Nouveau thread",
+        subtitle: "Lancer un agent dans un dossier",
+        keywords: "nouveau chat créer lancer agent claude",
+        icon: <Plus size={15} />,
+        hint: (
+          <span className="flex gap-1">
+            <Kbd>{MOD_LABEL}</Kbd>
+            <Kbd>N</Kbd>
+          </span>
+        ),
+        run: () => ui().setNewThreadOpen(true),
+      },
       {
         id: "nav:home",
         group: "Navigation",

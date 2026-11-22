@@ -124,6 +124,49 @@ pub struct ProviderUsage {
     /// Start of the counted window (Unix ms).
     #[ts(type = "number")]
     pub window_start: i64,
+    /// Utilization reported by the provider itself (e.g. Claude subscription windows), when known.
+    pub live: Option<LiveQuota>,
+}
+
+/// Provider-reported usage of a subscription window.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LiveQuota {
+    /// 0–1.
+    pub utilization: f64,
+    #[ts(type = "number | null")]
+    pub resets_at: Option<i64>,
+    /// When the agent last reported it (Unix ms).
+    #[ts(type = "number")]
+    pub reported_at: i64,
+}
+
+/// Claude Code reports `five_hour` / `seven_day` windows in `rate_limit_event`.
+fn live_quota(conn: &Connection, provider: &Provider) -> AppResult<Option<LiveQuota>> {
+    if provider.agent != AgentKind::ClaudeCode {
+        return Ok(None);
+    }
+    let window = match provider.window_kind {
+        WindowKind::Rolling5h => "five_hour",
+        WindowKind::Weekly => "seven_day",
+        _ => return Ok(None),
+    };
+    let Some(stored) = crate::db::settings::get(conn, crate::db::settings::CLAUDE_RATE_LIMITS)? else {
+        return Ok(None);
+    };
+    let reported_at = stored.get("updatedAt").and_then(serde_json::Value::as_i64).unwrap_or(0);
+    Ok(stored
+        .get("windows")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|ws| ws.iter().find(|w| w.get("window").and_then(serde_json::Value::as_str) == Some(window)))
+        .and_then(|w| {
+            Some(LiveQuota {
+                utilization: w.get("utilization")?.as_f64()?,
+                resets_at: w.get("resetsAt").and_then(serde_json::Value::as_i64),
+                reported_at,
+            })
+        }))
 }
 
 /// Editable fields of a provider card.
@@ -203,12 +246,14 @@ pub fn usage(conn: &Connection, provider: Provider, now: i64) -> AppResult<Provi
         _ => None,
     };
 
+    let live = live_quota(conn, &provider)?;
     Ok(ProviderUsage {
         provider,
         used,
         ratio,
         resets_at,
         window_start,
+        live,
     })
 }
 
@@ -312,6 +357,19 @@ mod tests {
 
             let bad = ProviderUpdate { alert_pct: 2.0, ..messages };
             assert!(update(conn, &bad, now).is_err());
+
+            assert!(usage(conn, get(conn, "claude-weekly")?.unwrap(), now)?.live.is_none());
+            crate::db::settings::set(
+                conn,
+                crate::db::settings::CLAUDE_RATE_LIMITS,
+                &serde_json::json!({"updatedAt": 5, "windows": [
+                    {"window": "five_hour", "utilization": 0.55, "resetsAt": 99},
+                    {"window": "seven_day", "utilization": 0.15, "resetsAt": null}
+                ]}),
+            )?;
+            let weekly = usage(conn, get(conn, "claude-weekly")?.unwrap(), now)?.live.unwrap();
+            assert_eq!((weekly.utilization, weekly.resets_at, weekly.reported_at), (0.15, None, 5));
+            assert!(usage(conn, get(conn, "codex")?.unwrap(), now)?.live.is_none());
             Ok(())
         })
         .await

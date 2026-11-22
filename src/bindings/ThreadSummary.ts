@@ -6,4 +6,8 @@ export type ThreadSummary = { id: string, projectId: string | null, projectName:
 /**
  * input + output tokens consumed by this thread.
  */
-tokens: number, costUsd: number, };
+tokens: number, costUsd: number, 
+/**
+ * Working directory of the agent process.
+ */
+cwd: string | null, permissionMode: string, };

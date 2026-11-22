@@ -170,6 +170,8 @@ pub enum AgentEvent {
         channel: DeltaChannel,
         text: String,
     },
+    /// A text/thinking item finished streaming (its full text is persisted).
+    MessageCompleted { message_id: String },
     /// A tool invocation started. `activity` is a short human label ("Édition de app.tsx").
     ToolCallStart {
         tool_call_id: String,

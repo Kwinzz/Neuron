@@ -1,7 +1,7 @@
 # Neuron — Contexte projet
 
 > Document vivant. **Mis à jour à chaque changement** (voir règle dans `CLAUDE.md`).
-> Dernière mise à jour : 2026-11-22 (Phase 1)
+> Dernière mise à jour : 2026-11-22 (Phase 2)
 
 ## Vision
 
@@ -79,12 +79,39 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 - [x] **Phase 0** — Init Tauri v2 + React/TS/Tailwind v4, CLAUDE.md, project.md, neon, bridge, schéma SQLite
 - [x] **Phase 1** — Shell (sidebar, dock live, palette Ctrl+K) + Mission Control sur SQLite
-- [ ] **Phase 2** — `AgentAdapter`, registre multi-threads, `ClaudeCodeAdapter`, chat streaming
+- [x] **Phase 2** — `AgentAdapter`, registre multi-threads, `ClaudeCodeAdapter`, chat streaming
 - [ ] **Phase 3** — Projets, `.neuron/context.md`, injection de contexte
 - [ ] **Phase 4** — Mémoire globale (`~/.neuron/memory.md` + SQLite), vue Mémoire, serveur MCP embarqué
 - [ ] **Phase 5** — Adaptateurs Antigravity / Codex / Generic PTY, paramètres, raccourcis, fluidité
 
 ## Journal des changements
+
+### 2026-11-22 — Phase 2 terminée : moteur d'agents + chat Claude Code
+- **Protocole vérifié en réel avant de coder** (sessions sondes) : `claude -p` en stream-json bidirectionnel garde
+  **un processus par thread pour plusieurs tours** ; permissions via `--permission-prompts host
+  --permission-prompt-tool stdio` (`control_request can_use_tool` ⇄ `control_response`). Sans
+  `--permission-prompt-tool stdio`, les demandes sont refusées d'office.
+- Back : `AgentAdapter` / `SessionSpec` / `AdapterEvent`, `ClaudeCodeAdapter` (spawn sans console, stdin/stdout/stderr
+  en tâches async, `--resume` après redémarrage), parseur pur testé sur 2 sessions réelles nettoyées,
+  `AgentRegistry` (sessions + pump par thread : persistance messages/outils/usage/statut, émission d'events,
+  permissions en attente, stop = interrupt puis kill de l'arbre après 5 s, `shutdown_all` à la fermeture),
+  statut granulaire par outil (`activity.rs`), migration `0003` (cwd, permission_mode, seq des outils),
+  commandes threads (create/send/permission/stop/history/rename/delete/prompt history/default cwd),
+  plugin dialog (choix du dossier), threads actifs remis à `idle` au démarrage.
+- **Quotas réels** : `rate_limit_event` de Claude (fenêtres 5h / 7j de l'abonnement) → `ProviderUsage.live`
+  → cartes « Abonnement · source Claude » avec % et réinitialisation, sans configuration.
+- Front : store `useChat` (deltas appliqués une fois par frame, dédup historique/live), vue **Nouveau thread**
+  (`Ctrl+N` : agent, dossier, modèle, permissions, premier message), navigation vers le chat depuis dock/palette/
+  tableaux, titre du thread dans la navbar.
+- **Vue chat** (neon / Gemini 4 Neon High, ~21 fichiers, 6 corrections par neon) : en-tête (renommage, modèle,
+  permissions, cwd, statut live, Stop), markdown + code coloré + copier, réflexion pliable, outils pliables avec
+  **diff** pour Edit, sortie tronquée, **carte d'autorisation** (Entrée / Échap), marqueurs de tour, composer
+  (historique ↑/↓, stop), suivi automatique du bas.
+- Test de bout en bout réel (Haiku, dossier jetable) : création + permission Write → fichier créé, 2e tour dans
+  le même processus (markdown + Rust coloré), Stop pendant un essai long → « Annulé » sans kill, rechargement →
+  historique intact, aucun processus orphelin même après fermeture forcée.
+- Corrigé pendant le test : navbar qui passait sur 2 lignes, threads « Inactif » avec chronos absurdes dans le dock
+  (exclus ; les terminés affichent « il y a … »), focus perdu après une autorisation, double coche.
 
 ### 2026-11-22 — Ajustements UI après comparaison au template
 - **Cause du « on ne distingue pas les conteneurs »** : le `<style>` inline de `index.html` (`html, body {background}`)
@@ -145,6 +172,9 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 - Correctif : la crate `tauri` résolue en 2.11 vs npm 2.12 → alignée en 2.12.7 et version mineure fixée.
 
 ## Questions ouvertes
+
+- Bundle front > 500 kB (highlight.js) : charger la vue chat à la demande (lazy) en Phase 5.
+- Processus inactifs : pas encore d'arrêt après inactivité (ils restent vivants jusqu'à fermeture/suppression).
 
 - Source des données de quotas (Claude Pro/Max, Antigravity, Codex) : saisie manuelle dans les paramètres vs lecture
   depuis les CLI quand disponible — à trancher en Phase 1/5.

@@ -9,6 +9,8 @@ import { useDashboard } from "@/stores/dashboard";
 import { Placeholder } from "./Placeholder";
 import { QuotaEditor } from "./QuotaEditor";
 import {
+  effectiveRatio,
+  effectiveResetsAt,
   formatQuotaValue,
   LEVEL_COLOR,
   LEVEL_TEXT,
@@ -66,7 +68,9 @@ export function TopQuotaCard() {
     );
   }
 
-  const { provider, used, ratio, resetsAt } = top;
+  const { provider, used, live } = top;
+  const ratio = effectiveRatio(top);
+  const resetsAt = effectiveResetsAt(top);
   const level = quotaLevel(ratio, provider.alertPct);
   const isAlert = level === "warn" || level === "danger";
   const iconTone =
@@ -98,7 +102,7 @@ export function TopQuotaCard() {
         </RingGauge>
 
         <div className="glass-tile relative -mt-8 flex w-full max-w-[260px] items-center justify-between rounded-xl px-5 py-3">
-          {ratio != null && provider.limitValue != null ? (
+          {ratio != null && (live || provider.limitValue != null) ? (
             <>
               <span className="text-xs text-fg-muted">0 %</span>
               <div className="flex flex-col items-center text-center">
@@ -106,8 +110,9 @@ export function TopQuotaCard() {
                   {formatPercent(ratio)}
                 </span>
                 <span className="mt-0.5 text-xs tabular-nums text-fg-muted">
-                  {formatQuotaValue(used, provider.unit)} /{" "}
-                  {formatQuotaValue(provider.limitValue, provider.unit)}
+                  {live || provider.limitValue == null
+                    ? "abonnement Claude"
+                    : `${formatQuotaValue(used, provider.unit)} / ${formatQuotaValue(provider.limitValue, provider.unit)}`}
                 </span>
               </div>
               <span className="text-xs text-fg-muted">100 %</span>

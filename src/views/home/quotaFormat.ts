@@ -79,13 +79,26 @@ export const LEVEL_TEXT: Record<QuotaLevel, string> = {
   danger: "text-danger",
 };
 
+/**
+ * Ratio shown for a quota: the provider-reported subscription utilization when known (Claude 5h/7d
+ * windows), else used / configured limit.
+ */
+export function effectiveRatio(usage: ProviderUsage): number | null {
+  return usage.live?.utilization ?? usage.ratio;
+}
+
+export function effectiveResetsAt(usage: ProviderUsage): number | null {
+  return usage.live?.resetsAt ?? usage.resetsAt;
+}
+
 export function pickTopProvider(list: readonly ProviderUsage[] | undefined): ProviderUsage | null {
   if (!list || list.length === 0) return null;
 
   let bestWithRatio: ProviderUsage | null = null;
   for (const item of list) {
-    if (item.ratio != null) {
-      if (bestWithRatio === null || item.ratio > (bestWithRatio.ratio ?? -1)) {
+    const r = effectiveRatio(item);
+    if (r != null) {
+      if (bestWithRatio === null || r > (effectiveRatio(bestWithRatio) ?? -1)) {
         bestWithRatio = item;
       }
     }

@@ -28,11 +28,14 @@ pub struct ThreadSummary {
     #[ts(type = "number")]
     pub tokens: i64,
     pub cost_usd: f64,
+    /// Working directory of the agent process.
+    pub cwd: Option<String>,
+    pub permission_mode: String,
 }
 
 const SELECT: &str = "SELECT t.id, t.project_id, p.name, t.agent, t.model, t.title, t.status,
             t.created_at, t.updated_at, t.ended_at,
-            COALESCE(u.tokens, 0), COALESCE(u.cost, 0.0)
+            COALESCE(u.tokens, 0), COALESCE(u.cost, 0.0), t.cwd, t.permission_mode
      FROM threads t
      LEFT JOIN projects p ON p.id = t.project_id
      LEFT JOIN (SELECT thread_id, SUM(input_tokens + output_tokens) AS tokens, SUM(cost_usd) AS cost
@@ -52,7 +55,109 @@ fn from_row(row: &Row<'_>) -> rusqlite::Result<ThreadSummary> {
         ended_at: row.get(9)?,
         tokens: row.get(10)?,
         cost_usd: row.get(11)?,
+        cwd: row.get(12)?,
+        permission_mode: row.get(13)?,
     })
+}
+
+/// Fields needed to (re)start a session.
+#[derive(Debug, Clone)]
+pub struct ThreadRuntime {
+    pub id: String,
+    pub agent: AgentKind,
+    pub project_id: Option<String>,
+    pub model: Option<String>,
+    pub cwd: Option<String>,
+    pub permission_mode: String,
+    pub session_ref: Option<String>,
+    pub title: String,
+}
+
+pub struct NewThread<'a> {
+    pub id: &'a str,
+    pub agent: AgentKind,
+    pub project_id: Option<&'a str>,
+    pub model: Option<&'a str>,
+    pub title: &'a str,
+    pub cwd: &'a str,
+    pub permission_mode: &'a str,
+    pub now: i64,
+}
+
+pub fn create(conn: &Connection, t: &NewThread<'_>) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO threads (id, project_id, agent, model, title, status, created_at, updated_at, cwd, permission_mode)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'idle', ?6, ?6, ?7, ?8)",
+        rusqlite::params![t.id, t.project_id, t.agent, t.model, t.title, t.now, t.cwd, t.permission_mode],
+    )?;
+    Ok(())
+}
+
+pub fn runtime(conn: &Connection, id: &str) -> AppResult<Option<ThreadRuntime>> {
+    let mut stmt = conn.prepare_cached(
+        "SELECT id, agent, project_id, model, cwd, permission_mode, session_ref, title FROM threads WHERE id = ?1",
+    )?;
+    Ok(stmt
+        .query_row([id], |r| {
+            Ok(ThreadRuntime {
+                id: r.get(0)?,
+                agent: r.get(1)?,
+                project_id: r.get(2)?,
+                model: r.get(3)?,
+                cwd: r.get(4)?,
+                permission_mode: r.get(5)?,
+                session_ref: r.get(6)?,
+                title: r.get(7)?,
+            })
+        })
+        .optional()?)
+}
+
+pub fn set_status(conn: &Connection, id: &str, status: ThreadStatus, now: i64) -> AppResult<()> {
+    let ended = (!status.is_active()).then_some(now);
+    conn.execute(
+        "UPDATE threads SET status = ?2, updated_at = ?3, ended_at = ?4 WHERE id = ?1",
+        rusqlite::params![id, status, now, ended],
+    )?;
+    Ok(())
+}
+
+pub fn set_session(conn: &Connection, id: &str, session_ref: &str, model: Option<&str>) -> AppResult<()> {
+    conn.execute(
+        "UPDATE threads SET session_ref = ?2, model = COALESCE(model, ?3) WHERE id = ?1",
+        rusqlite::params![id, session_ref, model],
+    )?;
+    Ok(())
+}
+
+pub fn set_title_if_empty(conn: &Connection, id: &str, title: &str) -> AppResult<()> {
+    conn.execute("UPDATE threads SET title = ?2 WHERE id = ?1 AND title = ''", rusqlite::params![id, title])?;
+    Ok(())
+}
+
+pub fn rename(conn: &Connection, id: &str, title: &str) -> AppResult<()> {
+    conn.execute("UPDATE threads SET title = ?2 WHERE id = ?1", rusqlite::params![id, title])?;
+    Ok(())
+}
+
+pub fn delete(conn: &Connection, id: &str) -> AppResult<()> {
+    conn.execute("DELETE FROM threads WHERE id = ?1", [id])?;
+    Ok(())
+}
+
+/// At startup no agent process is alive: threads left "active" by a previous run become idle.
+pub fn reset_stale_active(conn: &Connection, now: i64) -> AppResult<usize> {
+    let sql = format!(
+        "UPDATE threads SET status = 'idle', updated_at = ?1, ended_at = ?1 WHERE status IN ({})",
+        ThreadStatus::active_sql_list()
+    );
+    let n = conn.execute(&sql, [now])?;
+    conn.execute(
+        "UPDATE tool_calls SET status = 'error', ended_at = ?1, output = COALESCE(output, 'Interrompu (Neuron fermé)')
+         WHERE status = 'running'",
+        [now],
+    )?;
+    Ok(n)
 }
 
 pub fn list_recent(conn: &Connection, limit: u32) -> AppResult<Vec<ThreadSummary>> {

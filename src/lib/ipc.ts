@@ -4,8 +4,11 @@
  */
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { AgentEventEnvelope } from "@/bindings/AgentEventEnvelope";
 import type { AppInfo } from "@/bindings/AppInfo";
+import type { ChatItem } from "@/bindings/ChatItem";
+import type { NewThreadInput } from "@/bindings/NewThreadInput";
 import type { DashboardSnapshot } from "@/bindings/DashboardSnapshot";
 import type { IpcError } from "@/bindings/IpcError";
 import type { ProjectSummary } from "@/bindings/ProjectSummary";
@@ -48,6 +51,24 @@ export const ipc = {
   listProjects: () => invoke<ProjectSummary[]>("list_projects"),
   listThreads: (limit?: number) => invoke<ThreadSummary[]>("list_threads", { limit }),
   getThread: (id: string) => invoke<ThreadSummary>("get_thread", { id }),
+
+  // Threads & chat
+  createThread: (input: NewThreadInput) => invoke<ThreadSummary>("create_thread", { input }),
+  sendMessage: (threadId: string, text: string) => invoke<void>("send_message", { threadId, text }),
+  respondPermission: (threadId: string, requestId: string, allow: boolean) =>
+    invoke<void>("respond_permission", { threadId, requestId, allow }),
+  stopThread: (threadId: string) => invoke<void>("stop_thread", { threadId }),
+  threadHistory: (threadId: string) => invoke<ChatItem[]>("get_thread_history", { threadId }),
+  renameThread: (threadId: string, title: string) => invoke<void>("rename_thread", { threadId, title }),
+  deleteThread: (threadId: string) => invoke<void>("delete_thread", { threadId }),
+  runningThreads: () => invoke<string[]>("running_threads"),
+  promptHistory: (projectId?: string | null) => invoke<string[]>("prompt_history", { projectId: projectId ?? null }),
+  defaultCwd: () => invoke<string>("default_cwd"),
+  /** Native folder picker; resolves to null when cancelled. */
+  pickDirectory: async (defaultPath?: string): Promise<string | null> => {
+    const picked = await openDialog({ directory: true, multiple: false, ...(defaultPath ? { defaultPath } : {}) });
+    return typeof picked === "string" ? picked : null;
+  },
 
   // Debug builds only (rejected in release)
   dev: {

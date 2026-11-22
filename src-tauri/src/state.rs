@@ -3,10 +3,14 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
+use std::sync::Arc;
+
 use tauri::{AppHandle, Manager};
 
-use crate::db::Db;
+use crate::agents::registry::AgentRegistry;
+use crate::db::{Db, threads};
 use crate::error::AppResult;
+use crate::util::now_ms;
 
 /// Filesystem locations used by Neuron.
 #[derive(Debug, Clone)]
@@ -21,6 +25,8 @@ pub struct AppPaths {
 
 pub struct AppState {
     pub db: Db,
+    /// Running agent sessions (one process per active thread).
+    pub agents: Arc<AgentRegistry>,
     pub paths: AppPaths,
     /// Time from process start to the end of `setup` (includes window/WebView creation), in ms.
     pub setup_ms: u64,
@@ -48,8 +54,15 @@ impl AppState {
         let db = Db::open(&db_path)?;
         let db_open_us = as_u64(db_started.elapsed().as_micros());
 
+        // No agent process survives a restart: threads left active become idle.
+        let reset = db.blocking(|c| threads::reset_stale_active(c, now_ms()))?;
+        if reset > 0 {
+            tracing::info!(reset, "stale active threads reset");
+        }
+
         Ok(Self {
             db,
+            agents: Arc::new(AgentRegistry::new()),
             paths: AppPaths {
                 data_dir,
                 db_path,

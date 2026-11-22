@@ -95,6 +95,22 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
   `AGENT_ORDER` (claude → antigravity → codex → generic) ; ne jamais réordonner par rang. Texte jamais coloré
   avec la couleur de série ; identité jamais portée par la couleur seule (toujours un libellé).
 
+## Moteur d'agents (Phase 2)
+
+- `AgentAdapter::start(&SessionSpec) -> SessionHandle` : lance **un processus longue durée par thread**
+  (commandes via `mpsc`, `AdapterEvent`s en sortie). Parsing = fonction pure testée sur des flux réels
+  (`agents/claude/fixtures/*.jsonl`, nettoyés des chemins/infos perso).
+- Claude Code : `claude -p --input-format stream-json --output-format stream-json --verbose
+  --include-partial-messages --permission-prompts host --permission-prompt-tool stdio --permission-mode <m>
+  [--model] [--resume <session_id>]`. Permissions : `control_request can_use_tool` ⇄ `control_response allow/deny`.
+  Arrêt : `control_request interrupt`, puis kill de l'arbre de processus après 5 s.
+- `AgentRegistry` (dans `AppState`) : sessions par thread + une tâche *pump* par session qui persiste
+  (messages / tool_calls partagent `seq`, `token_usage`, statut) puis émet sur `agent://event`.
+  Au démarrage, les threads restés actifs repassent `idle` ; à la fermeture, tous les processus sont tués.
+- `rate_limit_event` (fenêtres 5h / 7j de l'abonnement Claude) → `settings.claude.rate_limits` → `ProviderUsage.live`.
+- Front : `useChat` (timeline par thread, événements appliqués **une fois par frame**), `ChatItem` = même type
+  pour l'historique et le live.
+
 ## Dev
 
 - `NEURON_DATA_DIR=<dossier>` : base SQLite isolée (tests manuels, captures).

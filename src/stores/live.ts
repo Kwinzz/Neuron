@@ -157,7 +157,9 @@ export function selectDockIds(state: LiveState, now: number): string[] {
   const recent = all
     .filter(
       (t) =>
-        !STATUS[t.status].active && (t.id in state.attention || now - (t.endedAt ?? t.updatedAt) < DOCK_LINGER_MS),
+        !STATUS[t.status].active &&
+        t.status !== "idle" &&
+        (t.id in state.attention || now - (t.endedAt ?? t.updatedAt) < DOCK_LINGER_MS),
     )
     .sort((a, b) => (b.endedAt ?? b.updatedAt) - (a.endedAt ?? a.updatedAt));
   return [...active, ...recent].map((t) => t.id);

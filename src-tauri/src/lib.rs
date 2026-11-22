@@ -9,7 +9,7 @@ pub mod util;
 
 use std::time::Instant;
 
-use tauri::Manager;
+use tauri::{Manager, RunEvent};
 use tracing_subscriber::EnvFilter;
 
 use crate::state::AppState;
@@ -19,7 +19,8 @@ pub fn run() {
     let started = Instant::now();
     init_tracing();
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
             let state = AppState::init(app.handle(), started)?;
             tracing::info!(
@@ -39,12 +40,31 @@ pub fn run() {
             commands::dashboard::list_projects,
             commands::dashboard::list_threads,
             commands::dashboard::get_thread,
+            commands::threads::create_thread,
+            commands::threads::send_message,
+            commands::threads::respond_permission,
+            commands::threads::stop_thread,
+            commands::threads::get_thread_history,
+            commands::threads::rename_thread,
+            commands::threads::delete_thread,
+            commands::threads::running_threads,
+            commands::threads::prompt_history,
+            commands::threads::default_cwd,
             commands::dev::dev_seed_demo,
             commands::dev::dev_clear_demo,
             commands::dev::dev_simulate_activity,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Neuron");
+        .build(tauri::generate_context!())
+        .expect("error while building Neuron");
+
+    app.run(|handle, event| {
+        if let RunEvent::Exit = event {
+            // Never leave orphan agent processes behind.
+            if let Some(state) = handle.try_state::<AppState>() {
+                state.agents.shutdown_all();
+            }
+        }
+    });
 }
 
 fn init_tracing() {

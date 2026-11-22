@@ -1,4 +1,127 @@
-//! Multi-agent engine. Phase 0 defines the normalized event contract shared with the frontend;
-//! the `AgentAdapter` trait, process registry and adapters arrive in Phase 2.
+//! Multi-agent engine.
+//!
+//! - [`AgentAdapter`]: starts an agent CLI as a long-lived session for one thread.
+//! - Adapters translate their native output into [`AdapterEvent`]s (internal, richer than the UI events).
+//! - [`registry::AgentRegistry`] owns running sessions and runs one *pump* task per thread that persists
+//!   adapter events to SQLite and emits normalized [`events::AgentEvent`]s to the frontend.
 
+pub mod activity;
+pub mod claude;
 pub mod events;
+pub mod registry;
+
+use std::path::PathBuf;
+
+use serde_json::Value;
+use tokio::sync::mpsc;
+
+use crate::agents::events::{AgentKind, DeltaChannel, ThreadStatus, TokenUsage};
+use crate::error::AppResult;
+
+/// Everything needed to start (or resume) a session for a thread.
+#[derive(Debug, Clone)]
+pub struct SessionSpec {
+    pub thread_id: String,
+    pub cwd: PathBuf,
+    pub model: Option<String>,
+    pub permission_mode: String,
+    /// Agent-native session id to resume (e.g. Claude Code `session_id`).
+    pub resume: Option<String>,
+    /// Extra context appended to the agent's system prompt (Phase 3: project context + memory).
+    pub append_system_prompt: Option<String>,
+}
+
+/// Commands sent to a running session.
+#[derive(Debug, Clone)]
+pub enum SessionCommand {
+    /// A new user turn.
+    Prompt(String),
+    /// Answer to a pending permission request.
+    Permission(PermissionDecision),
+    /// Ask the agent to stop the current turn (keeps the session alive when supported).
+    Interrupt,
+    /// Close stdin and terminate the process.
+    Shutdown,
+}
+
+#[derive(Debug, Clone)]
+pub struct PermissionDecision {
+    pub request_id: String,
+    pub allow: bool,
+    /// Original tool input, echoed back on allow.
+    pub input: Value,
+    pub message: Option<String>,
+}
+
+/// One usage window reported by the agent's provider (e.g. Claude 5-hour / 7-day limits).
+#[derive(Debug, Clone, PartialEq)]
+pub struct RateLimitWindow {
+    pub window: String,
+    /// 0–1.
+    pub utilization: f64,
+    /// Unix ms.
+    pub resets_at: Option<i64>,
+}
+
+/// Normalized events produced by adapters, consumed by the registry pump.
+#[derive(Debug, Clone, PartialEq)]
+pub enum AdapterEvent {
+    SessionInit { session_ref: String, model: Option<String> },
+    Status { status: ThreadStatus, detail: Option<String> },
+    TextDelta { item_id: String, channel: DeltaChannel, text: String },
+    /// A text/thinking block is complete (full text, for persistence).
+    BlockCompleted { item_id: String, channel: DeltaChannel, text: String },
+    ToolCallStart { id: String, name: String, input: Value },
+    ToolCallResult { id: String, output: String, is_error: bool },
+    PermissionRequest {
+        request_id: String,
+        tool_name: String,
+        description: String,
+        input: Value,
+        tool_use_id: Option<String>,
+    },
+    /// End of a turn with its usage.
+    TurnComplete { usage: TokenUsage, duration_ms: Option<i64>, error: Option<String> },
+    RateLimits(Vec<RateLimitWindow>),
+    /// Recoverable adapter problem (unparseable line, unexpected payload…).
+    Warning(String),
+    /// The process exited.
+    Exited { code: Option<i32>, stderr_tail: String },
+}
+
+/// Handle to a running session.
+pub struct SessionHandle {
+    pub commands: mpsc::UnboundedSender<SessionCommand>,
+    pub events: mpsc::UnboundedReceiver<AdapterEvent>,
+    /// OS process id, for forced termination of the whole process tree.
+    pub pid: Option<u32>,
+}
+
+/// A CLI agent integration.
+pub trait AgentAdapter: Send + Sync {
+    fn kind(&self) -> AgentKind;
+    /// Spawn the agent process for `spec`. Must not block: I/O runs on background tasks.
+    fn start(&self, spec: &SessionSpec) -> AppResult<SessionHandle>;
+}
+
+/// Kill a process and all its children (agents spawn shells, servers, …).
+pub fn kill_process_tree(pid: u32) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let _ = std::process::Command::new("taskkill")
+            .args(["/T", "/F", "/PID", &pid.to_string()])
+            .creation_flags(CREATE_NO_WINDOW)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = std::process::Command::new("kill")
+            .args(["-TERM", &format!("-{pid}")])
+            .status();
+        let _ = std::process::Command::new("kill").args(["-TERM", &pid.to_string()]).status();
+    }
+}

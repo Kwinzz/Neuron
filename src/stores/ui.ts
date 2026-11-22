@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type View = { kind: "home" };
+export type View = { kind: "home" } | { kind: "thread"; id: string };
 
 const DOCK_KEY = "neuron.dockOpen";
 
@@ -24,7 +24,8 @@ interface UiState {
   view: View;
   paletteOpen: boolean;
   dockOpen: boolean;
-  /** Thread currently focused by the user (dock highlight; chat view from Phase 2). */
+  newThreadOpen: boolean;
+  /** Thread currently open in the chat view (dock highlight, attention suppression). */
   focusedThreadId: string | null;
   /** Project filter selected in the sidebar (null = all). */
   selectedProjectId: string | null;
@@ -34,6 +35,8 @@ interface UiState {
   togglePalette: () => void;
   setDockOpen: (open: boolean) => void;
   toggleDock: () => void;
+  setNewThreadOpen: (open: boolean) => void;
+  /** Open a thread in the chat view (null = back to home). */
   focusThread: (id: string | null) => void;
   selectProject: (id: string | null) => void;
 }
@@ -42,10 +45,11 @@ export const useUi = create<UiState>((set, get) => ({
   view: { kind: "home" },
   paletteOpen: false,
   dockOpen: readDockPref(),
+  newThreadOpen: false,
   focusedThreadId: null,
   selectedProjectId: null,
 
-  navigate: (view) => set({ view }),
+  navigate: (view) => set({ view, focusedThreadId: view.kind === "thread" ? view.id : null }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   togglePalette: () => set({ paletteOpen: !get().paletteOpen }),
   setDockOpen: (dockOpen) => {
@@ -53,6 +57,7 @@ export const useUi = create<UiState>((set, get) => ({
     set({ dockOpen });
   },
   toggleDock: () => get().setDockOpen(!get().dockOpen),
-  focusThread: (focusedThreadId) => set({ focusedThreadId }),
+  setNewThreadOpen: (newThreadOpen) => set({ newThreadOpen, paletteOpen: false }),
+  focusThread: (id) => get().navigate(id ? { kind: "thread", id } : { kind: "home" }),
   selectProject: (selectedProjectId) => set({ selectedProjectId }),
 }));

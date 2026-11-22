@@ -12,6 +12,8 @@ import {
   LEVEL_TEXT,
   quotaLevel,
   WINDOW_LABEL,
+  effectiveRatio,
+  effectiveResetsAt,
 } from "./quotaFormat";
 import { ResetCountdown } from "./ResetCountdown";
 
@@ -30,7 +32,9 @@ export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
     });
   }, []);
 
-  const { provider, used, ratio, resetsAt } = usage;
+  const { provider, used, live } = usage;
+  const ratio = effectiveRatio(usage);
+  const resetsAt = effectiveResetsAt(usage);
   const level = quotaLevel(ratio, provider.alertPct);
   const isAlert = level === "warn" || level === "danger";
   const windowLabel = WINDOW_LABEL[provider.windowKind];
@@ -88,6 +92,11 @@ export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
           <span className={`inline-flex items-center gap-1 font-bold ${LEVEL_TEXT[level]}`}>
             <AlertTriangle size={12} className="shrink-0" />
             <span>{level === "danger" ? "Quota dépassé" : "Seuil d'alerte atteint"}</span>
+          </span>
+        ) : live ? (
+          <span className="inline-flex items-center gap-1.5 text-fg-muted" title="Utilisation rapportée par Claude Code">
+            <span className="size-1.5 rounded-full bg-accent-2" aria-hidden />
+            Abonnement · source Claude
           </span>
         ) : provider.limitValue == null ? (
           <span className="inline-flex items-center gap-1.5 text-fg-muted">

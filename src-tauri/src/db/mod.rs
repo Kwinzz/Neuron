@@ -1,9 +1,11 @@
 //! SQLite access. All queries go through [`Db::call`], which runs on Tokio's blocking pool
 //! so the async runtime (and therefore the UI) never waits on disk I/O.
 
+pub mod chat;
 pub mod migrations;
 pub mod projects;
 pub mod providers;
+pub mod settings;
 pub mod threads;
 pub mod usage;
 
@@ -40,6 +42,18 @@ impl Db {
         Self {
             conn: Arc::new(Mutex::new(conn)),
         }
+    }
+
+    /// Synchronous access, for startup code that runs before the async runtime is relevant.
+    pub fn blocking<F, T>(&self, f: F) -> AppResult<T>
+    where
+        F: FnOnce(&mut Connection) -> AppResult<T>,
+    {
+        let mut guard = self
+            .conn
+            .lock()
+            .map_err(|_| AppError::Other("database mutex poisoned".into()))?;
+        f(&mut guard)
     }
 
     /// Run `f` with exclusive access to the connection on the blocking thread pool.
