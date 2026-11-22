@@ -99,7 +99,7 @@ impl CodexParser {
 
     fn tool(&mut self, id: String, name: &str, input: Value) -> Vec<AdapterEvent> {
         if self.started.insert(id.clone()) {
-            vec![AdapterEvent::ToolCallStart { id, name: name.to_string(), input }]
+            vec![AdapterEvent::ToolCallStart { id, name: name.to_string(), input, parent_id: None }]
         } else {
             Vec::new()
         }

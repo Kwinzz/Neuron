@@ -425,7 +425,7 @@ impl AgentRegistry {
                     persist!(move |c| chat::insert_message(c, &mid, &tid, role, &text, None, now_ms()));
                     emit(&app, &id, AgentEvent::MessageCompleted { message_id: item_id });
                 }
-                AdapterEvent::ToolCallStart { id: tool_id, name, input } => {
+                AdapterEvent::ToolCallStart { id: tool_id, name, input, parent_id } => {
                     let (status, detail) = tool_activity(&name, &input);
                     {
                         let (tid, tool, n, inp) = (id.clone(), tool_id.clone(), name.clone(), input.clone());
@@ -434,7 +434,13 @@ impl AgentRegistry {
                     emit(
                         &app,
                         &id,
-                        AgentEvent::ToolCallStart { tool_call_id: tool_id, name, input, activity: detail.clone() },
+                        AgentEvent::ToolCallStart {
+                            tool_call_id: tool_id,
+                            name,
+                            input,
+                            activity: detail.clone(),
+                            parent_tool_call_id: parent_id,
+                        },
                     );
                     let (changed, status_changed, detail) = set_status(status, detail, &mut last_status);
                     if status_changed {
@@ -522,6 +528,21 @@ impl AgentRegistry {
                         });
                         persist!(move |c| settings::set(c, settings::CLAUDE_RATE_LIMITS, &value));
                     }
+                }
+                AdapterEvent::Subagent { tool_call_id, description, subagent_type, status, tool_uses, tokens, last_tool } => {
+                    emit(
+                        &app,
+                        &id,
+                        AgentEvent::SubagentUpdate {
+                            tool_call_id,
+                            description,
+                            subagent_type,
+                            status,
+                            tool_uses,
+                            tokens,
+                            last_tool,
+                        },
+                    );
                 }
                 AdapterEvent::Warning(w) => tracing::debug!(thread = %id, "{w}"),
                 AdapterEvent::Exited { code, stderr_tail } => {

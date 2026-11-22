@@ -82,7 +82,17 @@ pub enum AdapterEvent {
     TextDelta { item_id: String, channel: DeltaChannel, text: String },
     /// A text/thinking block is complete (full text, for persistence).
     BlockCompleted { item_id: String, channel: DeltaChannel, text: String },
-    ToolCallStart { id: String, name: String, input: Value },
+    /// `parent_id`: set for calls made by a sub-agent (id of the call that launched it).
+    ToolCallStart { id: String, name: String, input: Value, parent_id: Option<String> },
+    Subagent {
+        tool_call_id: String,
+        description: Option<String>,
+        subagent_type: Option<String>,
+        status: crate::agents::events::SubagentStatus,
+        tool_uses: Option<u64>,
+        tokens: Option<u64>,
+        last_tool: Option<String>,
+    },
     ToolCallResult { id: String, output: String, is_error: bool },
     PermissionRequest {
         request_id: String,

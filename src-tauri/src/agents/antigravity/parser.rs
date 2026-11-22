@@ -115,6 +115,7 @@ impl AntigravityParser {
                         id: self.id(step),
                         name,
                         input: s.pointer("/tool_info/parameters").cloned().unwrap_or(Value::Null),
+                        parent_id: None,
                     });
                 }
                 if done && self.finished_tools.insert(step) {

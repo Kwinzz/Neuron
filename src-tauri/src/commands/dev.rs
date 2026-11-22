@@ -9,7 +9,7 @@ use rusqlite::{Connection, params};
 use tauri::{AppHandle, Emitter, State};
 
 use crate::agents::events::{
-    AGENT_EVENT_CHANNEL, AgentEvent, AgentEventEnvelope, AgentKind, DeltaChannel, ThreadStatus, TokenUsage,
+    AGENT_EVENT_CHANNEL, AgentEvent, AgentEventEnvelope, AgentKind, DeltaChannel, SubagentStatus, ThreadStatus, TokenUsage,
 };
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
@@ -157,6 +157,25 @@ pub async fn dev_clear_demo(state: State<'_, AppState>) -> AppResult<()> {
 
 /// Simulate ~30 s of live activity on the active demo threads: status changes, deltas and token
 /// usage are emitted on the real event channel and persisted like a real adapter would.
+const SIM_WORDS: &[&str] = &[
+    "Je regarde la structure ",
+    "du module. ",
+    "Le registre lance un processus par chat",
+    "\nEnsuite je vérifie les tests ",
+    "et je corrige l'import manquant. ",
+    "\nTout compile, ",
+    "je relance la suite de tests.",
+];
+
+const SIM_TOOLS: &[(&str, &str)] = &[
+    ("Read", "src/agents/registry.rs"),
+    ("Grep", "fn reap_idle"),
+    ("Edit", "src/stores/activity.ts"),
+    ("Bash", "cargo test --lib"),
+    ("Glob", "src/**/*.tsx"),
+    ("Bash", "npm run build"),
+];
+
 #[tauri::command]
 pub async fn dev_simulate_activity(app: AppHandle, state: State<'_, AppState>) -> AppResult<usize> {
     ensure_debug()?;
@@ -207,10 +226,75 @@ pub async fn dev_simulate_activity(app: AppHandle, state: State<'_, AppState>) -
                 }
                 if current == ThreadStatus::Thinking || current == ThreadStatus::Editing {
                     emit(thread_id, AgentEvent::MessageDelta {
-                        message_id: format!("{thread_id}-m"),
+                        message_id: format!("{thread_id}-m{}", tick / 6),
                         channel: DeltaChannel::Text,
-                        text: "…".into(),
+                        text: SIM_WORDS[(tick * 7 + i) % SIM_WORDS.len()].into(),
                     });
+                }
+                // Mini-terminal activity: one tool call per tick, finished on the next one.
+                if i == 2 && tick == 0 {
+                    emit(thread_id, AgentEvent::PermissionRequest {
+                        request_id: format!("{thread_id}-perm"),
+                        tool_name: "Bash".into(),
+                        description: "cargo publish --dry-run".into(),
+                        input: serde_json::json!({ "command": "cargo publish --dry-run" }),
+                    });
+                }
+                if i != 2 {
+                    if tick > 0 {
+                        emit(thread_id, AgentEvent::ToolCallResult {
+                            tool_call_id: format!("{thread_id}-t{}", tick - 1),
+                            output: "ok".into(),
+                            is_error: (tick + i) % 11 == 0,
+                        });
+                    }
+                    let (name, input) = SIM_TOOLS[(tick + i) % SIM_TOOLS.len()];
+                    // Thread 0 runs a sub-agent between ticks 4 and 14: its calls carry the launcher id.
+                    let launcher = format!("{thread_id}-agent");
+                    let in_sub = i == 0 && (5..14).contains(&tick);
+                    emit(thread_id, AgentEvent::ToolCallStart {
+                        tool_call_id: format!("{thread_id}-t{tick}"),
+                        name: name.into(),
+                        input: serde_json::json!({ "command": input, "file_path": input }),
+                        activity: Some(format!("{name} {input}")),
+                        parent_tool_call_id: in_sub.then(|| launcher.clone()),
+                    });
+                    if i == 0 && tick == 4 {
+                        emit(thread_id, AgentEvent::ToolCallStart {
+                            tool_call_id: launcher.clone(),
+                            name: "Agent".into(),
+                            input: serde_json::json!({ "description": "Explorer le module agents", "subagent_type": "Explore" }),
+                            activity: Some("Agent Explorer le module agents".into()),
+                            parent_tool_call_id: None,
+                        });
+                    }
+                    if i == 0 && (4..14).contains(&tick) {
+                        emit(thread_id, AgentEvent::SubagentUpdate {
+                            tool_call_id: launcher.clone(),
+                            description: Some("Explorer le module agents".into()),
+                            subagent_type: Some("Explore".into()),
+                            status: SubagentStatus::Running,
+                            tool_uses: Some((tick - 4) as u64),
+                            tokens: Some(((tick - 3) * 2_400) as u64),
+                            last_tool: Some(name.into()),
+                        });
+                    }
+                    if i == 0 && tick == 14 {
+                        emit(thread_id, AgentEvent::SubagentUpdate {
+                            tool_call_id: launcher.clone(),
+                            description: Some("Explorer le module agents".into()),
+                            subagent_type: Some("Explore".into()),
+                            status: SubagentStatus::Completed,
+                            tool_uses: Some(9),
+                            tokens: Some(24_000),
+                            last_tool: None,
+                        });
+                        emit(thread_id, AgentEvent::ToolCallResult {
+                            tool_call_id: launcher.clone(),
+                            output: "Le module agents contient 4 adaptateurs.".into(),
+                            is_error: false,
+                        });
+                    }
                 }
                 if i != 2 {
                     let delta = TokenUsage {

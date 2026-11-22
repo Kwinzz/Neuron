@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { events, notify } from "@/lib/ipc";
+import { useActivity } from "@/stores/activity";
 import { useChat } from "@/stores/chat";
 import { useDashboard } from "@/stores/dashboard";
 import { type Attention, attentionFor, useLive } from "@/stores/live";
@@ -54,6 +55,7 @@ export function useAgentEventBridge(): void {
     events
       .onAgentEvent((envelope) => {
         useChat.getState().enqueue(envelope);
+        useActivity.getState().apply(envelope);
         const live = useLive.getState();
         const before = live.attention[envelope.threadId];
         live.applyEvent(envelope, useUi.getState().focusedThreadId);

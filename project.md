@@ -88,6 +88,21 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-22 — Threads live en mini-terminaux + sous-agents
+- **Backend** : le parser Claude lit `parent_tool_use_id` (appels faits par un sous-agent → `parentToolCallId` sur
+  `ToolCallStart`) et les événements `task_started` / `task_progress` / `task_notification` → nouvel événement
+  `SubagentUpdate` (description, type, statut, nombre d'outils, tokens, dernier outil). Correctif : le texte écrit par
+  un sous-agent n'est plus affiché comme réponse principale. Fixture réelle `claude/fixtures/subagent.jsonl` (nettoyée)
+  + test.
+- **Front** : store `activity` (journal par chat, 120 lignes max, texte en cours regroupé par frame), alimenté par
+  `useAgentEventBridge`.
+- **Dock (neon / Gemini 4 Neon High)** : une carte par chat avec un mini-terminal (outil en cours / ✓ / ✗ et résultat,
+  ligne en cours d'écriture, autorisations, séparateurs de tour, erreurs), suivi automatique du bas, chats terminés
+  réduits à 3 lignes ; sous-agents en couloirs imbriqués sous l'appel qui les a lancés (statut, outils, tokens).
+  Dock élargi à 380 px.
+- Simulation de démo (palette, debug) enrichie : actions, texte, autorisation et un sous-agent.
+
+
 ### 2026-11-22 — Phase 5 : CLI génériques, Paramètres, raccourcis, notifications, fluidité
 - **CLI génériques** (`agents/generic`) : profils configurés dans Paramètres (commande, arguments avec `{prompt}`
   sinon entrée standard, option PTY). Chaque profil apparaît comme un modèle « CLI génériques » dans Nouveau chat.

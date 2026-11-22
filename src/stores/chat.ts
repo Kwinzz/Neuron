@@ -115,6 +115,9 @@ function reduce(items: ChatItem[], { ts, event }: AgentEventEnvelope): ChatItem[
       }
       return items;
     }
+    case "SubagentUpdate":
+      // Sub-agent progress is shown in the live dock; the chat timeline shows its tool calls.
+      return items;
   }
 }
 

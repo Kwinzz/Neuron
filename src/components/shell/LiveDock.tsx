@@ -10,9 +10,9 @@ import { useNow } from "@/hooks/useNow";
 import { STATUS } from "@/lib/status";
 import { selectDockIds, useLive } from "@/stores/live";
 import { useUi } from "@/stores/ui";
-import { DockThreadRow } from "./DockThreadRow";
+import { DockCard } from "./dock/DockCard";
 
-const DOCK_WIDTH = 316;
+const DOCK_WIDTH = 380;
 
 /** Ids of dock threads, optionally filtered by the selected project. */
 function useDockIds(): string[] {
@@ -56,17 +56,18 @@ function DockPanel({ open }: { open: boolean }) {
   return (
     <aside
       className={cn(
-        "m-2 flex w-[300px] shrink-0 flex-col overflow-hidden rounded-xl border bg-sidebar text-sidebar-foreground shadow-sm",
+        "m-2 flex shrink-0 flex-col overflow-hidden rounded-xl border bg-sidebar text-sidebar-foreground shadow-sm",
         "animate-in fade-in-0 slide-in-from-right-3 transition-[opacity,transform] duration-200 ease-snappy",
         open ? "translate-x-0 opacity-100" : "translate-x-3 opacity-0",
       )}
-      aria-label="Threads en cours"
+      style={{ width: DOCK_WIDTH - 16 }}
+      aria-label="Threads live"
     >
       <header className="flex h-12 shrink-0 items-center gap-2 px-4">
         <Activity className="size-4 text-muted-foreground" />
         <h2 className="text-sm font-medium">Threads live</h2>
         {activeCount > 0 && (
-          <Badge variant="secondary" className="tabular-nums animate-in zoom-in-75 fade-in-0 duration-200">
+          <Badge variant="secondary" className="font-mono tabular-nums animate-in zoom-in-75 fade-in-0 duration-200">
             {activeCount}
           </Badge>
         )}
@@ -75,6 +76,7 @@ function DockPanel({ open }: { open: boolean }) {
           size="icon"
           className="ml-auto size-7"
           onClick={() => useUi.getState().toggleDock()}
+          aria-label={`Masquer (${MOD_LABEL}+J)`}
           title={`Masquer (${MOD_LABEL}+J)`}
         >
           <PanelRightClose />
@@ -90,20 +92,20 @@ function DockPanel({ open }: { open: boolean }) {
         <div className="min-w-0 p-2">
           {ids.length === 0 ? (
             <div className="flex flex-col items-center gap-1 px-6 py-12 text-center animate-in fade-in-0 duration-200">
-              <p className="text-sm font-medium">Aucun thread actif</p>
+              <p className="text-sm font-medium">Aucun chat actif</p>
               <p className="text-xs text-muted-foreground">
                 Les chats en cours, tous projets confondus, apparaissent ici en temps réel.
               </p>
             </div>
           ) : (
-            <ul className="flex flex-col gap-1">
+            <ul className="flex flex-col gap-2">
               {ids.map((id, i) => (
                 <li
                   key={id}
-                  className="animate-in fade-in-0 slide-in-from-right-2 duration-200 fill-mode-both"
+                  className="min-w-0 animate-in fade-in-0 slide-in-from-right-2 duration-200 fill-mode-both"
                   style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}
                 >
-                  <DockThreadRow id={id} />
+                  <DockCard id={id} />
                 </li>
               ))}
             </ul>

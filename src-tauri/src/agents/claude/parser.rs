@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use serde_json::Value;
 
-use crate::agents::events::{DeltaChannel, ThreadStatus, TokenUsage};
+use crate::agents::events::{DeltaChannel, SubagentStatus, ThreadStatus, TokenUsage};
 use crate::agents::{AdapterEvent, RateLimitWindow};
 
 #[derive(Debug)]
@@ -83,8 +83,29 @@ impl ClaudeParser {
             Some("status") if v.get("status").and_then(Value::as_str) == Some("requesting") => {
                 vec![AdapterEvent::Status { status: ThreadStatus::Thinking, detail: None }]
             }
+            Some(sub @ ("task_started" | "task_progress" | "task_notification")) => self.on_task(sub, v),
             _ => Vec::new(),
         }
+    }
+
+    /// Sub-agent lifecycle (`task_started` / `task_progress` / `task_notification`).
+    fn on_task(&mut self, subtype: &str, v: &Value) -> Vec<AdapterEvent> {
+        let Some(tool_call_id) = s(v, "tool_use_id") else { return Vec::new() };
+        let status = match (subtype, v.get("status").and_then(Value::as_str)) {
+            ("task_notification", Some("completed")) => SubagentStatus::Completed,
+            ("task_notification", _) => SubagentStatus::Failed,
+            _ => SubagentStatus::Running,
+        };
+        let usage = v.get("usage");
+        vec![AdapterEvent::Subagent {
+            tool_call_id,
+            description: s(v, "description"),
+            subagent_type: s(v, "subagent_type"),
+            status,
+            tool_uses: usage.and_then(|u| u.get("tool_uses")).and_then(Value::as_u64),
+            tokens: usage.and_then(|u| u.get("total_tokens")).and_then(Value::as_u64),
+            last_tool: s(v, "last_tool_name"),
+        }]
     }
 
     fn on_stream_event(&mut self, e: &Value) -> Vec<AdapterEvent> {
@@ -148,6 +169,8 @@ impl ClaudeParser {
         let Some(message) = v.get("message") else { return Vec::new() };
         let msg_id = s(message, "id").unwrap_or_default();
         let streamed = self.streamed_messages.contains(&msg_id);
+        // Messages written by a sub-agent carry the id of the call that launched it.
+        let parent = s(v, "parent_tool_use_id");
         let mut out = Vec::new();
         let Some(content) = message.get("content").and_then(Value::as_array) else { return out };
         for (n, block) in content.iter().enumerate() {
@@ -161,10 +184,12 @@ impl ClaudeParser {
                         id,
                         name: s(block, "name").unwrap_or_else(|| "outil".into()),
                         input: block.get("input").cloned().unwrap_or(Value::Null),
+                        parent_id: parent.clone(),
                     });
                 }
-                // Fallback when partial messages are not streamed.
-                Some(kind @ ("text" | "thinking")) if !streamed => {
+                // Fallback when partial messages are not streamed. A sub-agent's own text is not the answer:
+                // it reaches the conversation through the launching tool's result.
+                Some(kind @ ("text" | "thinking")) if !streamed && parent.is_none() => {
                     let channel = if kind == "text" { DeltaChannel::Text } else { DeltaChannel::Thinking };
                     let text = s(block, kind).unwrap_or_default();
                     if text.trim().is_empty() {
@@ -284,6 +309,36 @@ mod tests {
 
     const BASH: &str = include_str!("fixtures/bash_two_turns.jsonl");
     const PERMISSION: &str = include_str!("fixtures/permission_write.jsonl");
+    const SUBAGENT: &str = include_str!("fixtures/subagent.jsonl");
+
+    #[test]
+    fn subagent_calls_are_attached_to_their_launcher() {
+        let events = run(SUBAGENT);
+        let launcher = events
+            .iter()
+            .find_map(|e| match e {
+                AdapterEvent::ToolCallStart { id, name, parent_id: None, .. } if name == "Agent" => Some(id.clone()),
+                _ => None,
+            })
+            .expect("Agent call");
+        // The sub-agent's own Read is attached to the Agent call.
+        assert!(events.iter().any(|e| matches!(e,
+            AdapterEvent::ToolCallStart { name, parent_id: Some(p), .. } if name == "Read" && *p == launcher)));
+        // Lifecycle: started → progress → completed, all on the launcher id.
+        let statuses: Vec<SubagentStatus> = events
+            .iter()
+            .filter_map(|e| match e {
+                AdapterEvent::Subagent { tool_call_id, status, .. } if *tool_call_id == launcher => Some(*status),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(statuses.first(), Some(&SubagentStatus::Running));
+        assert_eq!(statuses.last(), Some(&SubagentStatus::Completed));
+        assert!(events.iter().any(|e| matches!(e,
+            AdapterEvent::Subagent { tool_uses: Some(1), last_tool: Some(t), .. } if t == "Read")));
+        // The final answer is still the main agent's.
+        assert!(events.iter().any(|e| matches!(e, AdapterEvent::BlockCompleted { text, .. } if text.contains("hello"))));
+    }
 
     #[test]
     fn parses_tool_turn_and_second_turn() {
@@ -292,7 +347,7 @@ mod tests {
         assert!(matches!(&events[0], AdapterEvent::SessionInit { session_ref, .. } if !session_ref.is_empty()));
 
         let tool_start = events.iter().find_map(|e| match e {
-            AdapterEvent::ToolCallStart { id, name, input } => Some((id.clone(), name.clone(), input.clone())),
+            AdapterEvent::ToolCallStart { id, name, input, .. } => Some((id.clone(), name.clone(), input.clone())),
             _ => None,
         });
         let (tool_id, name, input) = tool_start.expect("tool start");

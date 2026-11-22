@@ -178,6 +178,8 @@ pub enum AgentEvent {
         name: String,
         input: serde_json::Value,
         activity: Option<String>,
+        /// Set when a sub-agent made this call: the id of the tool call that launched the sub-agent.
+        parent_tool_call_id: Option<String>,
     },
     /// A tool invocation finished.
     ToolCallResult {
@@ -204,6 +206,28 @@ pub enum AgentEvent {
     },
     /// Error reported by the adapter or the process. `fatal` ends the thread.
     ThreadError { message: String, fatal: bool },
+    /// A sub-agent (Claude Code `Agent`/`Task` tool) started, progressed or ended. `toolCallId` is the call
+    /// that launched it; its own tool calls carry it as `parentToolCallId`.
+    SubagentUpdate {
+        tool_call_id: String,
+        description: Option<String>,
+        subagent_type: Option<String>,
+        status: SubagentStatus,
+        #[ts(type = "number | null")]
+        tool_uses: Option<u64>,
+        #[ts(type = "number | null")]
+        tokens: Option<u64>,
+        last_tool: Option<String>,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum SubagentStatus {
+    Running,
+    Completed,
+    Failed,
 }
 
 /// Payload emitted on [`AGENT_EVENT_CHANNEL`].
