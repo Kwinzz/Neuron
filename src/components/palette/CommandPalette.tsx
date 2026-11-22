@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { AgentBadge } from "@/components/ui/AgentBadge";
+import { IconBox } from "@/components/ui/IconBox";
 import { Kbd, MOD_LABEL } from "@/components/ui/Kbd";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { formatRelative } from "@/lib/format";
@@ -128,6 +129,7 @@ function useCommands(): Command[] {
           icon: <Database size={15} />,
           run: async () => {
             const rows = await ipc.dev.seedDemo();
+            useLive.setState({ threads: {}, attention: {} });
             await reload();
             toast({ tone: "ok", title: "Données de démo générées", description: `${rows} relevés de consommation` });
           },
@@ -249,18 +251,18 @@ function PaletteDialog() {
   let i = -1;
   return (
     <div
-      className="fade-in fixed inset-0 z-40 flex items-start justify-center bg-black/50 pt-[14vh]"
+      className="fade-in fixed inset-0 z-40 flex items-start justify-center bg-bg/60 pt-[14vh]"
       onMouseDown={(e) => e.target === e.currentTarget && close()}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Palette de commandes"
-        className="pop-in flex max-h-[min(560px,70vh)] w-[620px] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-lg border border-line-strong bg-surface shadow-2xl shadow-black/60"
+        className="glass-overlay pop-in flex max-h-[min(580px,72vh)] w-[640px] max-w-[calc(100vw-32px)] flex-col overflow-hidden shadow-2xl shadow-black/60"
         onKeyDown={onKeyDown}
       >
-        <div className="flex h-12 shrink-0 items-center gap-3 border-b border-line px-4">
-          <Search size={16} className="text-fg-subtle" />
+        <div className="flex h-14 shrink-0 items-center gap-3 border-b border-line px-5">
+          <Search size={18} className="text-accent" />
           <input
             ref={inputRef}
             value={query}
@@ -269,7 +271,7 @@ function PaletteDialog() {
               setIndex(0);
             }}
             placeholder="Rechercher un thread, un projet, une action…"
-            className="h-full flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-subtle"
+            className="h-full flex-1 bg-transparent text-base text-fg outline-none placeholder:text-fg-subtle focus-visible:outline-none"
             role="combobox"
             aria-expanded="true"
             aria-controls="palette-list"
@@ -278,13 +280,13 @@ function PaletteDialog() {
           <Kbd>Esc</Kbd>
         </div>
 
-        <div ref={listRef} id="palette-list" role="listbox" className="flex-1 overflow-y-auto p-1.5">
+        <div ref={listRef} id="palette-list" role="listbox" className="flex-1 overflow-y-auto p-2">
           {flat.length === 0 && (
-            <p className="px-3 py-8 text-center text-fg-subtle">Aucun résultat pour « {query} »</p>
+            <p className="px-3 py-8 text-center text-fg-muted">Aucun résultat pour « {query} »</p>
           )}
           {groups.map(([group, items]) => (
             <div key={group} className="pb-1">
-              <div className="px-2.5 pb-1 pt-2 font-mono text-[10px] uppercase tracking-wider text-fg-subtle">{group}</div>
+              <div className="px-3 pb-1.5 pt-2.5 text-xs font-bold uppercase tracking-wide text-fg-muted">{group}</div>
               {items.map((cmd) => {
                 i += 1;
                 const idx = i;
@@ -298,16 +300,16 @@ function PaletteDialog() {
                     data-index={idx}
                     onMouseMove={() => idx !== current && setIndex(idx)}
                     onClick={() => run(cmd)}
-                    className={`flex h-10 cursor-default items-center gap-3 rounded-md px-2.5 ${
-                      selected ? "bg-surface-hover text-fg" : "text-fg-muted"
+                    className={`flex h-12 cursor-default items-center gap-3 rounded-[15px] px-2.5 ${
+                      selected ? "bg-surface text-fg" : "text-fg-muted"
                     }`}
                   >
-                    <span className={`flex w-4 shrink-0 justify-center ${selected ? "text-accent" : "text-fg-subtle"}`}>
+                    <IconBox tone={selected ? "brand" : "muted"} size={30}>
                       {cmd.icon}
-                    </span>
-                    <span className="flex min-w-0 flex-1 items-baseline gap-2">
-                      <span className="truncate text-fg">{cmd.title}</span>
-                      {cmd.subtitle && <span className="truncate text-xs text-fg-subtle">{cmd.subtitle}</span>}
+                    </IconBox>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-sm font-bold text-fg">{cmd.title}</span>
+                      {cmd.subtitle && <span className="truncate text-xs text-fg-muted">{cmd.subtitle}</span>}
                     </span>
                     {cmd.hint && <span className="shrink-0">{cmd.hint}</span>}
                     {selected && <CornerDownLeft size={13} className="shrink-0 text-fg-subtle" />}
@@ -318,7 +320,7 @@ function PaletteDialog() {
           ))}
         </div>
 
-        <div className="flex h-8 shrink-0 items-center gap-3 border-t border-line px-3 text-[10px] text-fg-subtle">
+        <div className="flex h-10 shrink-0 items-center gap-3 border-t border-line px-5 text-[11px] text-fg-muted">
           <span className="flex items-center gap-1">
             <Kbd>↑</Kbd>
             <Kbd>↓</Kbd> naviguer

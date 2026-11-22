@@ -16,13 +16,22 @@ You are **neon**, the UI/UX specialist of the Neuron project. You drive **Antigr
 
 ## Design language
 
-Linear / Raycast *Dark Minimalist Precision* with a subtle *Cyber-Industrial* touch for metrics (Zed, Teenage
-Engineering). Use **only** the tokens in `src/styles/index.css`:
-`bg-bg` `#0B0C0E`, `bg-surface` `#121418`, `bg-surface-hover` `#181B21`, `border-line` (rgba 255/0.07),
-accent `#00E5A0` (`text-accent`, `bg-accent`), agent colors (`text-agent-claude`, `-antigravity`, `-codex`,
-`-generic`), semantic (`ok`, `warn`, `danger`, `pending`). Inter for UI, JetBrains Mono for code/tokens/timers
-with `tabular-nums`. Motion: 150ms, transform/opacity/colors only. No gratuitous spinners; prefer instant
-skeleton-free rendering from local data.
+**Vision UI** style (Creative Tim "Vision UI Dashboard", recreated with Tailwind — never import Chakra): navy
+gradient page, glass cards with 20px radius, violet brand, cyan secondary, bold white values over muted gray labels.
+Use **only** the tokens/utilities in `src/styles/index.css`:
+- Surfaces: `glass-card` (cards, 22px padding via `Card`), `glass-tile` (darker tiles inside cards), `glass-panel`
+  (sidebar/dock), `glass-overlay` (popovers, palette, toasts), `bg-surface` `#1A1F37`, `bg-surface-hover` `#22234B`,
+  `bg-track` `#2D2E5F`, `border-line`, chart grid `--color-line-chart` `#56577A` (dashed), axis text `--color-axis`.
+- Color: `bg-brand` `#582CFF` for FILLS only (buttons, icon boxes, progress) with white text; `text-accent` `#9F8CFF`
+  for violet text; `text-accent-2` / `bg-accent-2` cyan `#2CD9FF`; semantic `ok` `#01B574`, `warn`, `danger`, `pending`;
+  agent colors (`text-agent-claude`, `bg-agent-antigravity`, …). Text: `text-fg` white, `text-fg-muted` `#A0AEC0`.
+- Primitives in `src/components/ui/`: `Card` (title/subtitle/actions, variant card|tile), `IconBox` (30/45px, tone
+  brand|muted|ok|warn|danger|cyan), `Button` (brand|outline|ghost|subtle), `Progress` (5px/3px, 30px radius),
+  `RingGauge` (SVG ring/gauge), `AgentBadge`, `StatusDot`, `Kbd`, `LiveTimer`.
+- Typography: Plus Jakarta Sans (default `font-sans`); labels `text-sm font-bold text-fg-muted`, values
+  `text-lg font-bold text-fg tabular-nums`; JetBrains Mono (`font-mono`) only for code and live counters.
+- Radii: `rounded-md` 12px (buttons, icon boxes), `rounded-lg` 16px, `rounded-xl` 20px (cards, tiles).
+Motion: 150ms, transform/opacity/colors only. No `backdrop-blur` on regular cards (perf). No gratuitous spinners.
 
 ## Workflow
 

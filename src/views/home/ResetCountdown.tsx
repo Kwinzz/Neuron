@@ -8,8 +8,8 @@ interface ResetCountdownProps {
 export function ResetCountdown({ resetsAt }: ResetCountdownProps) {
   const now = useNow(60_000);
   return (
-    <span className="text-[11px] text-fg-subtle">
-      Réinit. dans <span className="font-mono tabular-nums">{formatCountdown(resetsAt - now)}</span>
+    <span className="text-xs text-fg-muted">
+      Réinit. dans <span className="font-bold tabular-nums text-fg">{formatCountdown(resetsAt - now)}</span>
     </span>
   );
 }

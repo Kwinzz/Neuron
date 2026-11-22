@@ -1,40 +1,29 @@
 import { type ReactNode, useEffect, useState } from "react";
-import { FolderGit2, LayoutDashboard, Search } from "lucide-react";
-import { Kbd, MOD_LABEL } from "@/components/ui/Kbd";
+import { FolderGit2, Keyboard, LayoutDashboard } from "lucide-react";
 import type { AppInfo } from "@/bindings/AppInfo";
+import { IconBox } from "@/components/ui/IconBox";
+import { Kbd, MOD_LABEL } from "@/components/ui/Kbd";
 import { ipc } from "@/lib/ipc";
 import { useDashboard } from "@/stores/dashboard";
 import { useUi } from "@/stores/ui";
 
+/** Floating Vision sidebar: wordmark, navigation, projects, shortcuts card. */
 export function Sidebar() {
-  const togglePalette = useUi((s) => s.togglePalette);
   const view = useUi((s) => s.view);
   const navigate = useUi((s) => s.navigate);
 
   return (
-    <nav className="flex h-full w-[232px] shrink-0 flex-col border-r border-line bg-bg-sunken" aria-label="Navigation">
-      <div className="flex h-11 shrink-0 items-center gap-2.5 px-4">
-        <span className="size-2 rounded-full bg-accent shadow-[0_0_10px_var(--color-accent)]" aria-hidden />
-        <span className="text-sm font-medium tracking-tight text-fg">Neuron</span>
+    <nav className="glass-panel flex h-full w-[260px] shrink-0 flex-col px-4" aria-label="Navigation">
+      <div className="flex h-[76px] shrink-0 items-center justify-center gap-2.5">
+        <span className="size-2 rounded-full bg-accent-2 shadow-[0_0_12px_var(--color-accent-2)]" aria-hidden />
+        <span className="text-wordmark text-sm font-bold uppercase tracking-[3px]">Neuron</span>
       </div>
+      <div className="mb-5 h-px shrink-0 bg-gradient-to-r from-transparent via-line-strong to-transparent" aria-hidden />
 
-      <div className="px-2 pb-2">
-        <button
-          type="button"
-          onClick={togglePalette}
-          className="flex h-8 w-full items-center gap-2 rounded-md border border-line bg-surface px-2.5 text-fg-subtle transition-colors duration-fast hover:border-line-strong hover:text-fg-muted"
-        >
-          <Search size={13} />
-          <span className="flex-1 text-left">Rechercher…</span>
-          <Kbd>{MOD_LABEL}</Kbd>
-          <Kbd>K</Kbd>
-        </button>
-      </div>
-
-      <ul className="flex flex-col gap-px px-2">
+      <ul className="flex flex-col gap-1.5">
         <li>
           <NavItem
-            icon={<LayoutDashboard size={14} />}
+            icon={<LayoutDashboard size={15} />}
             label="Mission Control"
             active={view.kind === "home"}
             onClick={() => navigate({ kind: "home" })}
@@ -44,7 +33,7 @@ export function Sidebar() {
 
       <ProjectList />
 
-      <SidebarFooter />
+      <ShortcutsCard />
     </nav>
   );
 }
@@ -54,23 +43,31 @@ function NavItem({
   label,
   active,
   onClick,
+  trailing,
+  title,
 }: {
   icon: ReactNode;
   label: string;
   active: boolean;
   onClick: () => void;
+  trailing?: ReactNode;
+  title?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title={title}
       aria-current={active ? "page" : undefined}
-      className={`flex h-7 w-full items-center gap-2.5 rounded-md px-2.5 transition-colors duration-fast ${
-        active ? "bg-surface-hover text-fg" : "text-fg-muted hover:bg-surface hover:text-fg"
+      className={`flex w-full items-center gap-3 rounded-[15px] py-2.5 pe-3 ps-3 text-sm font-bold transition-colors duration-fast ${
+        active ? "bg-surface text-fg" : "text-fg hover:bg-surface/50"
       }`}
     >
-      <span className={active ? "text-accent" : "text-fg-subtle"}>{icon}</span>
-      {label}
+      <IconBox tone={active ? "brand" : "muted"} size={30}>
+        {icon}
+      </IconBox>
+      <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+      {trailing}
     </button>
   );
 }
@@ -82,39 +79,39 @@ function ProjectList() {
   const setDockOpen = useUi((s) => s.setDockOpen);
 
   return (
-    <div className="mt-5 flex min-h-0 flex-1 flex-col">
-      <h3 className="px-4 pb-1.5 font-mono text-[10px] uppercase tracking-wider text-fg-subtle">Projets</h3>
-      <ul className="flex min-h-0 flex-col gap-px overflow-y-auto px-2">
-        {projects?.length === 0 && (
-          <li className="px-2.5 py-1 text-xs text-fg-subtle">Aucun projet pour l'instant.</li>
-        )}
+    <div className="mt-6 flex min-h-0 flex-1 flex-col">
+      <h3 className="px-3 pb-2 text-xs font-bold uppercase tracking-wide text-fg">Projets</h3>
+      <ul className="flex min-h-0 flex-col gap-1.5 overflow-y-auto">
+        {projects?.length === 0 && <li className="px-3 py-1 text-xs text-fg-muted">Aucun projet pour l'instant.</li>}
         {projects?.map((p) => {
           const active = selected === p.id;
           return (
             <li key={p.id}>
-              <button
-                type="button"
+              <NavItem
+                icon={<FolderGit2 size={15} />}
+                label={p.name}
+                active={active}
                 title={`${p.path}\nFiltrer le dock sur ce projet`}
                 onClick={() => {
                   selectProject(active ? null : p.id);
                   if (!active) setDockOpen(true);
                 }}
-                aria-pressed={active}
-                className={`flex h-7 w-full items-center gap-2.5 rounded-md px-2.5 transition-colors duration-fast ${
-                  active ? "bg-surface-hover text-fg" : "text-fg-muted hover:bg-surface hover:text-fg"
-                }`}
-              >
-                <FolderGit2 size={14} className={active ? "text-accent" : "text-fg-subtle"} />
-                <span className="min-w-0 flex-1 truncate text-left">{p.name}</span>
-                {p.activeCount > 0 ? (
-                  <span className="flex items-center gap-1 font-mono text-[10px] tabular-nums text-accent" title={`${p.activeCount} actif(s)`}>
-                    <span className="size-1.5 animate-pulse rounded-full bg-accent" />
-                    {p.activeCount}
-                  </span>
-                ) : (
-                  <span className="font-mono text-[10px] tabular-nums text-fg-subtle">{p.threadCount}</span>
-                )}
-              </button>
+                trailing={
+                  p.activeCount > 0 ? (
+                    <span
+                      className="flex items-center gap-1 rounded-full bg-accent-2/15 px-2 py-0.5 text-[11px] font-bold tabular-nums text-accent-2"
+                      title={`${p.activeCount} thread(s) actif(s)`}
+                    >
+                      <span className="size-1.5 animate-pulse rounded-full bg-accent-2" />
+                      {p.activeCount}
+                    </span>
+                  ) : (
+                    <span className="text-xs font-bold tabular-nums text-fg-subtle" title={`${p.threadCount} thread(s)`}>
+                      {p.threadCount}
+                    </span>
+                  )
+                }
+              />
             </li>
           );
         })}
@@ -123,8 +120,9 @@ function ProjectList() {
   );
 }
 
-function SidebarFooter() {
+function ShortcutsCard() {
   const [info, setInfo] = useState<AppInfo | null>(null);
+  const setPaletteOpen = useUi((s) => s.setPaletteOpen);
   useEffect(() => {
     ipc
       .appInfo()
@@ -133,10 +131,27 @@ function SidebarFooter() {
   }, []);
 
   return (
-    <div className="flex h-8 shrink-0 items-center gap-2 border-t border-line px-4 font-mono text-[10px] text-fg-subtle">
-      <span className="size-1.5 rounded-full bg-ok" aria-hidden />
-      <span>SQLite v{info?.schemaVersion ?? "–"}</span>
-      <span className="ml-auto tabular-nums">v{info?.version ?? "–"}</span>
+    <div className="mb-4 mt-4 shrink-0 overflow-hidden rounded-xl bg-[radial-gradient(120%_120%_at_0%_0%,var(--color-brand)_0%,transparent_65%),linear-gradient(135deg,var(--color-brand-active),var(--color-bg-sunken))] p-4">
+      <IconBox tone="muted" size={36} className="bg-white text-brand">
+        <Keyboard size={18} />
+      </IconBox>
+      <p className="mt-3 text-sm font-bold text-fg">Tout au clavier</p>
+      <p className="mt-1 flex flex-wrap items-center gap-1 text-xs text-fg/80">
+        <Kbd>{MOD_LABEL}</Kbd>
+        <Kbd>K</Kbd> palette · <Kbd>{MOD_LABEL}</Kbd>
+        <Kbd>J</Kbd> threads
+      </p>
+      <button
+        type="button"
+        onClick={() => setPaletteOpen(true)}
+        className="mt-3 h-9 w-full rounded-md bg-bg-sunken/80 text-xs font-bold text-fg transition-colors duration-fast hover:bg-bg-sunken"
+      >
+        Ouvrir la palette
+      </button>
+      <p className="mt-3 flex items-center justify-between text-[10px] font-bold text-fg/60">
+        <span>SQLite v{info?.schemaVersion ?? "–"}</span>
+        <span className="tabular-nums">v{info?.version ?? "–"}</span>
+      </p>
     </div>
   );
 }

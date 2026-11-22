@@ -35,12 +35,16 @@ interface LiveState {
 }
 
 function fromSummary(s: ThreadSummary, previous?: LiveThread): LiveThread {
+  const active = STATUS[s.status].active;
+  // Live-only fields survive a refresh only while the thread stays in the same active/inactive phase;
+  // otherwise (e.g. a finished thread restarted, or data re-seeded) they are derived from the summary again.
+  const samePhase = previous !== undefined && STATUS[previous.status].active === active;
   return {
     ...s,
-    detail: previous?.detail ?? null,
-    runStartedAt: previous?.runStartedAt ?? (STATUS[s.status].active ? s.updatedAt : s.createdAt),
-    lastEventAt: previous?.lastEventAt ?? s.updatedAt,
-    errorMessage: previous?.errorMessage ?? null,
+    detail: samePhase ? previous.detail : null,
+    runStartedAt: samePhase ? previous.runStartedAt : active ? s.updatedAt : s.createdAt,
+    lastEventAt: Math.max(previous?.lastEventAt ?? 0, s.updatedAt),
+    errorMessage: samePhase && !active ? previous.errorMessage : null,
   };
 }
 

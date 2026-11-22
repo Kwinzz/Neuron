@@ -1,3 +1,4 @@
+import type { ProviderUsage } from "@/bindings/ProviderUsage";
 import type { QuotaUnit } from "@/bindings/QuotaUnit";
 import type { WindowKind } from "@/bindings/WindowKind";
 import { formatCost, formatInteger, formatTokens } from "@/lib/format";
@@ -46,4 +47,56 @@ export function formatQuotaValue(value: number, unit: QuotaUnit): string {
     case "requests":
       return `${formatInteger(value)} req`;
   }
+}
+
+export type QuotaLevel = "none" | "ok" | "warn" | "danger";
+
+export function quotaLevel(ratio: number | null, alertPct: number): QuotaLevel {
+  if (ratio == null) return "none";
+  if (ratio >= 1) return "danger";
+  if (ratio >= alertPct) return "warn";
+  return "ok";
+}
+
+export const LEVEL_COLOR: Record<QuotaLevel, string> = {
+  none: "var(--color-brand)",
+  ok: "var(--color-brand)",
+  warn: "var(--color-warn)",
+  danger: "var(--color-danger)",
+};
+
+export const LEVEL_FILL: Record<QuotaLevel, string> = {
+  none: "bg-brand",
+  ok: "bg-ok",
+  warn: "bg-warn",
+  danger: "bg-danger",
+};
+
+export const LEVEL_TEXT: Record<QuotaLevel, string> = {
+  none: "text-fg-muted",
+  ok: "text-ok",
+  warn: "text-warn",
+  danger: "text-danger",
+};
+
+export function pickTopProvider(list: readonly ProviderUsage[] | undefined): ProviderUsage | null {
+  if (!list || list.length === 0) return null;
+
+  let bestWithRatio: ProviderUsage | null = null;
+  for (const item of list) {
+    if (item.ratio != null) {
+      if (bestWithRatio === null || item.ratio > (bestWithRatio.ratio ?? -1)) {
+        bestWithRatio = item;
+      }
+    }
+  }
+  if (bestWithRatio !== null) return bestWithRatio;
+
+  let bestByUsed: ProviderUsage | null = list[0] ?? null;
+  for (const item of list) {
+    if (bestByUsed === null || item.used > bestByUsed.used) {
+      bestByUsed = item;
+    }
+  }
+  return bestByUsed;
 }

@@ -31,17 +31,22 @@ graphique unifié.
 
 ## Direction artistique
 
-Linear / Raycast *Dark Minimalist Precision* + touche *Cyber-Industrial* pour les métriques (Zed, Teenage Engineering).
+Style **« Vision UI »** (template MIT *Vision UI Dashboard Chakra* de Creative Tim) recréé en Tailwind v4 :
+fond navy dégradé, cartes « verre », violet de marque, cyan secondaire, valeurs blanches grasses sur libellés gris.
+(Remplace le style Linear/Raycast émeraude des phases 0–1, à la demande de l'utilisateur.)
 
 | Token | Valeur |
 |---|---|
-| Fond | `#0B0C0E` |
-| Surface / hover | `#121418` / `#181B21` |
-| Bordure | `1px rgba(255,255,255,0.07)` |
-| Accent | Émeraude `#00E5A0` |
-| Agents (ordre fixe) | Claude `#d95926` · Antigravity `#3987e5` · Codex `#d55181` · Générique `#c98500` — validés sur fond sombre (bande de luminosité, chroma, CVD adjacent ΔE ≥ 13) |
-| Typo | Inter (UI), JetBrains Mono (code, tokens, chronos, `tabular-nums`) |
-| Motion | 150 ms, GPU (transform/opacity) |
+| Fond de page | `#070B24` + dégradé `159deg #0F123B → #090D2E → #020515` + halos violet/cyan (CSS maison) |
+| Carte | `linear-gradient(127.09deg, rgba(6,11,40,.94), rgba(10,14,35,.49))`, radius 20px, padding 22px |
+| Tuile / sidebar | `126.97deg #060C29 → rgba(4,12,48,.5)` / `111.84deg rgba(6,11,38,.94) → transparent` + blur 10px |
+| Surfaces | `#1A1F37` (pastilles, items actifs) · `#22234B` (hover) · piste `#2D2E5F` · grille charts `#56577A` |
+| Marque | Violet `#582CFF` (fonds) · texte violet `#9F8CFF` · cyan `#2CD9FF` |
+| Sémantique | ok `#01B574` · warn `#FFB547` · danger `#FF5B6B` (texte lisible) |
+| Agents (ordre fixe) | Claude `#d95926` · Antigravity `#3987e5` · Codex `#d55181` · Générique `#c98500` — revalidés sur la carte navy |
+| Typo | Plus Jakarta Sans (UI), JetBrains Mono (code + compteurs live) ; chiffres `tabular-nums` |
+| Rayons | 12px boutons/icon box · 15–16px items/panneaux · 20px cartes |
+| Motion | 150 ms, GPU (transform/opacity) ; flou réservé aux panneaux/overlays (perf) |
 
 ## Décisions d'architecture
 
@@ -80,6 +85,23 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 - [ ] **Phase 5** — Adaptateurs Antigravity / Codex / Generic PTY, paramètres, raccourcis, fluidité
 
 ## Journal des changements
+
+### 2026-11-22 — Refonte UI style « Vision UI » (avant Phase 2)
+- Demande utilisateur : interface dans le style du template **Vision UI Dashboard Chakra** (Creative Tim, MIT).
+  Choix : rester en **Tailwind** (pas de Chakra/emotion au runtime), violet `#582CFF` en couleur de marque.
+- Tokens refaits (`index.css`) avec les mêmes noms sémantiques + `brand`, `accent-2`, `track`, `line-chart`, `axis` ;
+  utilitaires `bg-app`, `glass-card`, `glass-tile`, `glass-panel`, `glass-overlay`, `text-wordmark`. Police Plus Jakarta Sans
+  (locale). Contrastes vérifiés : texte violet `#9F8CFF` (7:1), danger `#FF5B6B`. Palette agents revalidée sur navy.
+- Primitives : `Card`, `IconBox`, `Button`, `Progress`, `RingGauge`, `StatusIconBox`.
+- Shell : sidebar flottante (wordmark, items à icon box, projets, carte raccourcis), **Navbar** (fil d'Ariane,
+  recherche, bouton dock + badge, verre au scroll), dock en tuiles avec icônes de statut, palette et toasts en verre.
+- Back : `UsageReport.previous` (même durée écoulée sur la période précédente) → deltas des cartes stats.
+- Mission Control (neon/Antigravity, ~2 200 lignes, 5 retouches de neon) : stats + deltas, accueil avec visuel neuronal SVG,
+  jauge du quota le plus sollicité, efficacité du cache, graphique Vision (grille pointillée) + parts par IA, liste des
+  quotas, tableau des threads récents, timeline « En cours », par projet.
+- Corrigé à l'intégration : grilles basées sur la largeur réelle (container queries, sidebar + dock), delta qui passait
+  à la ligne, barre de défilement horizontale de la timeline, **bug** de chrono (un thread redevenu actif gardait l'heure de
+  départ de l'ancien état).
 
 ### 2026-11-22 — Phase 1 terminée
 - Back : migration `0002_default_providers` (4 cartes quotas), modules `db/{projects,threads,providers,usage}`,

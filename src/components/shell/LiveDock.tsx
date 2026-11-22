@@ -1,5 +1,6 @@
-import { Activity, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { Activity, PanelRightClose, PanelRightOpen, X } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
+import { IconBox } from "@/components/ui/IconBox";
 import { Kbd, MOD_LABEL } from "@/components/ui/Kbd";
 import { useNow } from "@/hooks/useNow";
 import { AGENTS } from "@/lib/agents";
@@ -29,7 +30,7 @@ function useActiveAgents() {
   );
 }
 
-/** Persistent right dock listing every live thread across projects. */
+/** Floating right dock listing every live thread across projects. */
 export function LiveDock() {
   const open = useUi((s) => s.dockOpen);
   return open ? <DockPanel /> : <DockRail />;
@@ -42,28 +43,35 @@ function DockPanel() {
   const toggleDock = useUi((s) => s.toggleDock);
 
   return (
-    <aside className="flex h-full w-[300px] shrink-0 flex-col border-l border-line bg-bg" aria-label="Threads en cours">
-      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-line px-3">
-        <Activity size={14} className="text-fg-subtle" />
-        <h2 className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">Threads live</h2>
-        <span className="font-mono text-[10px] tabular-nums text-accent">{activeCount > 0 ? activeCount : ""}</span>
+    <aside className="glass-card flex h-full w-[310px] shrink-0 flex-col rounded-lg" aria-label="Threads en cours">
+      <header className="flex h-[76px] shrink-0 items-center gap-3 px-4">
+        <IconBox tone="brand" size={30}>
+          <Activity size={15} />
+        </IconBox>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-bold text-fg">Threads live</h2>
+          <p className="text-xs text-fg-muted">
+            {activeCount > 0 ? `${activeCount} en cours` : "Aucun en cours"}
+          </p>
+        </div>
         <button
           type="button"
           onClick={toggleDock}
-          className="ml-auto flex items-center gap-1.5 rounded-sm p-1 text-fg-subtle transition-colors duration-fast hover:bg-surface-hover hover:text-fg"
+          className="rounded-md p-2 text-fg-muted transition-colors duration-fast hover:bg-surface hover:text-fg"
           title={`Masquer (${MOD_LABEL}+J)`}
         >
-          <PanelRightClose size={14} />
+          <PanelRightClose size={16} />
         </button>
       </header>
+      <div className="mx-4 h-px shrink-0 bg-gradient-to-r from-transparent via-line-strong to-transparent" aria-hidden />
 
       {projectId && <ProjectFilterNote />}
 
       <div className="flex-1 overflow-y-auto p-2">
         {ids.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 px-6 py-10 text-center">
-            <p className="text-fg-muted">Aucun thread actif</p>
-            <p className="text-xs text-fg-subtle">
+          <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
+            <p className="text-sm font-bold text-fg">Aucun thread actif</p>
+            <p className="text-xs text-fg-muted">
               Les threads en cours, tous projets confondus, apparaissent ici en temps réel.
             </p>
           </div>
@@ -78,7 +86,7 @@ function DockPanel() {
         )}
       </div>
 
-      <footer className="flex h-8 shrink-0 items-center gap-1.5 border-t border-line px-3 text-[10px] text-fg-subtle">
+      <footer className="flex h-11 shrink-0 items-center gap-1.5 px-4 text-[11px] text-fg-muted">
         <Kbd>{MOD_LABEL}</Kbd>
         <Kbd>J</Kbd>
         <span>afficher / masquer</span>
@@ -92,45 +100,49 @@ function ProjectFilterNote() {
   const name = useLive((s) => Object.values(s.threads).find((t) => t.projectId === projectId)?.projectName);
   const selectProject = useUi((s) => s.selectProject);
   return (
-    <div className="flex items-center gap-2 border-b border-line px-3 py-1.5 text-xs text-fg-muted">
+    <div className="mx-3 mt-3 flex items-center gap-2 rounded-md bg-surface px-3 py-2 text-xs text-fg-muted">
       <span className="min-w-0 flex-1 truncate">
-        Filtré : <span className="text-fg">{name ?? "projet"}</span>
+        Projet : <span className="font-bold text-fg">{name ?? "sélectionné"}</span>
       </span>
       <button
         type="button"
         onClick={() => selectProject(null)}
-        className="text-fg-subtle transition-colors duration-fast hover:text-fg"
+        aria-label="Retirer le filtre projet"
+        className="rounded-sm p-0.5 text-fg-muted transition-colors duration-fast hover:text-fg"
       >
-        Tout afficher
+        <X size={13} />
       </button>
     </div>
   );
 }
 
-/** Collapsed dock: thin rail with live indicators and the attention badge. */
+/** Collapsed dock: slim rail with live indicators and the attention badge. */
 function DockRail() {
   const agents = useActiveAgents();
   const attentionCount = useLive((s) => Object.keys(s.attention).length);
   const toggleDock = useUi((s) => s.toggleDock);
 
   return (
-    <aside className="flex h-full w-11 shrink-0 flex-col items-center gap-3 border-l border-line bg-bg py-3" aria-label="Threads en cours (réduit)">
+    <aside
+      className="glass-card flex h-full w-14 shrink-0 flex-col items-center gap-4 rounded-lg py-5"
+      aria-label="Threads en cours (réduit)"
+    >
       <button
         type="button"
         onClick={toggleDock}
-        className="relative rounded-sm p-1.5 text-fg-subtle transition-colors duration-fast hover:bg-surface-hover hover:text-fg"
+        className="relative flex size-[30px] items-center justify-center rounded-md bg-surface text-accent transition-colors duration-fast hover:bg-surface-hover"
         title={`Afficher les threads (${MOD_LABEL}+J)`}
       >
         <PanelRightOpen size={15} />
         {attentionCount > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-warn px-1 font-mono text-[9px] font-semibold tabular-nums text-accent-fg">
+          <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-warn px-1 text-[9px] font-bold tabular-nums text-bg">
             {attentionCount}
           </span>
         )}
       </button>
-      <div className="flex flex-col items-center gap-1.5" title={`${agents.length} thread(s) actif(s)`}>
+      <div className="flex flex-col items-center gap-2" title={`${agents.length} thread(s) actif(s)`}>
         {agents.map((agent, i) => (
-          <span key={i} className={`size-1.5 animate-pulse rounded-[2px] ${AGENTS[agent].bg}`} />
+          <span key={i} className={`size-2 animate-pulse rounded-[3px] ${AGENTS[agent].bg}`} />
         ))}
       </div>
     </aside>

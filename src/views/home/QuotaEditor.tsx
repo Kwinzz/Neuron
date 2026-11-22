@@ -2,6 +2,7 @@ import { type FormEvent, type KeyboardEvent, type RefObject, useEffect, useRef, 
 import type { Provider } from "@/bindings/Provider";
 import type { QuotaUnit } from "@/bindings/QuotaUnit";
 import type { WindowKind } from "@/bindings/WindowKind";
+import { Button } from "@/components/ui/Button";
 import { ipcErrorMessage } from "@/lib/ipc";
 import { useDashboard } from "@/stores/dashboard";
 import { QUOTA_UNITS, UNIT_LABEL, WINDOW_KINDS, WINDOW_LABEL } from "./quotaFormat";
@@ -14,7 +15,7 @@ interface QuotaEditorProps {
 }
 
 const INPUT_CLASS =
-  "h-7 w-full rounded-md border border-line bg-bg-sunken px-2 text-xs text-fg focus:border-line-strong";
+  "h-10 w-full rounded-md border border-line bg-surface px-3 text-sm text-fg outline-none transition-colors duration-fast focus:border-accent";
 
 export function QuotaEditor({ provider, onClose, anchorRef }: QuotaEditorProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -102,11 +103,12 @@ export function QuotaEditor({ provider, onClose, anchorRef }: QuotaEditorProps) 
       role="dialog"
       aria-label={`Configurer ${provider.label}`}
       onKeyDown={handleKeyDown}
-      className="pop-in absolute right-0 top-full z-20 mt-1 w-[300px] rounded-lg border border-line-strong bg-surface-raised p-3 shadow-lg"
+      className="pop-in glass-overlay absolute right-0 top-full z-30 mt-2 w-[320px] p-4 shadow-2xl"
     >
-      <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-2.5">
+      <h3 className="mb-3 text-sm font-bold text-fg">Configurer {provider.label}</h3>
+      <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-3">
         <label className="flex flex-col gap-1">
-          <span className="text-[11px] text-fg-muted">Libellé</span>
+          <span className="text-xs font-bold text-fg-muted">Libellé</span>
           <input
             ref={firstInputRef}
             type="text"
@@ -118,7 +120,7 @@ export function QuotaEditor({ provider, onClose, anchorRef }: QuotaEditorProps) 
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-[11px] text-fg-muted">Abonnement</span>
+          <span className="text-xs font-bold text-fg-muted">Abonnement</span>
           <input
             type="text"
             value={plan}
@@ -128,9 +130,9 @@ export function QuotaEditor({ provider, onClose, anchorRef }: QuotaEditorProps) 
           />
         </label>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2.5">
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] text-fg-muted">Fenêtre</span>
+            <span className="text-xs font-bold text-fg-muted">Fenêtre</span>
             <select
               value={windowKind}
               onChange={(e) => {
@@ -148,7 +150,7 @@ export function QuotaEditor({ provider, onClose, anchorRef }: QuotaEditorProps) 
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] text-fg-muted">Unité</span>
+            <span className="text-xs font-bold text-fg-muted">Unité</span>
             <select
               value={unit}
               onChange={(e) => {
@@ -166,9 +168,9 @@ export function QuotaEditor({ provider, onClose, anchorRef }: QuotaEditorProps) 
           </label>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2.5">
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] text-fg-muted">Limite</span>
+            <span className="text-xs font-bold text-fg-muted">Limite</span>
             <input
               type="number"
               min={0}
@@ -176,12 +178,12 @@ export function QuotaEditor({ provider, onClose, anchorRef }: QuotaEditorProps) 
               placeholder="Aucune"
               value={limit}
               onChange={(e) => setLimit(e.target.value)}
-              className={`${INPUT_CLASS} font-mono tabular-nums`}
+              className={`${INPUT_CLASS} tabular-nums`}
             />
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] text-fg-muted">Seuil d&apos;alerte (%)</span>
+            <span className="text-xs font-bold text-fg-muted">Seuil d&apos;alerte (%)</span>
             <input
               type="number"
               min={1}
@@ -190,29 +192,24 @@ export function QuotaEditor({ provider, onClose, anchorRef }: QuotaEditorProps) 
               required
               value={pct}
               onChange={(e) => setPct(e.target.value)}
-              className={`${INPUT_CLASS} font-mono tabular-nums`}
+              className={`${INPUT_CLASS} tabular-nums`}
             />
           </label>
         </div>
 
-        {error && <p className="text-[11px] text-danger">{error}</p>}
+        {error && (
+          <p role="alert" className="text-xs text-danger">
+            {error}
+          </p>
+        )}
 
         <div className="mt-1 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            disabled={saving}
-            onClick={onClose}
-            className="h-7 rounded-md px-2.5 text-xs text-fg-muted transition-colors duration-fast hover:bg-surface-hover hover:text-fg disabled:opacity-50"
-          >
+          <Button variant="ghost" size="sm" disabled={saving} onClick={onClose}>
             Annuler
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="h-7 rounded-md bg-accent px-2.5 text-xs font-medium text-accent-fg transition-colors duration-fast hover:bg-accent-strong disabled:opacity-50"
-          >
+          </Button>
+          <Button type="submit" variant="brand" size="sm" disabled={saving}>
             {saving ? "Enregistrement…" : "Enregistrer"}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

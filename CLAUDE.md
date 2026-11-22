@@ -74,9 +74,16 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
 
 - `strict: true`, pas de `any`, pas de `as` non justifié. Types IPC importés depuis `src/bindings/`.
 - Aucun `invoke`/`listen` hors de `src/lib/ipc.ts`.
-- Couleurs, rayons, durées : **uniquement les tokens** de `src/styles/index.css` (`bg-bg`, `bg-surface`,
-  `border-line`, `text-accent`, `text-agent-claude`…). Pas de hex en dur dans les composants.
-- Chiffres dynamiques (tokens, chronos, compteurs) : `font-mono tabular-nums`.
+- **Style « Vision UI »** (inspiré du template MIT Creative Tim, recréé en Tailwind — jamais Chakra) : fond navy
+  dégradé (`bg-app`), cartes `glass-card` (radius 20px, padding 22px via `<Card>`), tuiles `glass-tile`, panneaux
+  `glass-panel`, overlays `glass-overlay`. Primitives : `Card`, `IconBox`, `Button`, `Progress`, `RingGauge`,
+  `StatusIconBox` (`src/components/ui/`).
+- Couleurs, rayons, durées : **uniquement les tokens** de `src/styles/index.css`. `bg-brand` (#582CFF) = **fonds
+  uniquement** (texte blanc dessus) ; `text-accent` (#9F8CFF) = violet pour le texte ; `accent-2` = cyan ;
+  `text-fg` blanc / `text-fg-muted` gris. Pas de hex en dur dans les composants (les `var(--color-*)` sont OK).
+- Libellés `text-sm font-bold text-fg-muted`, valeurs `text-lg font-bold text-fg tabular-nums`. Police Plus Jakarta Sans ;
+  `font-mono` (JetBrains Mono) réservé au code et aux compteurs live du dock.
+- Pas de `backdrop-filter` sur les cartes ordinaires (perf WebView2) : seulement sidebar, navbar au scroll, palette, toasts.
 - Transitions : `150ms`, uniquement `transform`/`opacity`/`color`/`background-color` (GPU-friendly).
 - Pas de spinner inutile ; streaming sans re-render global (état par thread, mémoïsation).
 - Composants fonctionnels, un composant par fichier, nommage `PascalCase.tsx`.

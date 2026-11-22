@@ -17,4 +17,8 @@ byAgent: Array<AgentUsage>,
 /**
  * Top projects by input+output tokens (max 8).
  */
-byProject: Array<ProjectUsage>, totals: UsageSums, };
+byProject: Array<ProjectUsage>, totals: UsageSums, 
+/**
+ * Same elapsed duration in the previous period (e.g. yesterday 00:00 → same time), for deltas.
+ */
+previous: UsageSums, };

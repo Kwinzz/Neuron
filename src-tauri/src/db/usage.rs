@@ -123,6 +123,8 @@ pub struct UsageReport {
     /// Top projects by input+output tokens (max 8).
     pub by_project: Vec<ProjectUsage>,
     pub totals: UsageSums,
+    /// Same elapsed duration in the previous period (e.g. yesterday 00:00 → same time), for deltas.
+    pub previous: UsageSums,
 }
 
 fn agent_order(agent: AgentKind) -> usize {
@@ -223,6 +225,21 @@ pub fn report(conn: &Connection, range: UsageRange, now: i64) -> AppResult<Usage
         rows.collect::<Result<Vec<_>, _>>()?
     };
 
+    // Previous period: starts `count` days (or 1 day for Day) before `since`, local calendar,
+    // and covers the same elapsed duration as the current one.
+    let previous = {
+        let period_days = if range == UsageRange::Day { 1 } else { count };
+        let prev_since: i64 = conn.query_row(
+            "SELECT CAST(strftime('%s', ?1 / 1000, 'unixepoch', 'localtime', ?2, 'utc') AS INTEGER) * 1000",
+            params![since, format!("-{period_days} days")],
+            |r| r.get(0),
+        )?;
+        let prev_until = prev_since + (now - since).max(0);
+        let sql = format!("SELECT {SUMS_SQL} FROM token_usage u WHERE u.ts >= ?1 AND u.ts < ?2");
+        let mut stmt = conn.prepare_cached(&sql)?;
+        stmt.query_row(params![prev_since, prev_until], |r| UsageSums::from_row(r, 0))?
+    };
+
     Ok(UsageReport {
         range,
         since,
@@ -230,6 +247,7 @@ pub fn report(conn: &Connection, range: UsageRange, now: i64) -> AppResult<Usage
         by_agent,
         by_project,
         totals,
+        previous,
     })
 }
 
@@ -279,6 +297,8 @@ mod tests {
             let month = report(conn, UsageRange::Month, now)?;
             assert_eq!(month.buckets.len(), 30);
             assert_eq!(month.totals.input, 1150);
+            assert_eq!(month.previous.input, 7, "row 40 days ago falls in the previous 30-day window");
+            assert_eq!(week.previous.input, 0);
             Ok(())
         })
         .await

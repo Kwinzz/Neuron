@@ -3,9 +3,12 @@ import { type KeyboardEvent, useMemo, useRef, useState } from "react";
 import type { AgentKind } from "@/bindings/AgentKind";
 import type { UsageBucket } from "@/bindings/UsageBucket";
 import type { UsageRange } from "@/bindings/UsageRange";
+import { IconBox } from "@/components/ui/IconBox";
 import { Kbd, MOD_LABEL } from "@/components/ui/Kbd";
 import { AGENT_ORDER, AGENTS } from "@/lib/agents";
 import { bucketLabel, bucketTitle, formatTokens } from "@/lib/format";
+import { ChartTable } from "./ChartTable";
+import { ChartTooltip } from "./ChartTooltip";
 import { useElementWidth } from "./useElementWidth";
 
 interface UsageChartProps {
@@ -13,13 +16,13 @@ interface UsageChartProps {
   range: UsageRange;
 }
 
-const LEFT_GUTTER = 44;
+const LEFT_GUTTER = 48;
 const TOP_PAD = 8;
-const PLOT_H = 180;
-const BOTTOM_GUTTER = 20;
+const PLOT_H = 200;
+const BOTTOM_GUTTER = 22;
 const SVG_H = TOP_PAD + PLOT_H + BOTTOM_GUTTER;
 const BASELINE_Y = TOP_PAD + PLOT_H;
-const TOOLTIP_W = 196;
+const TOOLTIP_W = 204;
 const TOOLTIP_GAP = 6;
 
 function computeNiceMax(maxVal: number): number {
@@ -66,6 +69,7 @@ interface ComputedColumn {
 export function UsageChart({ buckets, range }: UsageChartProps) {
   const [containerRef, width] = useElementWidth<HTMLDivElement>(640);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const [tableMode, setTableMode] = useState(false);
   const colRefs = useRef<(SVGGElement | null)[]>([]);
 
@@ -100,7 +104,7 @@ export function UsageChart({ buckets, range }: UsageChartProps) {
     const plotW = Math.max(1, width - LEFT_GUTTER);
     const n = Math.max(1, rawBuckets.length);
     const slotW = plotW / n;
-    const barW = Math.min(28, Math.max(4, slotW * 0.55));
+    const barW = Math.min(14, Math.max(6, slotW * 0.5));
     const labelStep = range === "day" ? 3 : range === "month" ? 5 : 1;
 
     const columns: ComputedColumn[] = rawBuckets.map((rb, idx) => {
@@ -166,11 +170,13 @@ export function UsageChart({ buckets, range }: UsageChartProps) {
     return (
       <div
         ref={containerRef}
-        className="flex h-[248px] flex-col items-center justify-center gap-1.5 rounded-lg border border-line bg-surface p-4 text-center"
+        className="glass-tile flex h-[248px] flex-col items-center justify-center gap-2 p-4 text-center"
       >
-        <BarChart3 size={18} strokeWidth={1.75} className="text-fg-subtle" />
-        <p className="text-xs text-fg-muted">Aucune consommation sur cette période</p>
-        <p className="text-[11px] text-fg-subtle">
+        <IconBox size={45} tone="muted">
+          <BarChart3 size={22} />
+        </IconBox>
+        <p className="text-sm font-bold text-fg">Aucune consommation sur cette période</p>
+        <p className="text-xs text-fg-muted">
           En dev, <Kbd>{MOD_LABEL}</Kbd> <Kbd>K</Kbd> → « Générer des données de démo »
         </p>
       </div>
@@ -178,7 +184,6 @@ export function UsageChart({ buckets, range }: UsageChartProps) {
   }
 
   const activeCol = activeIndex != null ? geometry.columns[activeIndex] : undefined;
-  // Tooltip sits beside the column (right if it fits, else left) so it never hides the bars it describes.
   let tooltipLeft = 0;
   if (activeCol != null) {
     const right = activeCol.slotX + activeCol.slotW + TOOLTIP_GAP;
@@ -188,7 +193,7 @@ export function UsageChart({ buckets, range }: UsageChartProps) {
   }
 
   return (
-    <div ref={containerRef} className="rounded-lg border border-line bg-surface p-4">
+    <div ref={containerRef} className="glass-tile p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           {geometry.presentAgents.map((agent) => (
@@ -198,7 +203,7 @@ export function UsageChart({ buckets, range }: UsageChartProps) {
                 style={{ background: AGENTS[agent].color }}
                 aria-hidden
               />
-              <span className="text-[11px] text-fg-muted">{AGENTS[agent].label}</span>
+              <span className="text-xs font-bold text-fg-muted">{AGENTS[agent].label}</span>
             </div>
           ))}
         </div>
@@ -209,48 +214,16 @@ export function UsageChart({ buckets, range }: UsageChartProps) {
           onClick={() => {
             setTableMode((v) => !v);
             setActiveIndex(null);
+            setFocusedIndex(null);
           }}
-          className="text-[11px] text-fg-muted transition-colors duration-fast hover:text-fg"
+          className="text-xs font-bold text-fg-muted transition-colors duration-fast hover:text-fg"
         >
           {tableMode ? "Graphique" : "Tableau"}
         </button>
       </div>
 
       {tableMode ? (
-        <div className="max-h-[220px] overflow-auto">
-          <table className="w-full border-collapse text-left text-xs">
-            <caption className="sr-only">Consommation par période</caption>
-            <thead>
-              <tr className="border-b border-line text-[11px] text-fg-subtle">
-                <th className="py-1.5 pr-3 font-normal">Période</th>
-                {geometry.presentAgents.map((agent) => (
-                  <th key={agent} className="px-2 py-1.5 text-right font-normal">
-                    {AGENTS[agent].label}
-                  </th>
-                ))}
-                <th className="py-1.5 pl-3 text-right font-normal">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {geometry.columns.map((col) => (
-                <tr key={col.key} className="border-b border-line last:border-b-0">
-                  <td className="py-1.5 pr-3 text-fg">{col.title}</td>
-                  {geometry.presentAgents.map((agent) => (
-                    <td
-                      key={agent}
-                      className="px-2 py-1.5 text-right font-mono tabular-nums text-fg-muted"
-                    >
-                      {formatTokens(col.valuesByAgent[agent] ?? 0)}
-                    </td>
-                  ))}
-                  <td className="py-1.5 pl-3 text-right font-mono tabular-nums text-fg">
-                    {formatTokens(col.total)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ChartTable presentAgents={geometry.presentAgents} columns={geometry.columns} />
       ) : (
         <div className="relative">
           <svg
@@ -268,16 +241,17 @@ export function UsageChart({ buckets, range }: UsageChartProps) {
                   x2={width}
                   y1={t.y}
                   y2={t.y}
-                  stroke="var(--color-line)"
+                  stroke="var(--color-line-chart)"
+                  strokeDasharray="5 5"
                   strokeWidth={1}
-                  shapeRendering="crispEdges"
                 />
                 <text
-                  x={LEFT_GUTTER - 6}
-                  y={t.y + 3}
+                  x={LEFT_GUTTER - 8}
+                  y={t.y + 4}
                   textAnchor="end"
-                  fill="var(--color-fg-subtle)"
-                  className="font-mono text-[10px] tabular-nums"
+                  fill="var(--color-axis)"
+                  fontSize={12}
+                  className="tabular-nums"
                 >
                   {formatTokens(t.value)}
                 </text>
@@ -285,8 +259,9 @@ export function UsageChart({ buckets, range }: UsageChartProps) {
             ))}
 
             {geometry.columns.map((col, idx) => {
-              const isHovered = activeIndex === idx;
-              const isDimmed = activeIndex !== null && !isHovered;
+              const isActive = activeIndex === idx;
+              const isFocused = focusedIndex === idx;
+              const isDimmed = activeIndex !== null && !isActive;
 
               return (
                 <g
@@ -298,21 +273,31 @@ export function UsageChart({ buckets, range }: UsageChartProps) {
                   role="img"
                   aria-label={`${col.title}: ${formatTokens(col.total)} tokens`}
                   onMouseEnter={() => setActiveIndex(idx)}
-                  onMouseLeave={() => setActiveIndex(null)}
-                  onFocus={() => setActiveIndex(idx)}
-                  onBlur={() => setActiveIndex(null)}
+                  onMouseLeave={() => setActiveIndex(focusedIndex)}
+                  onFocus={() => {
+                    setActiveIndex(idx);
+                    setFocusedIndex(idx);
+                  }}
+                  onBlur={() => {
+                    setFocusedIndex((prev) => (prev === idx ? null : prev));
+                    setActiveIndex((prev) => (prev === idx ? null : prev));
+                  }}
                   onKeyDown={(e) => handleColKeyDown(idx, e)}
                   className={`outline-none transition-opacity duration-fast ${
                     isDimmed ? "opacity-45" : "opacity-100"
                   }`}
                 >
-                  {isHovered && (
+                  {isActive && (
                     <rect
                       x={col.slotX}
                       y={TOP_PAD}
                       width={col.slotW}
                       height={PLOT_H}
+                      rx={6}
                       fill="var(--color-surface-hover)"
+                      fillOpacity={0.5}
+                      stroke={isFocused ? "var(--color-accent)" : undefined}
+                      strokeWidth={isFocused ? 1.5 : undefined}
                     />
                   )}
 
@@ -338,10 +323,10 @@ export function UsageChart({ buckets, range }: UsageChartProps) {
                   {col.showLabel && (
                     <text
                       x={col.slotX + col.slotW / 2}
-                      y={BASELINE_Y + 15}
+                      y={BASELINE_Y + 16}
                       textAnchor="middle"
-                      fill="var(--color-fg-subtle)"
-                      className="font-mono text-[10px]"
+                      fill="var(--color-axis)"
+                      fontSize={12}
                     >
                       {col.label}
                     </text>
@@ -360,38 +345,13 @@ export function UsageChart({ buckets, range }: UsageChartProps) {
           </svg>
 
           {activeCol && (
-            <div
-              style={{ left: `${tooltipLeft}px`, top: "4px", width: `${TOOLTIP_W}px` }}
-              className="pointer-events-none absolute z-10 rounded-md border border-line-strong bg-surface-raised px-2.5 py-2 text-[11px] shadow-lg"
-            >
-              <div className="mb-1.5 font-medium text-fg">{activeCol.title}</div>
-              <div className="flex flex-col gap-1">
-                {AGENT_ORDER.map((agent) => {
-                  const val = activeCol.valuesByAgent[agent] ?? 0;
-                  if (val <= 0) return null;
-                  return (
-                    <div key={agent} className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1.5 text-fg-muted">
-                        <span
-                          className="size-2 shrink-0 rounded-[2px]"
-                          style={{ background: AGENTS[agent].color }}
-                          aria-hidden
-                        />
-                        <span>{AGENTS[agent].label}</span>
-                      </span>
-                      <span className="font-mono tabular-nums text-fg">{formatTokens(val)}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="my-1.5 border-t border-line" />
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-fg-muted">Total</span>
-                <span className="font-mono tabular-nums text-fg">
-                  {formatTokens(activeCol.total)}
-                </span>
-              </div>
-            </div>
+            <ChartTooltip
+              title={activeCol.title}
+              valuesByAgent={activeCol.valuesByAgent}
+              total={activeCol.total}
+              left={tooltipLeft}
+              width={TOOLTIP_W}
+            />
           )}
         </div>
       )}
