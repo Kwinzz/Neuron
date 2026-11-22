@@ -52,7 +52,7 @@ export function CodeBlock({ children }: { children?: ReactNode }) {
   };
 
   return (
-    <div className="chat-code my-3 overflow-hidden rounded-lg border bg-muted/40">
+    <div className="chat-code my-3 overflow-hidden rounded-lg border bg-muted/40 animate-in fade-in-0 slide-in-from-bottom-1 zoom-in-[0.99] duration-300">
       <div className="flex items-center justify-between border-b px-3 py-1">
         <span className="font-mono text-xs text-muted-foreground">{language ?? "texte"}</span>
         <Button

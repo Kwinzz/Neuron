@@ -17,7 +17,11 @@ export const ToolBlock = memo(function ToolBlock({ item }: { item: ToolItem }) {
   const Icon = toolIcon(item.name);
 
   return (
-    <Collapsible open={open} onOpenChange={setManual} className="rounded-lg border bg-card">
+    <Collapsible
+      open={open}
+      onOpenChange={setManual}
+      className="rounded-lg border bg-card animate-in fade-in-0 slide-in-from-bottom-2 duration-300"
+    >
       <CollapsibleTrigger asChild>
         <button
           type="button"
@@ -55,19 +59,21 @@ export const ToolBlock = memo(function ToolBlock({ item }: { item: ToolItem }) {
           </Badge>
           <ChevronRight
             className={cn(
-              "size-4 shrink-0 text-muted-foreground transition-transform",
+              "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
               open && "rotate-90",
             )}
           />
         </button>
       </CollapsibleTrigger>
-      <CollapsibleContent className="border-t px-3 py-3">
-        <ToolBody
-          name={item.name}
-          input={item.input}
-          output={item.output}
-          outputTone={item.status === "error" ? "danger" : "default"}
-        />
+      <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+        <div className="border-t px-3 py-3 animate-in fade-in-0 duration-300">
+          <ToolBody
+            name={item.name}
+            input={item.input}
+            output={item.output}
+            outputTone={item.status === "error" ? "danger" : "default"}
+          />
+        </div>
       </CollapsibleContent>
     </Collapsible>
   );

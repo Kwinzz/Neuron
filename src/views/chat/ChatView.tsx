@@ -12,6 +12,7 @@ import { ThreadHeader } from "./ThreadHeader";
 import { Timeline } from "./Timeline";
 import { TimelineSkeleton } from "./TimelineSkeleton";
 import { useStickToBottom } from "./useStickToBottom";
+import { WorkingIndicator } from "./WorkingIndicator";
 import "./chat.css";
 
 const EMPTY_ITEMS: ChatItem[] = [];
@@ -36,6 +37,12 @@ export function ChatView({ threadId }: { threadId: string }) {
   const loading = thread?.loading ?? false;
   const error = thread?.error ?? null;
   const items = thread?.items ?? EMPTY_ITEMS;
+  const last = items[items.length - 1];
+  // "Working" while the agent is busy and nothing is streaming / waiting on the user.
+  const working =
+    active &&
+    !(last && (last.kind === "text" || last.kind === "thinking") && last.streaming) &&
+    !(last && last.kind === "permission" && last.state === "pending");
 
   useEffect(() => {
     if (loaded) {
@@ -90,6 +97,7 @@ export function ChatView({ threadId }: { threadId: string }) {
         ) : (
           <Timeline items={items} threadId={threadId} />
         )}
+        {loaded && working && <WorkingIndicator threadId={threadId} />}
       </div>
 
       <Composer

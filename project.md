@@ -88,6 +88,17 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-22 — Chat : en-tête fixe, indicateur « Working », animations
+- En-tête du chat **toujours visible** (collant en haut, fond translucide flouté) et restylé : logo de l'agent
+  (point animé quand il travaille), titre renommable, « agent · modèle · raisonnement · dossier », statut en badge
+  avec chrono, tokens/coût, bouton Arrêter.
+- Indicateur **Working** sous le dernier message pendant que l'agent travaille (logo qui respire, texte scintillant,
+  points qui rebondissent, action en cours) ; disparaît dès que la réponse s'affiche en direct ou qu'une
+  autorisation est demandée.
+- Animations : apparition des blocs de code et des blocs outil/shell, dépliage/repliage animé des blocs shell et de
+  la réflexion, entrée des nouveaux messages/cartes (l'historique chargé n'est pas animé).
+
+
 ### 2026-11-22 — Multi-fournisseurs (Claude Code, Codex, Antigravity), sélecteurs refaits, sidebar
 - **Codex et Antigravity fonctionnent pour de vrai** (avancé depuis la Phase 5). Protocoles vérifiés en réel avant
   de coder :
