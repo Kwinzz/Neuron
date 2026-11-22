@@ -83,10 +83,25 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 - [x] **Phase 1** — Shell (sidebar, dock live, palette Ctrl+K) + Mission Control sur SQLite
 - [x] **Phase 2** — `AgentAdapter`, registre multi-threads, `ClaudeCodeAdapter`, chat streaming
 - [x] **Phase 3** — Projets, `.neuron/context.md`, injection de contexte (page projet, indicateur de contexte, aperçu dans le nouveau chat)
-- [ ] **Phase 4** — Mémoire globale (`~/.neuron/memory.md` + SQLite), vue Mémoire, serveur MCP embarqué
+- [x] **Phase 4** — Mémoire globale (`~/.neuron/memory.md` + SQLite), vue Mémoire, serveur MCP embarqué
 - [ ] **Phase 5** — ~~Adaptateurs Antigravity / Codex~~ (faits), Generic PTY, paramètres, raccourcis, fluidité
 
 ## Journal des changements
+
+### 2026-11-22 — Phase 4 (UI) : vue Mémoire + Markdown partagé
+- **Vue Mémoire (neon / Gemini 4 Neon High)** : souvenirs par catégorie (Règles strictes mises en avant), ajout
+  rapide, édition en ligne, suppression confirmée, recherche plein texte surlignée (`/`), provenance (toi,
+  memory.md, agent via MCP) ; carte « Agents & MCP » (Claude Code et Codex actifs automatiquement, bouton
+  « Connecter Antigravity » → `agy mcp add`, commande du serveur copiable). Mise à jour en direct sur
+  `memory://changed`. Entrées sidebar, palette et en-tête.
+- **Markdown partagé (neon)** : `components/markdown` (Markdown + CodeBlock + `md-prose`) utilisé par les réponses du
+  chat et tous les aperçus de contexte ; éditeur `context.md` refondu (barre d'outils, statut d'enregistrement en
+  ligne, modes Éditer/Partagé/Aperçu, Tab = indentation, scroll synchronisé) ; cartes Git / Fichiers récents / Chats
+  harmonisées.
+- Vérifié : app montée, `memory.md` créé (dossier isolé en dev), modification externe importée par le watcher.
+- Non testé : inscription Antigravity (modifie la config globale d'agy : action volontairement laissée à
+  l'utilisateur).
+
 
 ### 2026-11-22 — Phase 4 (backend) : mémoire globale + serveur MCP embarqué
 - `memory/` : SQLite `memories` (FTS5) ⇄ `~/.neuron/memory.md` (catégories Profil / Préférences techniques / Style
@@ -99,8 +114,7 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
   bouton de la vue Mémoire (commandes `connect/disconnect_antigravity_mcp`), outils pré-approuvés par `--settings`.
 - Mémoire injectée dans **chaque** nouveau chat (règles strictes en tête), aussi dans l'aperçu du contexte projet.
 - Watcher `memory.md` (stat toutes les 2 s) → événement `memory://changed`. Front : `ipc` mémoire, store `memory`,
-  vue `memory` déclarée. **Reste à faire** : la vue Mémoire (UI), son entrée sidebar/palette, et tester
-  l'inscription Antigravity.
+  vue `memory` déclarée.
 
 
 ### 2026-11-22 — Phase 3 : projets & injection de contexte

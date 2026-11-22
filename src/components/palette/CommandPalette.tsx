@@ -1,5 +1,6 @@
 import { type ReactNode, useMemo, useState } from "react";
 import {
+  Brain,
   Database,
   FlaskConical,
   FolderGit2,
@@ -97,6 +98,15 @@ function useCommands(): Command[] {
         keywords: "accueil home dashboard tableau de bord",
         icon: <LayoutDashboard size={15} />,
         run: () => ui().navigate({ kind: "home" }),
+      },
+      {
+        id: "nav:memory",
+        group: "Navigation",
+        title: "Mémoire",
+        subtitle: "Mémoire globale partagée par les agents (memory.md, MCP)",
+        keywords: "mémoire memory souvenirs règles préférences profil mcp",
+        icon: <Brain size={15} />,
+        run: () => ui().navigate({ kind: "memory" }),
       },
       {
         id: "nav:dock",

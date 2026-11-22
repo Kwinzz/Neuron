@@ -30,6 +30,7 @@ src-tauri/
                             (projects, threads, providers, usage) — fonctions sync `fn(&Connection, ...)`
     util.rs                 now_ms, constantes de durée
     context.rs              contexte projet : .neuron/context.md, instantané git, fichiers récents, assemblage
+    memory/                 mémoire globale (memory.md ⇄ SQLite) + serveur MCP stdio embarqué (mcp.rs)
     commands/               commandes #[tauri::command] groupées par domaine
     agents/                 trait AgentAdapter, adaptateurs, registre de processus, events normalisés
 src/
@@ -45,6 +46,8 @@ src/
   views/chat/               ChatView (chat existant) + DraftChat (nouveau chat vide, créé au 1er message)
   views/project/            page projet (éditeur context.md, git, fichiers récents, chats du projet)
   components/context/       indicateur de contexte injecté (en-tête de chat, nouveau chat)
+  components/markdown/      rendu Markdown partagé (chat + aperçus) : Markdown, CodeBlock, markdown.css
+  views/memory/             vue Mémoire (souvenirs par catégorie, recherche, état MCP des agents)
   styles/index.css          design tokens Tailwind v4 (@theme)
 scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
 .claude/agents/neon.md      définition du sous-agent neon
@@ -129,6 +132,12 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
 - **Contexte projet (Phase 3)** : figé dans `threads.context` à la création d'un chat de projet. Claude reçoit
   `--append-system-prompt` (adaptateur `supports_system_prompt() = true`) ; les autres CLI reçoivent
   `context::as_preamble` devant le premier message uniquement. Ne jamais créer `.neuron/` dans un dossier absent.
+- **Mémoire (Phase 4)** : SQLite `memories` = source de vérité, miroir `~/.neuron/memory.md` (import des éditions
+  via hash dans `settings`, réécrit après chaque changement ; `<NEURON_DATA_DIR>/.neuron` en dev). Injectée dans chaque
+  nouveau chat. Serveur MCP = le même exécutable lancé en `neuron --mcp-memory --db … --memory-file … --agent …`
+  (logs sur stderr, stdout = protocole). Claude : `--mcp-config=` + `--allowedTools=` ; Codex : `-c mcp_servers.neuron.*` ;
+  Antigravity : pas de MCP par session → inscription `agy mcp add` déclenchée **par l'utilisateur** depuis la vue Mémoire.
+  Événement `memory://changed` (watcher de memory.md) en plus de `agent://event`.
 - `rate_limit_event` (fenêtres 5h / 7j de l'abonnement Claude) → `settings.claude.rate_limits` → `ProviderUsage.live`.
 - Front : `useChat` (timeline par thread, événements appliqués **une fois par frame**), `ChatItem` = même type
   pour l'historique et le live.
