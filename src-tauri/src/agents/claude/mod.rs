@@ -151,6 +151,7 @@ mod tests {
             resume: Some("abc".into()),
             append_system_prompt: None,
             mcp: None,
+            generic: None,
         }
     }
 

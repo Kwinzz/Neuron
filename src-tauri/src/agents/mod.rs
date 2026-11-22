@@ -10,6 +10,7 @@ pub mod antigravity;
 pub mod catalog;
 pub mod claude;
 pub mod codex;
+pub mod generic;
 pub mod events;
 pub mod process;
 pub mod registry;
@@ -37,6 +38,8 @@ pub struct SessionSpec {
     pub append_system_prompt: Option<String>,
     /// Neuron's memory MCP server, offered to the agent for this session (Phase 4).
     pub mcp: Option<crate::memory::mcp::McpLaunch>,
+    /// Generic CLI to run (AgentKind::Generic), resolved from Paramètres by the chat's model id.
+    pub generic: Option<crate::app_settings::GenericCliProfile>,
 }
 
 /// Commands sent to a running session.

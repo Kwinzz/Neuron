@@ -6,13 +6,17 @@ import { create } from "zustand";
  * - thread: an existing chat
  * - project: a project page (context.md editor, git snapshot, chats)
  * - memory: global memory (~/.neuron/memory.md) and its MCP server
+ * - settings: Paramètres
  */
 export type View =
   | { kind: "home" }
   | { kind: "draft"; projectId: string | null }
   | { kind: "thread"; id: string }
   | { kind: "project"; id: string; tab?: "context" | "chats" }
-  | { kind: "memory" };
+  | { kind: "memory" }
+  | { kind: "settings"; section?: SettingsSection };
+
+export type SettingsSection = "general" | "notifications" | "context" | "generic" | "shortcuts";
 
 const DOCK_KEY = "neuron.dockOpen";
 
@@ -35,6 +39,8 @@ function writeDockPref(open: boolean): void {
 interface UiState {
   view: View;
   paletteOpen: boolean;
+  /** Keyboard shortcuts help dialog. */
+  shortcutsOpen: boolean;
   dockOpen: boolean;
   /** Chat currently open (dock highlight, attention suppression). */
   focusedThreadId: string | null;
@@ -43,6 +49,9 @@ interface UiState {
 
   navigate: (view: View) => void;
   setPaletteOpen: (open: boolean) => void;
+  setShortcutsOpen: (open: boolean) => void;
+  /** Open Paramètres (optionally on a section). */
+  openSettings: (section?: SettingsSection) => void;
   togglePalette: () => void;
   setDockOpen: (open: boolean) => void;
   toggleDock: () => void;
@@ -58,12 +67,15 @@ interface UiState {
 export const useUi = create<UiState>((set, get) => ({
   view: { kind: "home" },
   paletteOpen: false,
+  shortcutsOpen: false,
   dockOpen: readDockPref(),
   focusedThreadId: null,
   selectedProjectId: null,
 
   navigate: (view) => set({ view, paletteOpen: false, focusedThreadId: view.kind === "thread" ? view.id : null }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
+  setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen, paletteOpen: false }),
+  openSettings: (section) => get().navigate(section ? { kind: "settings", section } : { kind: "settings" }),
   togglePalette: () => set({ paletteOpen: !get().paletteOpen }),
   setDockOpen: (dockOpen) => {
     writeDockPref(dockOpen);

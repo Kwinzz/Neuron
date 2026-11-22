@@ -45,20 +45,23 @@ pub async fn create_thread(
     let mode = input.permission_mode.clone().unwrap_or_else(|| "manual".into());
     validate_settings(&mode, input.effort.as_deref())?;
 
+    let app_settings = state.db.call(|c| crate::app_settings::load(c)).await?;
+    let ctx_opts = app_settings.context.clone();
     // Project chats get the project context (context.md + git + recent files), frozen with the chat.
     let context = match input.project_id.clone() {
         Some(project_id) => {
             let project = state.db.call(move |c| projects::get(c, &project_id)).await?;
             match project {
                 // Missing folder (moved project, demo data): no context rather than failing the chat.
-                Some(p) if std::path::Path::new(&p.path).is_dir() => Some(
+                Some(p) if std::path::Path::new(&p.path).is_dir() => Some({
+                    let opts = ctx_opts.clone();
                     tokio::task::spawn_blocking(move || {
                         let root = std::path::PathBuf::from(&p.path);
                         crate::context::ensure_context_file(&root, &p.name)?;
-                        crate::context::build(&root, &p.name, now_ms())
+                        crate::context::build(&root, &p.name, now_ms(), &opts)
                     })
-                    .await??,
-                ),
+                    .await??
+                }),
                 _ => None,
             }
         }
@@ -73,7 +76,8 @@ pub async fn create_thread(
             crate::db::memories::list(c)
         })
         .await?;
-    let context = crate::context::with_memory(context, crate::memory::context_section(&memory_items));
+    let memory_section = crate::memory::context_section(&memory_items).filter(|_| ctx_opts.inject_memory);
+    let context = crate::context::with_memory(context, memory_section);
 
     let id = uuid::Uuid::new_v4().to_string();
     let summary = {
@@ -292,6 +296,15 @@ pub async fn delete_project(state: State<'_, AppState>, project_id: String) -> A
 
 /// Models per provider (Claude Code, Codex, Antigravity), read from the installed CLIs.
 #[tauri::command]
-pub async fn list_models(refresh: Option<bool>) -> AppResult<Vec<crate::agents::catalog::ProviderCatalog>> {
-    Ok(crate::agents::catalog::catalog(refresh.unwrap_or(false)).await)
+pub async fn list_models(
+    state: State<'_, AppState>,
+    refresh: Option<bool>,
+) -> AppResult<Vec<crate::agents::catalog::ProviderCatalog>> {
+    let mut list = crate::agents::catalog::catalog(refresh.unwrap_or(false)).await;
+    // Generic CLIs from Paramètres (not cached: they change with the settings).
+    let profiles = state.db.call(|c| crate::app_settings::load(c)).await?.generic_clis;
+    if !profiles.is_empty() {
+        list.push(crate::agents::catalog::generic_provider(&profiles));
+    }
+    Ok(list)
 }

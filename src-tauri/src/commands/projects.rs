@@ -74,10 +74,12 @@ pub async fn save_project_context(state: State<'_, AppState>, project_id: String
 pub async fn project_overview(state: State<'_, AppState>, project_id: String) -> AppResult<ProjectOverview> {
     let p = project(&state, &project_id).await?;
     let memory_items = state.db.call(|c| crate::db::memories::list(c)).await?;
+    let opts = state.db.call(|c| crate::app_settings::load(c)).await?.context;
     tokio::task::spawn_blocking(move || {
         let root = PathBuf::from(&p.path);
-        let preview = context::build(&root, &p.name, now_ms())?;
-        let preview = context::with_memory(Some(preview), crate::memory::context_section(&memory_items))
+        let preview = context::build(&root, &p.name, now_ms(), &opts)?;
+        let memory = crate::memory::context_section(&memory_items).filter(|_| opts.inject_memory);
+        let preview = context::with_memory(Some(preview), memory)
             .unwrap_or_else(|| ContextBundle { markdown: String::new(), sources: Vec::new() });
         Ok(ProjectOverview {
             git: context::git_snapshot(&root),

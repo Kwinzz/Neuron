@@ -1,6 +1,8 @@
 import { type ReactNode, useMemo, useState } from "react";
 import {
   Brain,
+  Keyboard,
+  Settings,
   Database,
   FlaskConical,
   FolderGit2,
@@ -107,6 +109,25 @@ function useCommands(): Command[] {
         keywords: "mémoire memory souvenirs règles préférences profil mcp",
         icon: <Brain size={15} />,
         run: () => ui().navigate({ kind: "memory" }),
+      },
+      {
+        id: "nav:settings",
+        group: "Navigation",
+        title: "Paramètres",
+        subtitle: "Agents inactifs, notifications, contexte injecté, CLI génériques",
+        keywords: "paramètres settings préférences options notifications cli générique pty",
+        icon: <Settings size={15} />,
+        hint: <CommandShortcut>{MOD_LABEL}+,</CommandShortcut>,
+        run: () => ui().openSettings(),
+      },
+      {
+        id: "nav:shortcuts",
+        group: "Navigation",
+        title: "Raccourcis clavier",
+        keywords: "raccourcis clavier shortcuts aide touches",
+        icon: <Keyboard size={15} />,
+        hint: <CommandShortcut>{MOD_LABEL}+/</CommandShortcut>,
+        run: () => ui().setShortcutsOpen(true),
       },
       {
         id: "nav:dock",

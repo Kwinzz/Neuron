@@ -4,6 +4,7 @@ import type { ChatItem } from "@/bindings/ChatItem";
 import { useScrollRoot } from "@/components/shell/ScrollRoot";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { useHotkey } from "@/hooks/useHotkey";
 import { STATUS } from "@/lib/status";
 import { useChat } from "@/stores/chat";
 import { useLive } from "@/stores/live";
@@ -36,6 +37,19 @@ export function ChatView({ threadId }: { threadId: string }) {
   useEffect(() => {
     void useChat.getState().load(threadId);
   }, [threadId]);
+
+  // Échap stops the running agent — also from the composer, but never while a dialog/menu/popover is
+  // open (they own Échap) or from a single-line input (chat rename).
+  useHotkey(
+    "escape",
+    (e) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.tagName === "INPUT") return;
+      if (document.querySelector('[role="dialog"], [role="menu"], [role="listbox"], [data-radix-popper-content-wrapper]')) return;
+      void useChat.getState().stop(threadId);
+    },
+    { enabled: active, allowInInputs: true },
+  );
 
   const loaded = thread?.loaded ?? false;
   const loading = thread?.loading ?? false;

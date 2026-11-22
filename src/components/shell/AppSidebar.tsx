@@ -1,6 +1,7 @@
 import { type ComponentProps, memo, useEffect, useMemo, useState } from "react";
 import {
   Brain,
+  Settings,
   BrainCircuit,
   ChevronRight,
   CirclePlus,
@@ -99,6 +100,7 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 function MainNav() {
   const isHome = useUi((s) => s.view.kind === "home");
   const isMemory = useUi((s) => s.view.kind === "memory");
+  const isSettings = useUi((s) => s.view.kind === "settings");
   const isDraft = useUi((s) => s.view.kind === "draft" && s.view.projectId === null);
   return (
     <SidebarGroup>
@@ -127,6 +129,12 @@ function MainNav() {
             <SidebarMenuButton tooltip="Mémoire" isActive={isMemory} onClick={() => useUi.getState().navigate({ kind: "memory" })}>
               <Brain />
               <span>Mémoire</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton tooltip={`Paramètres (${MOD_LABEL}+,)`} isActive={isSettings} onClick={() => useUi.getState().openSettings()}>
+              <Settings />
+              <span>Paramètres</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>

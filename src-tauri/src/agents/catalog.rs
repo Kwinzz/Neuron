@@ -231,6 +231,31 @@ async fn antigravity() -> ProviderCatalog {
 }
 
 /// All providers (cached for 10 min unless `refresh`).
+/// The "Generic" provider: one model per CLI configured in Paramètres.
+pub fn generic_provider(profiles: &[crate::app_settings::GenericCliProfile]) -> ProviderCatalog {
+    ProviderCatalog {
+        agent: AgentKind::Generic,
+        label: "CLI génériques".into(),
+        available: true,
+        models: profiles
+            .iter()
+            .map(|p| ModelInfo {
+                id: p.id.clone(),
+                label: p.name.clone(),
+                hint: Some(format!("{}{}", p.command, if p.pty { " · PTY" } else { "" })),
+                vendor: "other".into(),
+                efforts: Vec::new(),
+                default_effort: None,
+                effort_models: None,
+            })
+            .collect(),
+        note: Some(
+            "CLI générique : un processus par message, sans mémoire entre les messages ni demande d'autorisation."
+                .into(),
+        ),
+    }
+}
+
 pub async fn catalog(refresh: bool) -> Vec<ProviderCatalog> {
     if !refresh {
         if let Ok(guard) = CACHE.lock() {

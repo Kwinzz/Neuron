@@ -218,7 +218,12 @@ fn ago(ms: i64, now_ms: i64) -> String {
 }
 
 /// Assemble the context injected into a new chat of the project at `root`.
-pub fn build(root: &Path, project_name: &str, now_ms: i64) -> AppResult<ContextBundle> {
+pub fn build(
+    root: &Path,
+    project_name: &str,
+    now_ms: i64,
+    opts: &crate::app_settings::ContextSettings,
+) -> AppResult<ContextBundle> {
     let mut md = format!(
         "# Contexte Neuron — projet « {project_name} »\n\
          Dossier du projet : {}\n\
@@ -242,7 +247,7 @@ pub fn build(root: &Path, project_name: &str, now_ms: i64) -> AppResult<ContextB
         });
     }
 
-    if let Some(snapshot) = git_snapshot(root) {
+    if let Some(snapshot) = git_snapshot(root).filter(|_| opts.git_snapshot) {
         md.push_str("\n## Git\n\n");
         if let Some(branch) = &snapshot.branch {
             md.push_str(&format!("Branche courante : `{branch}`\n"));
@@ -268,7 +273,7 @@ pub fn build(root: &Path, project_name: &str, now_ms: i64) -> AppResult<ContextB
         });
     }
 
-    let recent = recent_files(root);
+    let recent = if opts.recent_files { recent_files(root) } else { Vec::new() };
     if !recent.is_empty() {
         md.push_str("\n## Fichiers modifiés récemment\n\n");
         for f in &recent {
@@ -331,7 +336,7 @@ mod tests {
         write_context(&root, "# Règles\nToujours écrire des tests.").unwrap();
         std::fs::write(root.join("main.rs"), "fn main() {}").unwrap();
 
-        let bundle = build(&root, "demo", crate::util::now_ms()).unwrap();
+        let bundle = build(&root, "demo", crate::util::now_ms(), &Default::default()).unwrap();
         assert!(bundle.markdown.contains("Toujours écrire des tests."));
         assert!(bundle.markdown.contains("`main.rs`"), "recent files listed");
         assert!(!bundle.markdown.contains("context.md` ("), ".neuron/ is not listed as a recent file");

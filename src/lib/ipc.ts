@@ -5,10 +5,18 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import {
+  isPermissionGranted,
+  requestPermission,
+  sendNotification,
+} from "@tauri-apps/plugin-notification";
 import type { AgentEventEnvelope } from "@/bindings/AgentEventEnvelope";
 import type { AppInfo } from "@/bindings/AppInfo";
 import type { ChatItem } from "@/bindings/ChatItem";
 import type { AgyMcpStatus } from "@/bindings/AgyMcpStatus";
+import type { AppSettings } from "@/bindings/AppSettings";
+import type { GenericCliProfile } from "@/bindings/GenericCliProfile";
+import type { GenericCliTest } from "@/bindings/GenericCliTest";
 import type { ContextBundle } from "@/bindings/ContextBundle";
 import type { Memory } from "@/bindings/Memory";
 import type { MemoryCategory } from "@/bindings/MemoryCategory";
@@ -90,6 +98,10 @@ export const ipc = {
     invoke<void>("save_project_context", { projectId, content }),
   projectOverview: (projectId: string) => invoke<ProjectOverview>("project_overview", { projectId }),
   threadContext: (threadId: string) => invoke<ContextBundle | null>("thread_context", { threadId }),
+  // Paramètres
+  getAppSettings: () => invoke<AppSettings>("get_app_settings"),
+  updateAppSettings: (settings: AppSettings) => invoke<AppSettings>("update_app_settings", { settings }),
+  testGenericCli: (profile: GenericCliProfile) => invoke<GenericCliTest>("test_generic_cli", { profile }),
   // Global memory (~/.neuron/memory.md ⇄ SQLite) & its MCP server
   listMemories: () => invoke<Memory[]>("list_memories"),
   createMemory: (category: MemoryCategory, content: string) => invoke<Memory>("create_memory", { category, content }),
@@ -124,3 +136,15 @@ export const events = {
     listen<AgentEventEnvelope>(AGENT_EVENT_CHANNEL, (e) => handler(e.payload)),
   onMemoryChanged: (handler: () => void): Promise<UnlistenFn> => listen(MEMORY_CHANGED_CHANNEL, () => handler()),
 } as const;
+
+/** Native desktop notifications (asks the OS permission once). */
+export const notify = {
+  ensurePermission: async (): Promise<boolean> => {
+    if (!isTauri()) return false;
+    if (await isPermissionGranted()) return true;
+    return (await requestPermission()) === "granted";
+  },
+  send: (title: string, body: string): void => {
+    if (isTauri()) sendNotification({ title, body });
+  },
+};

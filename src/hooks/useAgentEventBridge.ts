@@ -1,8 +1,9 @@
 import { useEffect } from "react";
-import { events } from "@/lib/ipc";
+import { events, notify } from "@/lib/ipc";
 import { useChat } from "@/stores/chat";
 import { useDashboard } from "@/stores/dashboard";
-import { type Attention, useLive } from "@/stores/live";
+import { type Attention, attentionFor, useLive } from "@/stores/live";
+import { useSettings } from "@/stores/settings";
 import { useNav } from "@/stores/nav";
 import { toast } from "@/stores/toast";
 import { useUi } from "@/stores/ui";
@@ -13,6 +14,33 @@ const ATTENTION_TOAST: Record<Attention, { tone: "ok" | "warn" | "danger"; title
   error: { tone: "danger", title: "Chat en erreur" },
 };
 
+const NOTIFY_TITLE: Record<Attention, string> = {
+  done: "Réponse terminée",
+  approval: "Autorisation demandée",
+  error: "Erreur",
+};
+
+/** Last status notified per chat: one notification per transition. */
+const notified = new Map<string, Attention>();
+
+/** Native notification while the Neuron window is in the background (per Paramètres › Notifications). */
+function maybeNotify(threadId: string, why: Attention | null): void {
+  if (!why) {
+    notified.delete(threadId);
+    return;
+  }
+  if (notified.get(threadId) === why || document.hasFocus()) return;
+  const prefs = useSettings.getState().settings?.notifications;
+  if (!prefs?.enabled) return;
+  const wanted = why === "done" ? prefs.onFinished : why === "approval" ? prefs.onPermission : prefs.onError;
+  if (!wanted) return;
+  notified.set(threadId, why);
+  const thread = useLive.getState().threads[threadId];
+  void notify.ensurePermission().then((ok) => {
+    if (ok) notify.send(NOTIFY_TITLE[why], thread?.title || "Chat sans titre");
+  });
+}
+
 /**
  * Mount once (AppShell): routes `agent://event` into the live store, refreshes the dashboard
  * (throttled) and raises a toast when a background thread needs attention.
@@ -20,6 +48,7 @@ const ATTENTION_TOAST: Record<Attention, { tone: "ok" | "warn" | "danger"; title
 export function useAgentEventBridge(): void {
   useEffect(() => {
     let disposed = false;
+    void useSettings.getState().load().catch(() => undefined);
     let unlisten: (() => void) | null = null;
 
     events
@@ -43,6 +72,10 @@ export function useAgentEventBridge(): void {
               useLive.getState().markSeen(envelope.threadId);
             },
           });
+        }
+
+        if (envelope.event.kind === "ThreadStatusChanged") {
+          maybeNotify(envelope.threadId, attentionFor(envelope.event.status));
         }
 
         const kind = envelope.event.kind;

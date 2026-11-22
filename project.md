@@ -84,9 +84,27 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 - [x] **Phase 2** — `AgentAdapter`, registre multi-threads, `ClaudeCodeAdapter`, chat streaming
 - [x] **Phase 3** — Projets, `.neuron/context.md`, injection de contexte (page projet, indicateur de contexte, aperçu dans le nouveau chat)
 - [x] **Phase 4** — Mémoire globale (`~/.neuron/memory.md` + SQLite), vue Mémoire, serveur MCP embarqué
-- [ ] **Phase 5** — ~~Adaptateurs Antigravity / Codex~~ (faits), Generic PTY, paramètres, raccourcis, fluidité
+- [x] **Phase 5** — Adaptateurs Antigravity / Codex, CLI génériques (pipe + PTY), Paramètres, raccourcis, notifications, fluidité
 
 ## Journal des changements
+
+### 2026-11-22 — Phase 5 : CLI génériques, Paramètres, raccourcis, notifications, fluidité
+- **CLI génériques** (`agents/generic`) : profils configurés dans Paramètres (commande, arguments avec `{prompt}`
+  sinon entrée standard, option PTY). Chaque profil apparaît comme un modèle « CLI génériques » dans Nouveau chat.
+  Un processus par message, sortie streamée en texte (codes ANSI retirés par `vte`). PTY via `portable-pty`
+  (ConPTY) : Neuron répond à la requête de position du curseur, sans quoi le programme ne démarre pas sous Windows.
+  Tests pipe + PTY ; bouton « Tester » dans Paramètres.
+- **Paramètres** (`app_settings.rs`, un document JSON) : arrêt des agents inactifs (15 min par défaut, reprise
+  transparente au message suivant), notifications natives (autorisation / fin / erreur, uniquement fenêtre en
+  arrière-plan, `tauri-plugin-notification` 2.4), contexte injecté (mémoire / git / fichiers récents), CLI génériques.
+- **UI (neon / Gemini 4 Neon High)** : vue Paramètres (navigation par section, enregistrement immédiat, éditeur de
+  CLI avec préréglages Ollama / Aider / Gemini CLI / LLM et aperçu de la commande), dialogue d'aide des raccourcis.
+- **Raccourcis** : `Ctrl+,` Paramètres, `Ctrl+Maj+M` Mémoire, `Ctrl+Maj+H` Accueil, `Ctrl+/` aide, `Alt+↑/↓` chat
+  précédent/suivant, `Échap` arrête l'agent dans un chat. Liste unique dans `lib/shortcuts.ts`.
+- **Fluidité** : toutes les vues chargées à la demande et préchargées au repos ; bundle principal 793 → 375 kB,
+  plus d'avertissement de taille. Réglages de raisonnement/permissions masqués pour les CLI génériques.
+- Vérifié : 89 tests Rust, clippy propre, build OK, app montée sans erreur. Non vérifié à l'écran.
+
 
 ### 2026-11-22 — Phase 4 (UI) : vue Mémoire + Markdown partagé
 - **Vue Mémoire (neon / Gemini 4 Neon High)** : souvenirs par catégorie (Règles strictes mises en avant), ajout
@@ -311,8 +329,6 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Questions ouvertes
 
-- Bundle front > 500 kB (highlight.js) : charger la vue chat à la demande (lazy) en Phase 5.
-- Processus inactifs : pas encore d'arrêt après inactivité (ils restent vivants jusqu'à fermeture/suppression).
 
 - Source des données de quotas (Claude Pro/Max, Antigravity, Codex) : saisie manuelle dans les paramètres vs lecture
   depuis les CLI quand disponible — à trancher en Phase 1/5.

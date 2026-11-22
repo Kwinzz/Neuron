@@ -48,7 +48,7 @@ function fromSummary(s: ThreadSummary, previous?: LiveThread): LiveThread {
   };
 }
 
-function attentionFor(status: ThreadStatus): Attention | null {
+export function attentionFor(status: ThreadStatus): Attention | null {
   if (status === "done") return "done";
   if (status === "awaiting_approval") return "approval";
   if (status === "error") return "error";

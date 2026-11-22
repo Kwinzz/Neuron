@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Capabilities of the main Neuron window",
   "windows": ["main"],
-  "permissions": ["core:default", "dialog:allow-open"]
+  "permissions": ["core:default", "dialog:allow-open", "notification:default"]
 }

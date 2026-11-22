@@ -21,6 +21,7 @@ function useViewTitle(view: View): { section: string; title: string } {
   if (view.kind === "draft") return { section: draftProject ?? "Chats", title: "Nouveau chat" };
   if (view.kind === "project") return { section: "Projets", title: pageProject ?? "Projet" };
   if (view.kind === "memory") return { section: "Neuron", title: "Mémoire" };
+  if (view.kind === "settings") return { section: "Neuron", title: "Paramètres" };
   return { section: "Neuron", title: "Accueil" };
 }
 

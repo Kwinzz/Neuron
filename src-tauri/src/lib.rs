@@ -1,6 +1,7 @@
 //! Neuron — backend entry point.
 
 pub mod agents;
+pub mod app_settings;
 pub mod commands;
 pub mod context;
 pub mod db;
@@ -23,6 +24,7 @@ pub fn run() {
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(move |app| {
             let state = AppState::init(app.handle(), started)?;
             tracing::info!(
@@ -33,6 +35,7 @@ pub fn run() {
             );
             app.manage(state);
             commands::memory::spawn_memory_watcher(app.handle());
+            commands::settings::spawn_idle_reaper(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -60,6 +63,9 @@ pub fn run() {
             commands::projects::save_project_context,
             commands::projects::project_overview,
             commands::projects::thread_context,
+            commands::settings::get_app_settings,
+            commands::settings::update_app_settings,
+            commands::settings::test_generic_cli,
             commands::memory::list_memories,
             commands::memory::create_memory,
             commands::memory::update_memory,

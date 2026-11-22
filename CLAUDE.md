@@ -29,6 +29,7 @@ src-tauri/
     db/                     connexion, PRAGMAs, migrations (PRAGMA user_version) + requêtes par domaine
                             (projects, threads, providers, usage) — fonctions sync `fn(&Connection, ...)`
     util.rs                 now_ms, constantes de durée
+    app_settings.rs         Paramètres (document JSON unique dans `settings`, valeurs par défaut tolérantes)
     context.rs              contexte projet : .neuron/context.md, instantané git, fichiers récents, assemblage
     memory/                 mémoire globale (memory.md ⇄ SQLite) + serveur MCP stdio embarqué (mcp.rs)
     commands/               commandes #[tauri::command] groupées par domaine
@@ -48,6 +49,8 @@ src/
   components/context/       indicateur de contexte injecté (en-tête de chat, nouveau chat)
   components/markdown/      rendu Markdown partagé (chat + aperçus) : Markdown, CodeBlock, markdown.css
   views/memory/             vue Mémoire (souvenirs par catégorie, recherche, état MCP des agents)
+  views/settings/           Paramètres (agents inactifs, notifications, contexte injecté, CLI génériques, raccourcis)
+  lib/shortcuts.ts          liste unique des raccourcis globaux (aide + palette)
   styles/index.css          design tokens Tailwind v4 (@theme)
 scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
 .claude/agents/neon.md      définition du sous-agent neon
@@ -138,6 +141,16 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
   (logs sur stderr, stdout = protocole). Claude : `--mcp-config=` + `--allowedTools=` ; Codex : `-c mcp_servers.neuron.*` ;
   Antigravity : pas de MCP par session → inscription `agy mcp add` déclenchée **par l'utilisateur** depuis la vue Mémoire.
   Événement `memory://changed` (watcher de memory.md) en plus de `agent://event`.
+- **CLI génériques (Phase 5)** : profils dans Paramètres (`GenericCliProfile` : commande, args avec `{prompt}` sinon
+  stdin, `pty`). Le chat `generic` stocke l'id du profil dans `model`. Un processus par message, sortie streamée en
+  texte (ANSI retiré via `vte`). PTY = `portable-pty` (ConPTY) : **répondre à la requête de position du curseur
+  `ESC[6n` par `ESC[1;1R`**, sinon le programme ne démarre jamais sous Windows.
+- **Arrêt des inactifs** : `AgentRegistry::reap_idle` (tâche toutes les 60 s, `idleShutdownMinutes`) ; le chat reprend
+  au message suivant comme après un redémarrage.
+- **Notifications natives** (`tauri-plugin-notification`, mineure alignée crate/npm) : envoyées par
+  `useAgentEventBridge` sur transition de statut (terminé / autorisation / erreur) quand la fenêtre n'a pas le focus.
+- Vues chargées à la demande (`React.lazy` dans `AppShell`, préchargées au repos) : garder les imports lourds
+  (markdown, highlight.js, recharts) hors du bundle principal.
 - `rate_limit_event` (fenêtres 5h / 7j de l'abonnement Claude) → `settings.claude.rate_limits` → `ProviderUsage.live`.
 - Front : `useChat` (timeline par thread, événements appliqués **une fois par frame**), `ChatItem` = même type
   pour l'historique et le live.

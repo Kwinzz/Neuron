@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 use tauri::{AppHandle, Emitter};
@@ -16,6 +16,7 @@ use crate::agents::activity::tool_activity;
 use crate::agents::antigravity::AntigravityAdapter;
 use crate::agents::claude::ClaudeCodeAdapter;
 use crate::agents::codex::CodexAdapter;
+use crate::agents::generic::GenericAdapter;
 use crate::agents::events::{
     AGENT_EVENT_CHANNEL, AgentEvent, AgentEventEnvelope, AgentKind, ThreadStatus, TokenUsage,
 };
@@ -42,6 +43,10 @@ struct ActiveSession {
     shutdown_requested: bool,
     /// Model/effort/permissions changed: restart (with --resume) before the next prompt.
     stale: bool,
+    /// A turn is in progress (from the prompt until TurnComplete).
+    busy: bool,
+    /// Last time the session became idle (idle-shutdown reaper).
+    idle_since: Instant,
 }
 
 pub struct AgentRegistry {
@@ -82,6 +87,7 @@ impl AgentRegistry {
         adapters.insert(AgentKind::ClaudeCode, Arc::new(ClaudeCodeAdapter::default()));
         adapters.insert(AgentKind::Antigravity, Arc::new(AntigravityAdapter::default()));
         adapters.insert(AgentKind::Codex, Arc::new(CodexAdapter::default()));
+        adapters.insert(AgentKind::Generic, Arc::new(GenericAdapter));
         Self { sessions: Mutex::new(HashMap::new()), adapters, spawn_lock: tokio::sync::Mutex::new(0), mcp }
     }
 
@@ -141,6 +147,9 @@ impl AgentRegistry {
         for attempt in 0..2 {
             let sender = self.ensure_session(app, db, &runtime).await?;
             if sender.send(SessionCommand::Prompt(text.clone())).is_ok() {
+                if let Some(s) = self.lock().get_mut(thread_id) {
+                    s.busy = true;
+                }
                 return Ok(());
             }
             // The process died between spawn and send: drop it and retry once with a fresh one.
@@ -178,6 +187,17 @@ impl AgentRegistry {
             .clone()
             .map(PathBuf::from)
             .ok_or_else(|| AppError::Invalid("aucun dossier de travail pour ce thread".into()))?;
+        // Generic CLIs: the chat's model is the profile id, resolved from Paramètres at each spawn.
+        let generic = if runtime.agent == AgentKind::Generic {
+            let wanted = runtime.model.clone().unwrap_or_default();
+            db.call(|c| crate::app_settings::load(c))
+                .await?
+                .generic_clis
+                .into_iter()
+                .find(|p| p.id == wanted)
+        } else {
+            None
+        };
 
         let spec = SessionSpec {
             thread_id: runtime.id.clone(),
@@ -191,7 +211,9 @@ impl AgentRegistry {
             mcp: self
                 .mcp
                 .as_ref()
-                .map(|(exe, paths)| crate::memory::mcp::McpLaunch::new(exe.clone(), paths, runtime.agent.as_str())),
+                .map(|(exe, paths)| crate::memory::mcp::McpLaunch::new(exe.clone(), paths, runtime.agent.as_str()))
+                .filter(|_| runtime.agent != AgentKind::Generic),
+            generic,
         };
         let handle = adapter.start(&spec)?;
         *generation += 1;
@@ -207,6 +229,8 @@ impl AgentRegistry {
                 stop_requested: false,
                 shutdown_requested: false,
                 stale: false,
+                busy: false,
+                idle_since: Instant::now(),
             },
         );
         tracing::info!(thread = %runtime.id, pid = ?handle.pid, resume = spec.resume.is_some(), "agent session started");
@@ -299,6 +323,21 @@ impl AgentRegistry {
                 kill_process_tree(pid);
             }
         }
+    }
+
+    /// Stop sessions idle for at least `max_idle` (their chats resume on the next message). Returns their ids.
+    pub fn reap_idle(&self, max_idle: Duration) -> Vec<String> {
+        let ids: Vec<String> = self
+            .lock()
+            .iter()
+            .filter(|(_, s)| !s.busy && s.pending.is_empty() && s.idle_since.elapsed() >= max_idle)
+            .map(|(id, _)| id.clone())
+            .collect();
+        for id in &ids {
+            tracing::info!(thread = %id, "idle agent session stopped");
+            self.shutdown(id);
+        }
+        ids
     }
 
     /// App exit: kill every agent process.
@@ -433,6 +472,10 @@ impl AgentRegistry {
                 }
                 AdapterEvent::TurnComplete { usage, duration_ms, error } => {
                     let (stopped, _) = self.take_flags(&id, generation);
+                    if let Some(s) = self.lock().get_mut(&id).filter(|s| s.generation == generation) {
+                        s.busy = false;
+                        s.idle_since = Instant::now();
+                    }
                     cumulative.add(&usage);
                     {
                         let (tid, project, m, agent) = (id.clone(), rt.project_id.clone(), model.clone(), rt.agent);

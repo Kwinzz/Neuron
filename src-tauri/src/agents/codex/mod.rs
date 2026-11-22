@@ -203,6 +203,7 @@ mod tests {
             resume: None,
             append_system_prompt: None,
             mcp: None,
+            generic: None,
         }
     }
 
