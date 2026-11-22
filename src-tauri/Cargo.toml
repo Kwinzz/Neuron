@@ -1,0 +1,37 @@
+[package]
+name = "neuron"
+version = "0.1.0"
+description = "Neuron — unified desktop cockpit for CLI AI agents"
+edition = "2024"
+rust-version = "1.85"
+
+[lib]
+# `_lib` suffix avoids a name clash with the bin target on Windows.
+name = "neuron_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+tauri = { version = "2.12", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+rusqlite = { version = "0.43", features = ["bundled"] }
+thiserror = "2"
+ts-rs = { version = "12", features = ["serde-json-impl"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v4"] }
+
+# Keep dependencies optimized so SQLite & JSON parsing stay fast in dev builds.
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

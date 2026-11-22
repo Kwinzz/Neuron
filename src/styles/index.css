@@ -1,0 +1,104 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+
+/*
+ * Neuron design tokens — the ONLY source of colors, fonts, radii and durations.
+ * Usage: bg-bg, bg-surface, hover:bg-surface-hover, border-line, text-fg, text-fg-muted,
+ *        text-accent, bg-accent/10, text-agent-claude, text-ok, text-danger, font-mono, duration-fast ...
+ */
+@theme {
+  /* Surfaces */
+  --color-bg: #0b0c0e;
+  --color-bg-sunken: #08090a;
+  --color-surface: #121418;
+  --color-surface-hover: #181b21;
+  --color-surface-raised: #1d2128;
+
+  /* Lines */
+  --color-line: rgb(255 255 255 / 0.07);
+  --color-line-strong: rgb(255 255 255 / 0.12);
+
+  /* Foreground */
+  --color-fg: #e6e8eb;
+  --color-fg-muted: #9198a1;
+  --color-fg-subtle: #5d646d;
+
+  /* Accent — electric emerald */
+  --color-accent: #00e5a0;
+  --color-accent-strong: #00ffb3;
+  --color-accent-fg: #04140e;
+
+  /* Agents */
+  --color-agent-claude: #e8a05c;
+  --color-agent-antigravity: #5b9cff;
+  --color-agent-codex: #d4d4d8;
+  --color-agent-generic: #a78bfa;
+
+  /* Semantic */
+  --color-ok: #00e5a0;
+  --color-warn: #f5c451;
+  --color-danger: #ff5c6c;
+  --color-pending: #7aa2ff;
+
+  /* Typography */
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, "Cascadia Code", Consolas, monospace;
+
+  /* Radii */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+
+  /* Motion */
+  --ease-out-quick: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@utility duration-fast {
+  transition-duration: 150ms;
+  transition-timing-function: var(--ease-out-quick);
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-bg font-sans text-fg antialiased;
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    user-select: none;
+    overflow: hidden;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  }
+
+  /* Discreet scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+
+  :focus-visible {
+    outline: 1px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+
+  input,
+  textarea,
+  [contenteditable="true"],
+  pre,
+  code {
+    user-select: text;
+  }
+}
