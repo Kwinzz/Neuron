@@ -33,7 +33,7 @@ export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
   const { provider, used, ratio, resetsAt } = usage;
   const level = quotaLevel(ratio, provider.alertPct);
   const isAlert = level === "warn" || level === "danger";
-  const sub = [provider.plan, WINDOW_LABEL[provider.windowKind]].filter(Boolean).join(" · ");
+  const windowLabel = WINDOW_LABEL[provider.windowKind];
 
   return (
     <div className="relative border-b border-line-chart/60 py-4 first:pt-0 last:border-b-0 last:pb-0">
@@ -43,8 +43,13 @@ export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
         </IconBox>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-fg">{provider.label}</p>
-          <p className="truncate text-xs text-fg-muted">{sub}</p>
+          <p className="flex items-center gap-2 text-sm font-bold text-fg">
+            <span className="truncate">{provider.label}</span>
+            <span className="shrink-0 rounded-sm bg-surface px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-accent">
+              {windowLabel}
+            </span>
+          </p>
+          {provider.plan && <p className="truncate text-xs text-fg-muted">{provider.plan}</p>}
         </div>
 
         <div className="shrink-0 text-right text-sm font-bold tabular-nums text-fg">

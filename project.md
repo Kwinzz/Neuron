@@ -37,7 +37,7 @@ fond navy dégradé, cartes « verre », violet de marque, cyan secondaire, vale
 
 | Token | Valeur |
 |---|---|
-| Fond de page | `#070B24` + dégradé `159deg #0F123B → #090D2E → #020515` + halos violet/cyan (CSS maison) |
+| Fond de page | navy `#0E1030` traversé d'une bande diagonale bleu-violet lumineuse (radial-gradients, CSS maison) — c'est elle qui fait ressortir les cartes |
 | Carte | `linear-gradient(127.09deg, rgba(6,11,40,.94), rgba(10,14,35,.49))`, radius 20px, padding 22px |
 | Tuile / sidebar | `126.97deg #060C29 → rgba(4,12,48,.5)` / `111.84deg rgba(6,11,38,.94) → transparent` + blur 10px |
 | Surfaces | `#1A1F37` (pastilles, items actifs) · `#22234B` (hover) · piste `#2D2E5F` · grille charts `#56577A` |
@@ -59,7 +59,7 @@ fond navy dégradé, cartes « verre », violet de marque, cyan secondaire, vale
 | `ts-rs` pour les types IPC | génération fiable des types TS depuis Rust (`cargo test`), stable |
 | Canal d'events unique `agent://event` | un seul listener front, routage par `threadId` |
 | Polices via `@fontsource-variable` | aucune requête réseau au démarrage |
-| Sous-agent **neon** → `agy -p` via `scripts/neon-bridge.sh` | parallélisation du travail UI ; mode par défaut `--dangerously-skip-permissions` (choix utilisateur), surcharge via `NEON_MODE` |
+| Sous-agent **neon** → `agy -p --model gemini-4-neon-high` via `scripts/neon-bridge.sh` | parallélisation du travail UI ; mode par défaut `--dangerously-skip-permissions` (choix utilisateur), surcharge via `NEON_MODE` / `NEON_MODEL` |
 | DB dans `app_data_dir()/neuron.db` (WAL) | données app séparées de la mémoire utilisateur `~/.neuron/` |
 | Git : commit local par phase validée, pas de push | choix utilisateur |
 | **zustand** pour l'état front | sélecteurs fins → un event d'un thread ne re-rend que sa ligne ; pas de Provider |
@@ -85,6 +85,15 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 - [ ] **Phase 5** — Adaptateurs Antigravity / Codex / Generic PTY, paramètres, raccourcis, fluidité
 
 ## Journal des changements
+
+### 2026-11-22 — Ajustements UI après comparaison au template
+- **Cause du « on ne distingue pas les conteneurs »** : le `<style>` inline de `index.html` (`html, body {background}`)
+  n'était pas dans un layer Tailwind et écrasait `bg-app` → le fond restait un navy uni, de la même teinte que les cartes.
+  Corrigé (style inline limité à `html`) et fond refait comme le template : navy traversé d'une bande diagonale
+  bleu-violet lumineuse (CSS maison) sur laquelle les cartes sombres translucides ressortent.
+- Quotas : fenêtre affichée en pastille, plus de doublon « Fenêtre glissante 5h · Fenêtre 5h ». Carte raccourcis en liste.
+- neon : le bridge fixe désormais le modèle `gemini-4-neon-high` par défaut (`NEON_MODEL` / `-m` pour changer).
+  Les deux délégations précédentes avaient tourné sur Gemini 4 Argon (réglage Antigravity de l'utilisateur).
 
 ### 2026-11-22 — Refonte UI style « Vision UI » (avant Phase 2)
 - Demande utilisateur : interface dans le style du template **Vision UI Dashboard Chakra** (Creative Tim, MIT).

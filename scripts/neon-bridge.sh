@@ -9,6 +9,7 @@
 #   AGY_BIN     binaire Antigravity (défaut: agy)
 #   NEON_MODE   skip (défaut, --dangerously-skip-permissions) | accept-edits | auto | plan
 #   NEON_LOG_DIR dossier des logs (défaut: <workdir>/logs/neon)
+#   NEON_MODEL  modèle Antigravity (défaut: gemini-4-neon-high ; -m l'emporte)
 set -euo pipefail
 
 usage() {
@@ -17,7 +18,7 @@ usage() {
 }
 
 WORKDIR="$(pwd)"
-MODEL=""
+MODEL="${NEON_MODEL:-gemini-4-neon-high}"
 EFFORT=""
 PROMPT_FILE=""
 DRY_RUN=0

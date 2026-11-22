@@ -136,11 +136,18 @@ function ShortcutsCard() {
         <Keyboard size={18} />
       </IconBox>
       <p className="mt-3 text-sm font-bold text-fg">Tout au clavier</p>
-      <p className="mt-1 flex flex-wrap items-center gap-1 text-xs text-fg/80">
-        <Kbd>{MOD_LABEL}</Kbd>
-        <Kbd>K</Kbd> palette · <Kbd>{MOD_LABEL}</Kbd>
-        <Kbd>J</Kbd> threads
-      </p>
+      <ul className="mt-2 flex flex-col gap-1.5 text-xs text-fg/80">
+        <li className="flex items-center gap-1">
+          <Kbd>{MOD_LABEL}</Kbd>
+          <Kbd>K</Kbd>
+          <span className="ml-1">Palette</span>
+        </li>
+        <li className="flex items-center gap-1">
+          <Kbd>{MOD_LABEL}</Kbd>
+          <Kbd>J</Kbd>
+          <span className="ml-1">Threads live</span>
+        </li>
+      </ul>
       <button
         type="button"
         onClick={() => setPaletteOpen(true)}

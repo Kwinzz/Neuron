@@ -77,12 +77,17 @@
 
 /* ---------- Vision surfaces ---------- */
 
+/* Page background: dark navy crossed by a bright, blurred blue–violet diagonal band (Vision look).
+   The band is what makes the dark translucent cards stand out — keep it vivid. */
 @utility bg-app {
-  background-color: var(--color-bg);
+  background-color: #0e1030;
   background-image:
-    radial-gradient(900px 620px at 8% -10%, rgb(88 44 255 / 0.32), transparent 62%),
-    radial-gradient(760px 560px at 100% 105%, rgb(44 217 255 / 0.13), transparent 60%),
-    linear-gradient(159deg, #0f123b 14%, #090d2e 56%, #020515 86%);
+    radial-gradient(34% 30% at 36% 26%, rgb(70 88 255 / 0.85), transparent 72%),
+    radial-gradient(38% 30% at 58% 46%, rgb(66 72 248 / 0.85), transparent 72%),
+    radial-gradient(34% 30% at 84% 62%, rgb(80 110 250 / 0.8), transparent 70%),
+    radial-gradient(44% 34% at 72% 94%, rgb(60 56 222 / 0.8), transparent 72%),
+    radial-gradient(30% 26% at 14% 90%, rgb(46 36 160 / 0.6), transparent 70%),
+    linear-gradient(160deg, #15153a 0%, #0e1030 48%, #120c2e 100%);
   background-attachment: fixed;
 }
 
