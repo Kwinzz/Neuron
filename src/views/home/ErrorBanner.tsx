@@ -1,5 +1,5 @@
 import { AlertTriangle } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/legacy/Button";
 import { IconBox } from "@/components/ui/IconBox";
 import { useDashboard } from "@/stores/dashboard";
 

@@ -1,4 +1,4 @@
-import { Card } from "@/components/ui/Card";
+import { Card } from "@/components/legacy/Card";
 import { formatTokens } from "@/lib/format";
 import { useDashboard } from "@/stores/dashboard";
 import { AgentShares } from "./AgentShares";

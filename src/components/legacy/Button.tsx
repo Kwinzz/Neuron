@@ -4,7 +4,7 @@ type Variant = "brand" | "outline" | "ghost" | "subtle";
 type Size = "sm" | "md";
 
 const VARIANT: Record<Variant, string> = {
-  brand: "bg-brand text-white hover:bg-brand-hover active:bg-brand-active",
+  brand: "bg-brand text-brand-fg hover:bg-brand-hover active:bg-brand-active",
   outline: "border border-white/80 text-white hover:bg-white/10 active:bg-white/20",
   ghost: "text-fg-muted hover:bg-surface hover:text-fg",
   subtle: "bg-surface text-fg hover:bg-surface-hover",

@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Progress } from "@/components/ui/Progress";
+import { Progress } from "@/components/legacy/Progress";
 import { formatCost, formatTokens } from "@/lib/format";
 
 interface ProjectRowProps {
@@ -28,7 +28,7 @@ export const ProjectRow = memo(function ProjectRow({
         className="mt-2"
         size="sm"
         value={share}
-        fillClassName="bg-accent-2"
+        fillClassName="bg-hl-2"
         label={`Part du projet ${name}`}
       />
     </div>

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Card } from "@/components/ui/Card";
+import { Card } from "@/components/legacy/Card";
 import { STATUS } from "@/lib/status";
 import { useDashboard } from "@/stores/dashboard";
 import { Placeholder } from "./Placeholder";

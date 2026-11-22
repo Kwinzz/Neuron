@@ -16,6 +16,19 @@ You are **neon**, the UI/UX specialist of the Neuron project. You drive **Antigr
 
 ## Design language
 
+> **Branch `design/shadcn`:** this branch uses **shadcn/ui** (style `radix-nova`, base color *Neutral*, dark only)
+> instead of the Vision style below. Build with the shadcn components in `src/components/ui/*.tsx` (lowercase:
+> `button`, `card`, `badge`, `tabs`, `table`, `chart` (Recharts), `progress`, `collapsible`, `tooltip`, `popover`,
+> `dialog`, `command`, `select`, `toggle-group`, `scroll-area`, `skeleton`, `alert`, `separator`, `sidebar`…), `cn`
+> from `"cn"`, and shadcn tokens (`bg-background`, `bg-card`, `text-muted-foreground`, `border`, `bg-primary
+> text-primary-foreground`, `bg-accent`, `ring`, `chart-1..4` = agent colors in fixed order). Look: Vercel/shadcn
+> dashboard — flat neutral cards with 1px borders, `rounded-xl`, generous whitespace, `text-sm` body,
+> `text-2xl font-semibold tabular-nums` KPI values, muted descriptions, no gradients, no glow. Status colors only via
+> `text-ok`, `text-warn`, `text-destructive`, `text-live` (+ icon/label). Legacy Neuron primitives that remain
+> usable: `IconBox`, `AgentBadge`, `StatusDot`, `StatusIconBox`, `Kbd`, `LiveTimer`, `RingGauge`
+> (`src/components/ui/PascalCase.tsx`); the old Card/Button/Progress live in `src/components/legacy/` — do not use
+> them in new code. The Vision section below applies to `main` only.
+
 **Vision UI** style (Creative Tim "Vision UI Dashboard", recreated with Tailwind — never import Chakra): navy
 gradient page, glass cards with 20px radius, violet brand, cyan secondary, bold white values over muted gray labels.
 Use **only** the tokens/utilities in `src/styles/index.css`:

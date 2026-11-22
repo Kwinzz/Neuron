@@ -110,7 +110,7 @@ export function DiffView({ oldText, newText }: DiffViewProps) {
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="text-xs font-bold text-accent transition-colors duration-fast hover:text-accent-strong"
+            className="text-xs font-bold text-hl transition-colors duration-fast hover:text-hl-strong"
           >
             {expanded ? "Réduire" : `Afficher tout (${rows.length} lignes)`}
           </button>

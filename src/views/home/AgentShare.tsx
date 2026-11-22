@@ -1,7 +1,7 @@
 import { memo } from "react";
 import type { AgentKind } from "@/bindings/AgentKind";
 import { IconBox } from "@/components/ui/IconBox";
-import { Progress } from "@/components/ui/Progress";
+import { Progress } from "@/components/legacy/Progress";
 import { AGENTS } from "@/lib/agents";
 import { formatPercent, formatTokens } from "@/lib/format";
 

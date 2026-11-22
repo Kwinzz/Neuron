@@ -24,7 +24,7 @@ export const STATUS: Record<ThreadStatus, StatusMeta> = {
 
 /** Tailwind text color per tone (static strings). */
 export const TONE_TEXT: Record<StatusTone, string> = {
-  live: "text-accent-2",
+  live: "text-hl-2",
   pending: "text-pending",
   warn: "text-warn",
   ok: "text-ok",
@@ -33,7 +33,7 @@ export const TONE_TEXT: Record<StatusTone, string> = {
 };
 
 export const TONE_BG: Record<StatusTone, string> = {
-  live: "bg-accent-2",
+  live: "bg-hl-2",
   pending: "bg-pending",
   warn: "bg-warn",
   ok: "bg-ok",

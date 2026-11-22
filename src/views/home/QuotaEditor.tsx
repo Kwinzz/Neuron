@@ -2,7 +2,7 @@ import { type FormEvent, type KeyboardEvent, type RefObject, useEffect, useRef, 
 import type { Provider } from "@/bindings/Provider";
 import type { QuotaUnit } from "@/bindings/QuotaUnit";
 import type { WindowKind } from "@/bindings/WindowKind";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/legacy/Button";
 import { ipcErrorMessage } from "@/lib/ipc";
 import { useDashboard } from "@/stores/dashboard";
 import { QUOTA_UNITS, UNIT_LABEL, WINDOW_KINDS, WINDOW_LABEL } from "./quotaFormat";
@@ -15,7 +15,7 @@ interface QuotaEditorProps {
 }
 
 const INPUT_CLASS =
-  "h-10 w-full rounded-md border border-line bg-surface px-3 text-sm text-fg outline-none transition-colors duration-fast focus:border-accent";
+  "h-10 w-full rounded-md border border-line bg-surface px-3 text-sm text-fg outline-none transition-colors duration-fast focus:border-hl";
 
 export function QuotaEditor({ provider, onClose, anchorRef }: QuotaEditorProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);

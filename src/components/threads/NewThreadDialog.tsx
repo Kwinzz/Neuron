@@ -1,7 +1,7 @@
 import { type FormEvent, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { AlertTriangle, FolderOpen, Sparkles, X } from "lucide-react";
 import type { AgentKind } from "@/bindings/AgentKind";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/legacy/Button";
 import { IconBox } from "@/components/ui/IconBox";
 import { Kbd, MOD_LABEL } from "@/components/ui/Kbd";
 import { AGENTS } from "@/lib/agents";
@@ -167,7 +167,7 @@ function Dialog() {
               onChange={(e) => setCwd(e.target.value)}
               spellCheck={false}
               placeholder="C:\chemin\vers\le\projet"
-              className="h-10 min-w-0 flex-1 rounded-md border border-line-strong bg-bg-sunken px-3 font-mono text-[13px] text-fg outline-none transition-colors duration-fast focus:border-accent"
+              className="h-10 min-w-0 flex-1 rounded-md border border-line-strong bg-bg-sunken px-3 font-mono text-[13px] text-fg outline-none transition-colors duration-fast focus:border-hl"
             />
             <Button type="button" variant="subtle" onClick={() => void browse()}>
               <FolderOpen size={15} />
@@ -201,7 +201,7 @@ function Dialog() {
                 onChange={(e) => setModel(e.target.value)}
                 placeholder="ex. claude-opus-5-5"
                 spellCheck={false}
-                className="mt-2 h-9 w-full rounded-md border border-line-strong bg-bg-sunken px-3 font-mono text-[13px] text-fg outline-none focus:border-accent"
+                className="mt-2 h-9 w-full rounded-md border border-line-strong bg-bg-sunken px-3 font-mono text-[13px] text-fg outline-none focus:border-hl"
               />
             )}
           </Field>
@@ -243,7 +243,7 @@ function Dialog() {
             onChange={(e) => setPrompt(e.target.value)}
             rows={4}
             placeholder="Que doit faire l'agent ?"
-            className="w-full resize-y rounded-md border border-line-strong bg-bg-sunken px-3 py-2.5 text-sm text-fg outline-none transition-colors duration-fast placeholder:text-fg-subtle focus:border-accent"
+            className="w-full resize-y rounded-md border border-line-strong bg-bg-sunken px-3 py-2.5 text-sm text-fg outline-none transition-colors duration-fast placeholder:text-fg-subtle focus:border-hl"
           />
         </Field>
 
@@ -289,7 +289,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       onClick={onClick}
       aria-pressed={active}
       className={`h-8 rounded-md px-3 text-xs font-bold transition-colors duration-fast ${
-        active ? "bg-brand text-white" : "bg-surface text-fg-muted hover:text-fg"
+        active ? "bg-brand text-brand-fg" : "bg-surface text-fg-muted hover:text-fg"
       }`}
     >
       {children}

@@ -1,7 +1,7 @@
 import { type KeyboardEvent, memo, useEffect, useRef, useState } from "react";
 import { Pencil, Square } from "lucide-react";
 import { AgentBadge } from "@/components/ui/AgentBadge";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/legacy/Button";
 import { LiveTimer } from "@/components/ui/LiveTimer";
 import { StatusIconBox } from "@/components/ui/StatusIconBox";
 import { formatCost, formatTokens } from "@/lib/format";

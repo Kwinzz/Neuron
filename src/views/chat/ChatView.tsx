@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { MessageSquare, XCircle } from "lucide-react";
 import type { ChatItem } from "@/bindings/ChatItem";
 import { useScrollRoot } from "@/components/shell/ScrollRoot";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/legacy/Button";
 import { IconBox } from "@/components/ui/IconBox";
 import { STATUS } from "@/lib/status";
 import { useChat } from "@/stores/chat";

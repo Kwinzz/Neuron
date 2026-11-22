@@ -1,4 +1,4 @@
-import { Card } from "@/components/ui/Card";
+import { Card } from "@/components/legacy/Card";
 import { RingGauge } from "@/components/ui/RingGauge";
 import { formatPercent, formatTokens } from "@/lib/format";
 import { useDashboard } from "@/stores/dashboard";
@@ -48,7 +48,7 @@ export function CacheCard() {
           size={160}
           thickness={8}
           sweep={360}
-          color="var(--color-accent-2)"
+          color="var(--color-hl-2)"
           value={isLoading ? 0 : hit}
           label="Taux de lecture cache"
         >

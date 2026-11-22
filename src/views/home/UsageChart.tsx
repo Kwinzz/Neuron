@@ -296,7 +296,7 @@ export function UsageChart({ buckets, range }: UsageChartProps) {
                       rx={6}
                       fill="var(--color-surface-hover)"
                       fillOpacity={0.5}
-                      stroke={isFocused ? "var(--color-accent)" : undefined}
+                      stroke={isFocused ? "var(--color-hl)" : undefined}
                       strokeWidth={isFocused ? 1.5 : undefined}
                     />
                   )}

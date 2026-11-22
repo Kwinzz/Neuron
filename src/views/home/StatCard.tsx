@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Card } from "@/components/ui/Card";
+import { Card } from "@/components/legacy/Card";
 import { IconBox } from "@/components/ui/IconBox";
 import { Delta } from "./Delta";
 import { Placeholder } from "./Placeholder";

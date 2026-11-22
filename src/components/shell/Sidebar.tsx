@@ -15,7 +15,7 @@ export function Sidebar() {
   return (
     <nav className="glass-panel flex h-full w-[260px] shrink-0 flex-col px-4" aria-label="Navigation">
       <div className="flex h-[76px] shrink-0 items-center justify-center gap-2.5">
-        <span className="size-2 rounded-full bg-accent-2 shadow-[0_0_12px_var(--color-accent-2)]" aria-hidden />
+        <span className="size-2 rounded-full bg-hl-2 shadow-[0_0_12px_var(--color-hl-2)]" aria-hidden />
         <span className="text-wordmark text-sm font-bold uppercase tracking-[3px]">Neuron</span>
       </div>
       <div className="mb-5 h-px shrink-0 bg-gradient-to-r from-transparent via-line-strong to-transparent" aria-hidden />
@@ -99,10 +99,10 @@ function ProjectList() {
                 trailing={
                   p.activeCount > 0 ? (
                     <span
-                      className="flex items-center gap-1 rounded-full bg-accent-2/15 px-2 py-0.5 text-[11px] font-bold tabular-nums text-accent-2"
+                      className="flex items-center gap-1 rounded-full bg-hl-2/15 px-2 py-0.5 text-[11px] font-bold tabular-nums text-hl-2"
                       title={`${p.activeCount} thread(s) actif(s)`}
                     >
-                      <span className="size-1.5 animate-pulse rounded-full bg-accent-2" />
+                      <span className="size-1.5 animate-pulse rounded-full bg-hl-2" />
                       {p.activeCount}
                     </span>
                   ) : (

@@ -47,7 +47,7 @@ export function RangeSwitch({ value, onChange }: RangeSwitchProps) {
             onClick={() => onChange(item.value)}
             onKeyDown={(e) => handleKeyDown(idx, e)}
             className={`h-7 rounded-[10px] px-3 text-xs font-bold transition-colors duration-fast ${
-              active ? "bg-brand text-white" : "text-fg-muted hover:text-fg"
+              active ? "bg-brand text-brand-fg" : "text-fg-muted hover:text-fg"
             }`}
           >
             {item.label}

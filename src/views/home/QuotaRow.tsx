@@ -2,7 +2,7 @@ import { AlertTriangle, Settings2 } from "lucide-react";
 import { memo, useCallback, useRef, useState } from "react";
 import type { ProviderUsage } from "@/bindings/ProviderUsage";
 import { IconBox } from "@/components/ui/IconBox";
-import { Progress } from "@/components/ui/Progress";
+import { Progress } from "@/components/legacy/Progress";
 import { AGENTS } from "@/lib/agents";
 import { formatPercent } from "@/lib/format";
 import { QuotaEditor } from "./QuotaEditor";
@@ -49,7 +49,7 @@ export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-2 text-sm font-bold text-fg">
             <span className="truncate">{provider.label}</span>
-            <span className="shrink-0 rounded-sm bg-surface px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-accent">
+            <span className="shrink-0 rounded-sm bg-surface px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-hl">
               {windowLabel}
             </span>
           </p>
@@ -95,7 +95,7 @@ export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
           </span>
         ) : live ? (
           <span className="inline-flex items-center gap-1.5 text-fg-muted" title="Utilisation rapportée par Claude Code">
-            <span className="size-1.5 rounded-full bg-accent-2" aria-hidden />
+            <span className="size-1.5 rounded-full bg-hl-2" aria-hidden />
             Abonnement · source Claude
           </span>
         ) : provider.limitValue == null ? (
@@ -104,7 +104,7 @@ export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="font-bold text-accent transition-colors duration-fast hover:text-accent-strong"
+              className="font-bold text-hl transition-colors duration-fast hover:text-hl-strong"
             >
               Configurer
             </button>

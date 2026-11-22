@@ -1,7 +1,7 @@
 import { AlertTriangle, Gauge } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/legacy/Button";
+import { Card } from "@/components/legacy/Card";
 import { IconBox } from "@/components/ui/IconBox";
 import { RingGauge } from "@/components/ui/RingGauge";
 import { formatPercent } from "@/lib/format";

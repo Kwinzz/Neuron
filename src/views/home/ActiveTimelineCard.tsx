@@ -1,5 +1,5 @@
 import { Coffee } from "lucide-react";
-import { Card } from "@/components/ui/Card";
+import { Card } from "@/components/legacy/Card";
 import { IconBox } from "@/components/ui/IconBox";
 import { Kbd, MOD_LABEL } from "@/components/ui/Kbd";
 import { useDashboard } from "@/stores/dashboard";

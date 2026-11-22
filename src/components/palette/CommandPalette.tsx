@@ -278,7 +278,7 @@ function PaletteDialog() {
         onKeyDown={onKeyDown}
       >
         <div className="flex h-14 shrink-0 items-center gap-3 border-b border-line px-5">
-          <Search size={18} className="text-accent" />
+          <Search size={18} className="text-hl" />
           <input
             ref={inputRef}
             value={query}

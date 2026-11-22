@@ -83,7 +83,7 @@ function renderInput(name: string, input: JsonValue): ReactNode {
         <div className="flex flex-col gap-1.5">
           {description && <p className="text-xs text-fg-subtle">{description}</p>}
           <pre className="rounded-md bg-bg/40 px-3 py-2 font-mono text-xs text-fg whitespace-pre-wrap break-all select-text">
-            <span className="select-none text-accent-2">$ </span>
+            <span className="select-none text-hl-2">$ </span>
             {command}
           </pre>
         </div>

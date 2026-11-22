@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import { ArrowUp, Square } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/legacy/Button";
 import { ipc } from "@/lib/ipc";
 import { useChat } from "@/stores/chat";
 import { NewMessagesPill } from "./NewMessagesPill";
@@ -171,7 +171,7 @@ export const Composer = memo(function Composer({
             <NewMessagesPill onClick={onPillClick} />
           </div>
         )}
-        <div className="glass-overlay flex items-end gap-2 rounded-xl p-2 transition-colors duration-fast focus-within:border-accent/60">
+        <div className="glass-overlay flex items-end gap-2 rounded-xl p-2 transition-colors duration-fast focus-within:border-hl/60">
           <textarea
             ref={textareaRef}
             data-composer

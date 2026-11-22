@@ -13,7 +13,7 @@ const REHYPE: MarkdownProps["rehypePlugins"] = [[rehypeHighlight, { detect: fals
 const COMPONENTS: Components = {
   pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
   a: ({ href, children }) => (
-    <a href={href} target="_blank" rel="noreferrer" className="text-accent underline-offset-2 hover:underline">
+    <a href={href} target="_blank" rel="noreferrer" className="text-hl underline-offset-2 hover:underline">
       {children}
     </a>
   ),

@@ -1,5 +1,5 @@
 import { ArrowRight } from "lucide-react";
-import { Card } from "@/components/ui/Card";
+import { Card } from "@/components/legacy/Card";
 import { Kbd, MOD_LABEL } from "@/components/ui/Kbd";
 import { useLive } from "@/stores/live";
 import { useUi } from "@/stores/ui";
@@ -18,7 +18,7 @@ export function WelcomeCard() {
           className="absolute inset-0"
           style={{
             background:
-              "radial-gradient(60% 80% at 85% 30%, color-mix(in srgb, var(--color-brand) 35%, transparent), transparent 70%), radial-gradient(40% 60% at 100% 100%, color-mix(in srgb, var(--color-accent-2) 18%, transparent), transparent 70%)",
+              "radial-gradient(60% 80% at 85% 30%, color-mix(in srgb, var(--color-brand) 35%, transparent), transparent 70%), radial-gradient(40% 60% at 100% 100%, color-mix(in srgb, var(--color-hl-2) 18%, transparent), transparent 70%)",
           }}
         />
         <NeuralArt className="absolute right-0 top-0 h-full w-[60%] max-w-[360px]" />
@@ -45,7 +45,7 @@ export function WelcomeCard() {
           <button
             type="button"
             onClick={() => useUi.getState().setPaletteOpen(true)}
-            className="inline-flex items-center gap-1.5 text-sm font-bold text-fg transition-colors duration-fast hover:text-accent"
+            className="inline-flex items-center gap-1.5 text-sm font-bold text-fg transition-colors duration-fast hover:text-hl"
           >
             <span>Ouvrir la palette</span>
             <ArrowRight size={14} />

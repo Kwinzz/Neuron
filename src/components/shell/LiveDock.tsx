@@ -130,7 +130,7 @@ function DockRail() {
       <button
         type="button"
         onClick={toggleDock}
-        className="relative flex size-[30px] items-center justify-center rounded-md bg-surface text-accent transition-colors duration-fast hover:bg-surface-hover"
+        className="relative flex size-[30px] items-center justify-center rounded-md bg-surface text-hl transition-colors duration-fast hover:bg-surface-hover"
         title={`Afficher les threads (${MOD_LABEL}+J)`}
       >
         <PanelRightOpen size={15} />

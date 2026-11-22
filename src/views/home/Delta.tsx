@@ -21,7 +21,7 @@ export function Delta({ ratio }: DeltaProps) {
 
   return (
     <span
-      className="inline-flex items-center gap-0.5 whitespace-nowrap text-sm font-bold tabular-nums text-accent-2"
+      className="inline-flex items-center gap-0.5 whitespace-nowrap text-sm font-bold tabular-nums text-hl-2"
       title="vs période précédente"
     >
       {ratio > 0 && pct !== 0 && <ArrowUp size={14} aria-hidden />}

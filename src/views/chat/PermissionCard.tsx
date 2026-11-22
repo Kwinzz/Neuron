@@ -1,7 +1,7 @@
 import { type KeyboardEvent, memo, useEffect, useRef, useState } from "react";
 import { Check, ShieldAlert, X } from "lucide-react";
 import type { ChatItem } from "@/bindings/ChatItem";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/legacy/Button";
 import { IconBox } from "@/components/ui/IconBox";
 import { Kbd } from "@/components/ui/Kbd";
 import { useChat } from "@/stores/chat";

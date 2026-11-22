@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { PanelRight, Plus, Search } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/legacy/Button";
 import { Kbd, MOD_LABEL } from "@/components/ui/Kbd";
 import { useLive } from "@/stores/live";
 import { useUi, type View } from "@/stores/ui";
@@ -71,7 +71,7 @@ function SearchPill() {
     <button
       type="button"
       onClick={() => setPaletteOpen(true)}
-      className="flex h-10 w-[240px] items-center gap-2.5 rounded-[15px] border border-line-strong bg-bg-sunken px-3.5 text-sm text-fg-muted transition-colors duration-fast hover:border-accent/60 hover:text-fg"
+      className="flex h-10 w-[240px] items-center gap-2.5 rounded-[15px] border border-line-strong bg-bg-sunken px-3.5 text-sm text-fg-muted transition-colors duration-fast hover:border-hl/60 hover:text-fg"
     >
       <Search size={15} className="text-fg" />
       <span className="flex-1 text-left">Rechercher…</span>
@@ -92,7 +92,7 @@ function DockToggle() {
       aria-pressed={dockOpen}
       title={`${dockOpen ? "Masquer" : "Afficher"} les threads (${MOD_LABEL}+J)`}
       className={`relative flex size-10 items-center justify-center rounded-md transition-colors duration-fast ${
-        dockOpen ? "bg-brand text-white hover:bg-brand-hover" : "bg-surface text-accent hover:bg-surface-hover"
+        dockOpen ? "bg-brand text-brand-fg hover:bg-brand-hover" : "bg-surface text-hl hover:bg-surface-hover"
       }`}
     >
       <PanelRight size={17} />

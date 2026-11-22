@@ -44,7 +44,7 @@ export const TOOL_STATUS: Record<
   ToolStatus,
   { tone: "cyan" | "muted" | "danger" | "warn"; label: string; text: string }
 > = {
-  running: { tone: "cyan", label: "En cours", text: "text-accent-2" },
+  running: { tone: "cyan", label: "En cours", text: "text-hl-2" },
   ok: { tone: "muted", label: "Terminé", text: "text-fg-subtle" },
   error: { tone: "danger", label: "Échec", text: "text-danger" },
   denied: { tone: "warn", label: "Refusé", text: "text-warn" },

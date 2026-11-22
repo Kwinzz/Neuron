@@ -11,23 +11,23 @@ const NODES: readonly NeuralNode[] = [
   // Layer 1 (leftmost)
   { x: 54, y: 46, r: 2.5, fill: "var(--color-brand-soft)", opacity: 0.55 },
   { x: 38, y: 112, r: 3, fill: "var(--color-brand-soft)", opacity: 0.65 },
-  { x: 64, y: 176, r: 2.5, fill: "var(--color-accent-2)", opacity: 0.5 },
+  { x: 64, y: 176, r: 2.5, fill: "var(--color-hl-2)", opacity: 0.5 },
   { x: 48, y: 224, r: 2, fill: "var(--color-brand-soft)", opacity: 0.5 },
   // Layer 2
   { x: 132, y: 34, r: 3, fill: "var(--color-brand-soft)", opacity: 0.7 },
-  { x: 118, y: 92, r: 4.5, fill: "var(--color-accent-2)", opacity: 0.85, halo: true },
+  { x: 118, y: 92, r: 4.5, fill: "var(--color-hl-2)", opacity: 0.85, halo: true },
   { x: 144, y: 152, r: 3.5, fill: "var(--color-brand-soft)", opacity: 0.75 },
   { x: 126, y: 214, r: 3, fill: "var(--color-brand-soft)", opacity: 0.6 },
   // Layer 3
-  { x: 222, y: 48, r: 3.5, fill: "var(--color-accent-2)", opacity: 0.75 },
+  { x: 222, y: 48, r: 3.5, fill: "var(--color-hl-2)", opacity: 0.75 },
   { x: 206, y: 108, r: 3, fill: "var(--color-brand-soft)", opacity: 0.7 },
   { x: 234, y: 164, r: 5, fill: "var(--color-brand-soft)", opacity: 0.9, halo: true },
-  { x: 214, y: 226, r: 2.5, fill: "var(--color-accent-2)", opacity: 0.6 },
+  { x: 214, y: 226, r: 2.5, fill: "var(--color-hl-2)", opacity: 0.6 },
   // Layer 4 (rightmost)
   { x: 306, y: 36, r: 3, fill: "var(--color-brand-soft)", opacity: 0.65 },
-  { x: 324, y: 88, r: 4.5, fill: "var(--color-accent-2)", opacity: 0.9, halo: true },
+  { x: 324, y: 88, r: 4.5, fill: "var(--color-hl-2)", opacity: 0.9, halo: true },
   { x: 298, y: 142, r: 3, fill: "var(--color-brand-soft)", opacity: 0.75 },
-  { x: 332, y: 196, r: 3.5, fill: "var(--color-accent-2)", opacity: 0.7 },
+  { x: 332, y: 196, r: 3.5, fill: "var(--color-hl-2)", opacity: 0.7 },
   { x: 304, y: 238, r: 2.5, fill: "var(--color-brand-soft)", opacity: 0.55 },
 ];
 
@@ -87,7 +87,7 @@ export function NeuralArt({ className = "" }: { className?: string }) {
             y1={from.y}
             x2={to.x}
             y2={to.y}
-            stroke="var(--color-accent)"
+            stroke="var(--color-hl)"
             strokeOpacity={idx % 2 === 0 ? 0.24 : 0.18}
             strokeWidth={1}
           />

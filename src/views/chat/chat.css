@@ -108,7 +108,7 @@
 }
 
 .chat-prose a {
-  color: var(--color-accent);
+  color: var(--color-hl);
   text-underline-offset: 2px;
 }
 
@@ -150,7 +150,7 @@
   height: 1em;
   margin-left: 2px;
   vertical-align: -0.15em;
-  background-color: var(--color-accent-2);
+  background-color: var(--color-hl-2);
   animation: chat-blink 1s steps(2, start) infinite;
 }
 
@@ -182,7 +182,7 @@
 .chat-code .hljs-name,
 .chat-code .hljs-selector-class,
 .chat-code .hljs-selector-id {
-  color: var(--color-accent);
+  color: var(--color-hl);
 }
 
 .chat-code .hljs-string,
@@ -213,7 +213,7 @@
 .chat-code .hljs-title.class_,
 .chat-code .hljs-function,
 .chat-code .hljs-section {
-  color: var(--color-accent-2);
+  color: var(--color-hl-2);
 }
 
 .chat-code .hljs-attr,
