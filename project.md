@@ -88,6 +88,13 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Accueil : cartes KPI épurées
+- Plus de textes sous les nombres (« En hausse vs période précédente », descriptions) : seuls le libellé, la valeur et
+  le badge d'évolution restent ; la description passe en info-bulle du libellé.
+- « Tours » remplacé par **Tokens au total** (entrée + sortie + cache, tous fournisseurs) ; « Coût estimé » devient
+  **Coût total** (tous fournisseurs : Claude communiqué, Codex/Antigravity estimés).
+
+
 ### 2026-11-22 — Tarifs mis à jour automatiquement (LiteLLM)
 - `pricing.rs` : la liste publique de LiteLLM (GitHub) est téléchargée au démarrage **au plus une fois par jour**
   (`reqwest`/rustls, 30 s max, en tâche de fond) et mise en cache dans `<data_dir>/prices.json` (≈ 27 Ko, 275 modèles
