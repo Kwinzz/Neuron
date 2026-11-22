@@ -2,6 +2,7 @@
 //! so the async runtime (and therefore the UI) never waits on disk I/O.
 
 pub mod chat;
+pub mod memories;
 pub mod migrations;
 pub mod projects;
 pub mod providers;

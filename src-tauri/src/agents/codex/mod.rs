@@ -46,6 +46,14 @@ pub fn turn_args(spec: &SessionSpec, thread: Option<&str>, prompt: &str) -> Vec<
     if let Some(effort) = spec.effort.as_deref().filter(|e| EFFORT_LEVELS.contains(e)) {
         args.extend(["-c".into(), format!("model_reasoning_effort=\"{effort}\"")]);
     }
+    if let Some(mcp) = &spec.mcp {
+        use crate::memory::mcp::SERVER_NAME;
+        // TOML literal strings ('…'): Windows paths keep their backslashes.
+        let lit = |s: &str| format!("'{}'", s.replace('\'', ""));
+        let list = mcp.args.iter().map(|a| lit(a)).collect::<Vec<_>>().join(",");
+        args.extend(["-c".into(), format!("mcp_servers.{SERVER_NAME}.command={}", lit(&mcp.command.display().to_string()))]);
+        args.extend(["-c".into(), format!("mcp_servers.{SERVER_NAME}.args=[{list}]")]);
+    }
     if let Some(thread) = thread.filter(|t| !t.is_empty()) {
         args.extend(["resume".into(), thread.into()]);
     }
@@ -194,6 +202,7 @@ mod tests {
             permission_mode: mode.into(),
             resume: None,
             append_system_prompt: None,
+            mcp: None,
         }
     }
 

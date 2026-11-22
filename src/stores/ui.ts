@@ -5,12 +5,14 @@ import { create } from "zustand";
  * - draft: empty chat, created on its first message (optionally inside a project)
  * - thread: an existing chat
  * - project: a project page (context.md editor, git snapshot, chats)
+ * - memory: global memory (~/.neuron/memory.md) and its MCP server
  */
 export type View =
   | { kind: "home" }
   | { kind: "draft"; projectId: string | null }
   | { kind: "thread"; id: string }
-  | { kind: "project"; id: string; tab?: "context" | "chats" };
+  | { kind: "project"; id: string; tab?: "context" | "chats" }
+  | { kind: "memory" };
 
 const DOCK_KEY = "neuron.dockOpen";
 

@@ -68,6 +68,18 @@ pub fn build_args(spec: &SessionSpec) -> Vec<String> {
     if let Some(extra) = spec.append_system_prompt.as_deref().filter(|s| !s.trim().is_empty()) {
         args.extend(["--append-system-prompt".into(), extra.into()]);
     }
+    if let Some(mcp) = &spec.mcp {
+        use crate::memory::mcp::{SERVER_NAME, TOOL_NAMES};
+        let config = json!({ "mcpServers": { SERVER_NAME: {
+            "type": "stdio",
+            "command": mcp.command.display().to_string(),
+            "args": mcp.args,
+        }}});
+        // `=` forms: both options are variadic and must not swallow the next argument.
+        args.push(format!("--mcp-config={config}"));
+        let allowed: Vec<String> = TOOL_NAMES.iter().map(|t| format!("mcp__{SERVER_NAME}__{t}")).collect();
+        args.push(format!("--allowedTools={}", allowed.join(",")));
+    }
     args
 }
 
@@ -138,6 +150,7 @@ mod tests {
             permission_mode: "acceptEdits".into(),
             resume: Some("abc".into()),
             append_system_prompt: None,
+            mcp: None,
         }
     }
 

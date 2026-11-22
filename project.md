@@ -88,6 +88,21 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-22 — Phase 4 (backend) : mémoire globale + serveur MCP embarqué
+- `memory/` : SQLite `memories` (FTS5) ⇄ `~/.neuron/memory.md` (catégories Profil / Préférences techniques / Style
+  de code / Règles strictes / Autres ; import des modifications du fichier, réécriture après chaque changement ;
+  hash du dernier état synchronisé dans `settings`). Isolé dans `<NEURON_DATA_DIR>/.neuron` en dev.
+- Serveur MCP stdio embarqué : `neuron --mcp-memory --db … --memory-file … --agent …` (même exécutable), outils
+  `neuron_memory_read` / `neuron_memory_search` / `neuron_memory_save`. Offert à chaque session : Claude via
+  `--mcp-config` + `--allowedTools`, Codex via `-c mcp_servers.neuron.*` — **vérifié en live (les deux retrouvent
+  le souvenir)**. Antigravity n'accepte pas de serveur MCP par session : inscription unique `agy mcp add` via un
+  bouton de la vue Mémoire (commandes `connect/disconnect_antigravity_mcp`), outils pré-approuvés par `--settings`.
+- Mémoire injectée dans **chaque** nouveau chat (règles strictes en tête), aussi dans l'aperçu du contexte projet.
+- Watcher `memory.md` (stat toutes les 2 s) → événement `memory://changed`. Front : `ipc` mémoire, store `memory`,
+  vue `memory` déclarée. **Reste à faire** : la vue Mémoire (UI), son entrée sidebar/palette, et tester
+  l'inscription Antigravity.
+
+
 ### 2026-11-22 — Phase 3 : projets & injection de contexte
 - **Backend** (`context.rs`) : `.neuron/context.md` créé depuis un modèle à l'ajout du projet (jamais écrasé, jamais
   créé dans un dossier absent), instantané git (branche, `status --porcelain` ≤ 30, 5 derniers commits, timeout 5 s,

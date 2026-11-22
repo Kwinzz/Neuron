@@ -8,7 +8,12 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { AgentEventEnvelope } from "@/bindings/AgentEventEnvelope";
 import type { AppInfo } from "@/bindings/AppInfo";
 import type { ChatItem } from "@/bindings/ChatItem";
+import type { AgyMcpStatus } from "@/bindings/AgyMcpStatus";
 import type { ContextBundle } from "@/bindings/ContextBundle";
+import type { Memory } from "@/bindings/Memory";
+import type { MemoryCategory } from "@/bindings/MemoryCategory";
+import type { MemoryHit } from "@/bindings/MemoryHit";
+import type { MemoryInfo } from "@/bindings/MemoryInfo";
 import type { ProjectContextFile } from "@/bindings/ProjectContextFile";
 import type { ProjectOverview } from "@/bindings/ProjectOverview";
 import type { NewThreadInput } from "@/bindings/NewThreadInput";
@@ -25,6 +30,8 @@ import type { UsageReport } from "@/bindings/UsageReport";
 
 /** Must match `AGENT_EVENT_CHANNEL` in `src-tauri/src/agents/events.rs`. */
 export const AGENT_EVENT_CHANNEL = "agent://event";
+/** memory.md edited outside the app, or an agent saved a memory through MCP. */
+export const MEMORY_CHANGED_CHANNEL = "memory://changed";
 
 /** True when running inside the Tauri webview (false in a plain browser via `npm run dev`). */
 export const isTauri = (): boolean => "__TAURI_INTERNALS__" in window;
@@ -83,6 +90,18 @@ export const ipc = {
     invoke<void>("save_project_context", { projectId, content }),
   projectOverview: (projectId: string) => invoke<ProjectOverview>("project_overview", { projectId }),
   threadContext: (threadId: string) => invoke<ContextBundle | null>("thread_context", { threadId }),
+  // Global memory (~/.neuron/memory.md ⇄ SQLite) & its MCP server
+  listMemories: () => invoke<Memory[]>("list_memories"),
+  createMemory: (category: MemoryCategory, content: string) => invoke<Memory>("create_memory", { category, content }),
+  updateMemory: (id: string, category: MemoryCategory, content: string) =>
+    invoke<Memory>("update_memory", { id, category, content }),
+  deleteMemory: (id: string) => invoke<void>("delete_memory", { id }),
+  searchMemories: (query: string, limit?: number) => invoke<MemoryHit[]>("search_memories", { query, limit }),
+  memoryInfo: () => invoke<MemoryInfo>("memory_info"),
+  openMemoryFile: () => invoke<void>("open_memory_file"),
+  antigravityMcpStatus: () => invoke<AgyMcpStatus>("antigravity_mcp_status"),
+  connectAntigravityMcp: () => invoke<AgyMcpStatus>("connect_antigravity_mcp"),
+  disconnectAntigravityMcp: () => invoke<AgyMcpStatus>("disconnect_antigravity_mcp"),
   /** Models per provider, read from the installed CLIs (cached 10 min server-side). */
   listModels: (refresh = false) => invoke<ProviderCatalog[]>("list_models", { refresh }),
   /** Native folder picker; resolves to null when cancelled. */
@@ -103,4 +122,5 @@ export const events = {
   /** Subscribe to every normalized agent event. Returns the unsubscribe function. */
   onAgentEvent: (handler: (payload: AgentEventEnvelope) => void): Promise<UnlistenFn> =>
     listen<AgentEventEnvelope>(AGENT_EVENT_CHANNEL, (e) => handler(e.payload)),
+  onMemoryChanged: (handler: () => void): Promise<UnlistenFn> => listen(MEMORY_CHANGED_CHANNEL, () => handler()),
 } as const;

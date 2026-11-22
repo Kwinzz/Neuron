@@ -73,12 +73,16 @@ pub async fn save_project_context(state: State<'_, AppState>, project_id: String
 #[tauri::command]
 pub async fn project_overview(state: State<'_, AppState>, project_id: String) -> AppResult<ProjectOverview> {
     let p = project(&state, &project_id).await?;
+    let memory_items = state.db.call(|c| crate::db::memories::list(c)).await?;
     tokio::task::spawn_blocking(move || {
         let root = PathBuf::from(&p.path);
+        let preview = context::build(&root, &p.name, now_ms())?;
+        let preview = context::with_memory(Some(preview), crate::memory::context_section(&memory_items))
+            .unwrap_or_else(|| ContextBundle { markdown: String::new(), sources: Vec::new() });
         Ok(ProjectOverview {
             git: context::git_snapshot(&root),
             recent_files: context::recent_files(&root),
-            preview: context::build(&root, &p.name, now_ms())?,
+            preview,
         })
     })
     .await?

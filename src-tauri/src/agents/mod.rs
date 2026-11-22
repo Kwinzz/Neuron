@@ -35,6 +35,8 @@ pub struct SessionSpec {
     pub resume: Option<String>,
     /// Extra context appended to the agent's system prompt (Phase 3: project context + memory).
     pub append_system_prompt: Option<String>,
+    /// Neuron's memory MCP server, offered to the agent for this session (Phase 4).
+    pub mcp: Option<crate::memory::mcp::McpLaunch>,
 }
 
 /// Commands sent to a running session.

@@ -77,7 +77,7 @@ fn model(id: &str, label: &str, hint: Option<&str>, efforts: &[&str], default_ef
 }
 
 /// Run `binary args…` and return stdout when it succeeds in time.
-async fn run_cli(binary: &str, args: &[&str]) -> Option<String> {
+pub(crate) async fn run_cli(binary: &str, args: &[&str]) -> Option<String> {
     let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
     let child = command(binary, &args, &std::env::temp_dir())
         .stdin(Stdio::null())

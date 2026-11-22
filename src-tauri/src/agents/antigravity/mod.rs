@@ -48,6 +48,16 @@ pub fn build_args(spec: &SessionSpec) -> Vec<String> {
     if let Some(conv) = spec.resume.as_deref().filter(|s| !s.is_empty()) {
         args.extend(["--conversation".into(), conv.into()]);
     }
+    if let Some(mcp) = &spec.mcp {
+        use crate::memory::mcp::{SERVER_NAME, TOOL_NAMES};
+        // agy has no per-session MCP servers: the server is registered once in its own config (`agy mcp add`,
+        // done by the user from the Memory view). Here we only pre-approve its tools for this session.
+        let _ = &mcp.command;
+        let settings = json!({
+            "permissions": { "allow": TOOL_NAMES.iter().map(|t| format!("mcp({SERVER_NAME}/{t})")).collect::<Vec<_>>() },
+        });
+        args.extend(["--settings".into(), settings.to_string()]);
+    }
     // `-p` takes a value: give it an empty one so stdin drives the turns. Must stay last.
     args.extend(["-p".into(), String::new()]);
     args
@@ -92,6 +102,7 @@ mod tests {
             permission_mode: "acceptEdits".into(),
             resume: Some("conv-1".into()),
             append_system_prompt: None,
+            mcp: None,
         };
         let args = build_args(&spec);
         let joined = args.join(" ");

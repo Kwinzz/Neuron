@@ -20,6 +20,7 @@ fn spec(model: &str, effort: Option<&str>) -> SessionSpec {
         permission_mode: "acceptEdits".into(),
         resume: None,
         append_system_prompt: None,
+        mcp: None,
     }
 }
 
@@ -119,4 +120,82 @@ async fn codex_and_antigravity_receive_preamble() {
     let agy = ask(&AntigravityAdapter::default(), spec("gemini-4-neon-low", None), prompt).await;
     println!("antigravity: {agy}");
     assert!(codex.to_uppercase().contains("PAPAYE") && agy.to_uppercase().contains("PAPAYE"));
+}
+
+/// One turn with Neuron's memory MCP server; prints tool calls; returns the text.
+async fn ask_with_memory(adapter: &dyn AgentAdapter, mut spec: SessionSpec, agent: &str) -> (String, Vec<String>) {
+    use neuron_lib::memory::{MemoryCategory, MemoryPaths, mcp::McpLaunch};
+    let dir = PathBuf::from(std::env::var("NEURON_LIVE_DIR").unwrap()).join(format!("mem-{agent}"));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let paths = MemoryPaths { db_path: dir.join("neuron.db"), file_path: dir.join("memory.md") };
+    let db = neuron_lib::db::Db::open(&paths.db_path).unwrap();
+    db.blocking(|c| {
+        neuron_lib::db::memories::insert(c, MemoryCategory::Other, "Le mot de code mémoire est KIWI.", "user", 1)
+    })
+    .unwrap();
+    drop(db);
+    spec.mcp = Some(McpLaunch::new(PathBuf::from(env!("CARGO_BIN_EXE_neuron")), &paths, agent));
+
+    let mut handle = adapter.start(&spec).expect("start");
+    handle
+        .commands
+        .send(SessionCommand::Prompt(
+            "Appelle l'outil MCP neuron_memory_search avec la requête « mot de code », puis réponds uniquement \
+             avec le mot de code trouvé."
+                .into(),
+        ))
+        .unwrap();
+    let (mut out, mut tools) = (String::new(), Vec::new());
+    while let Ok(Some(ev)) = tokio::time::timeout(Duration::from_secs(240), handle.events.recv()).await {
+        match ev {
+            AdapterEvent::BlockCompleted { text, channel: neuron_lib::agents::events::DeltaChannel::Text, .. } => {
+                out.push_str(&text)
+            }
+            AdapterEvent::ToolCallStart { name, .. } => tools.push(name),
+            AdapterEvent::ToolCallResult { output, is_error, .. } => {
+                println!("[{agent}] tool result (error={is_error}): {}", output.chars().take(160).collect::<String>())
+            }
+            AdapterEvent::PermissionRequest { .. } => println!("[{agent}] PERMISSION REQUEST: {ev:?}"),
+            AdapterEvent::Warning(w) => println!("[{agent}] warning: {w}"),
+            AdapterEvent::TurnComplete { error, .. } => {
+                if let Some(e) = error {
+                    println!("[{agent}] turn error: {e}");
+                }
+                handle.commands.send(SessionCommand::Shutdown).unwrap();
+            }
+            AdapterEvent::Exited { stderr_tail, .. } => {
+                if !stderr_tail.trim().is_empty() {
+                    println!("[{agent}] stderr: {}", stderr_tail.chars().take(400).collect::<String>());
+                }
+                break;
+            }
+            _ => {}
+        }
+    }
+    (out, tools)
+}
+
+#[tokio::test]
+#[ignore]
+async fn memory_mcp_claude() {
+    let (answer, tools) = ask_with_memory(&ClaudeCodeAdapter::default(), spec("claude-haiku-5-5", Some("low")), "claude_code").await;
+    println!("claude tools={tools:?} answer={answer}");
+    assert!(answer.to_uppercase().contains("KIWI"));
+}
+
+#[tokio::test]
+#[ignore]
+async fn memory_mcp_codex() {
+    let (answer, tools) = ask_with_memory(&CodexAdapter::default(), spec("gpt-6-luna", Some("low")), "codex").await;
+    println!("codex tools={tools:?} answer={answer}");
+    assert!(answer.to_uppercase().contains("KIWI"));
+}
+
+#[tokio::test]
+#[ignore]
+async fn memory_mcp_antigravity() {
+    let (answer, tools) = ask_with_memory(&AntigravityAdapter::default(), spec("gemini-4-neon-low", None), "antigravity").await;
+    println!("antigravity tools={tools:?} answer={answer}");
+    assert!(answer.to_uppercase().contains("KIWI"));
 }

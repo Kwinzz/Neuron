@@ -5,6 +5,7 @@ pub mod commands;
 pub mod context;
 pub mod db;
 pub mod error;
+pub mod memory;
 pub mod state;
 pub mod util;
 
@@ -31,6 +32,7 @@ pub fn run() {
                 "neuron ready"
             );
             app.manage(state);
+            commands::memory::spawn_memory_watcher(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -58,6 +60,16 @@ pub fn run() {
             commands::projects::save_project_context,
             commands::projects::project_overview,
             commands::projects::thread_context,
+            commands::memory::list_memories,
+            commands::memory::create_memory,
+            commands::memory::update_memory,
+            commands::memory::delete_memory,
+            commands::memory::search_memories,
+            commands::memory::memory_info,
+            commands::memory::open_memory_file,
+            commands::memory::antigravity_mcp_status,
+            commands::memory::connect_antigravity_mcp,
+            commands::memory::disconnect_antigravity_mcp,
             commands::threads::create_project,
             commands::threads::delete_project,
             commands::dev::dev_seed_demo,

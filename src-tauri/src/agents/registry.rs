@@ -49,11 +49,13 @@ pub struct AgentRegistry {
     adapters: HashMap<AgentKind, Arc<dyn AgentAdapter>>,
     /// Serializes session spawning (avoids double spawn on fast double-send).
     spawn_lock: tokio::sync::Mutex<u64>,
+    /// Neuron executable + memory paths: every session gets the memory MCP server (None in tests).
+    mcp: Option<(PathBuf, crate::memory::MemoryPaths)>,
 }
 
 impl Default for AgentRegistry {
     fn default() -> Self {
-        Self::new()
+        Self::new(None)
     }
 }
 
@@ -75,12 +77,12 @@ pub fn title_from_prompt(prompt: &str) -> String {
 }
 
 impl AgentRegistry {
-    pub fn new() -> Self {
+    pub fn new(mcp: Option<(PathBuf, crate::memory::MemoryPaths)>) -> Self {
         let mut adapters: HashMap<AgentKind, Arc<dyn AgentAdapter>> = HashMap::new();
         adapters.insert(AgentKind::ClaudeCode, Arc::new(ClaudeCodeAdapter::default()));
         adapters.insert(AgentKind::Antigravity, Arc::new(AntigravityAdapter::default()));
         adapters.insert(AgentKind::Codex, Arc::new(CodexAdapter::default()));
-        Self { sessions: Mutex::new(HashMap::new()), adapters, spawn_lock: tokio::sync::Mutex::new(0) }
+        Self { sessions: Mutex::new(HashMap::new()), adapters, spawn_lock: tokio::sync::Mutex::new(0), mcp }
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, HashMap<String, ActiveSession>> {
@@ -186,6 +188,10 @@ impl AgentRegistry {
             resume: runtime.session_ref.clone(),
             // Project context: system prompt when the CLI supports it (re-applied on every restart/resume).
             append_system_prompt: runtime.context.clone().filter(|_| adapter.supports_system_prompt()),
+            mcp: self
+                .mcp
+                .as_ref()
+                .map(|(exe, paths)| crate::memory::mcp::McpLaunch::new(exe.clone(), paths, runtime.agent.as_str())),
         };
         let handle = adapter.start(&spec)?;
         *generation += 1;

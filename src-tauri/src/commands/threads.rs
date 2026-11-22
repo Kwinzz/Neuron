@@ -64,6 +64,16 @@ pub async fn create_thread(
         }
         None => None,
     };
+    // Global memory goes into every new chat (project or not).
+    let memory_file = state.paths.memory_file.clone();
+    let memory_items = state
+        .db
+        .call(move |c| {
+            crate::memory::import_if_changed(c, &memory_file, now_ms())?;
+            crate::db::memories::list(c)
+        })
+        .await?;
+    let context = crate::context::with_memory(context, crate::memory::context_section(&memory_items));
 
     let id = uuid::Uuid::new_v4().to_string();
     let summary = {

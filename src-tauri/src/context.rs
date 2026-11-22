@@ -284,6 +284,28 @@ pub fn build(root: &Path, project_name: &str, now_ms: i64) -> AppResult<ContextB
     Ok(ContextBundle { markdown: md, sources })
 }
 
+/// Add the global memory to a (possibly absent) project bundle. Chats outside a project get a bundle
+/// with only the memory; None when there is nothing to inject.
+pub fn with_memory(
+    bundle: Option<ContextBundle>,
+    memory: Option<(String, ContextSource)>,
+) -> Option<ContextBundle> {
+    match (bundle, memory) {
+        (bundle, None) => bundle,
+        (Some(mut b), Some((md, source))) => {
+            b.markdown.push_str(&md);
+            b.sources.push(source);
+            Some(b)
+        }
+        (None, Some((md, source))) => Some(ContextBundle {
+            markdown: format!(
+                "# Contexte Neuron\n(Contexte fourni automatiquement par Neuron au démarrage de ce chat.)\n{md}"
+            ),
+            sources: vec![source],
+        }),
+    }
+}
+
 /// Preamble for agents without a system-prompt option (Codex, Antigravity): sent before the first message.
 pub fn as_preamble(context: &str, prompt: &str) -> String {
     format!("<contexte_neuron>\n{context}\n</contexte_neuron>\n\n{prompt}")
