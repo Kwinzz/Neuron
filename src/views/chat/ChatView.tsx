@@ -63,7 +63,9 @@ export function ChatView({ threadId }: { threadId: string }) {
   }, [scrollToBottom]);
 
   return (
-    <div className="flex min-h-full min-w-0 flex-col gap-4 px-4 pb-4 md:px-6">
+    <div className="flex min-h-full min-w-0 flex-col gap-4 px-4 md:px-6">
+      {/* No bottom padding on this root: the sticky composer carries its own. Otherwise it shifts by that
+          amount between "scrolled up" (pinned to the edge) and "at the bottom" (resting above the padding). */}
       <ThreadHeader threadId={threadId} />
 
       <div
