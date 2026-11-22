@@ -88,6 +88,19 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Quotas : barre lisible + quotas du fournisseur dans l'en-tête du chat
+- **Accueil** : nouvelle barre de quota (`QuotaBar`, 24 px) avec le pourcentage dedans à gauche et le temps avant
+  reset dedans à droite ; remplissage translucide pour garder le texte lisible.
+- **En-tête de chat** : fenêtres 5 h et hebdomadaire du fournisseur du chat (mini-barre + %, info-bulle avec le reset),
+  écrans larges.
+- **Codex** : ses limites ne sont pas dans le flux JSON mais dans son fichier de session
+  (`~/.codex/sessions/…/rollout-…-<thread>.jsonl`, `rate_limits.primary/secondary`) → lues après chaque tour
+  (`agents/codex/limits.rs`). Fenêtres 300 / 10 080 / 43 200 min → `five_hour` / `seven_day` / `thirty_day`.
+  Plan gratuit actuel : une seule fenêtre de 30 jours.
+- Limites stockées par agent (`<agent>.rate_limits`, Claude inchangé) ; `DashboardSnapshot.liveQuotas`.
+- Antigravity n'expose aucune donnée de quota (ni flux, ni fichiers locaux) : rien n'est affiché pour lui.
+
+
 ### 2026-11-23 — Accueil : cartes KPI épurées
 - Plus de textes sous les nombres (« En hausse vs période précédente », descriptions) : seuls le libellé, la valeur et
   le badge d'évolution restent ; la description passe en info-bulle du libellé.

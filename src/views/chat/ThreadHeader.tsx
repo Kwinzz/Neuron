@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/tooltip";
 import { AGENTS } from "@/lib/agents";
 import { CostLabel } from "@/components/ui/CostLabel";
+import { HeaderQuotas } from "./HeaderQuotas";
 import { formatTokens } from "@/lib/format";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { describeStatus, STATUS, TONE_TEXT } from "@/lib/status";
@@ -152,6 +153,7 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          <HeaderQuotas agent={live.agent} />
           <Badge
             variant="outline"
             className={cn("hidden max-w-60 gap-1.5 bg-card sm:inline-flex", TONE_TEXT[statusMeta.tone])}

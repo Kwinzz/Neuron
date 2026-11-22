@@ -525,15 +525,14 @@ impl AgentRegistry {
                     emit(&app, &id, AgentEvent::ThreadStatusChanged { status, detail: None });
                 }
                 AdapterEvent::RateLimits(windows) => {
-                    if rt.agent == AgentKind::ClaudeCode {
-                        let value = json!({
-                            "updatedAt": now_ms(),
-                            "windows": windows.iter().map(|w| json!({
-                                "window": w.window, "utilization": w.utilization, "resetsAt": w.resets_at
-                            })).collect::<Vec<_>>(),
-                        });
-                        persist!(move |c| settings::set(c, settings::CLAUDE_RATE_LIMITS, &value));
-                    }
+                    let value = json!({
+                        "updatedAt": now_ms(),
+                        "windows": windows.iter().map(|w| json!({
+                            "window": w.window, "utilization": w.utilization, "resetsAt": w.resets_at
+                        })).collect::<Vec<_>>(),
+                    });
+                    let key = settings::rate_limits_key(rt.agent);
+                    persist!(move |c| settings::set(c, &key, &value));
                 }
                 AdapterEvent::Subagent { tool_call_id, description, subagent_type, status, tool_uses, tokens, last_tool } => {
                     emit(

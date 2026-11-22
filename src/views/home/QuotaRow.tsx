@@ -5,19 +5,17 @@ import type { ProviderUsage } from "@/bindings/ProviderUsage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Progress } from "@/components/ui/progress";
 import { AGENT_ORDER } from "@/lib/agents";
-import { formatPercent } from "@/lib/format";
 import { QuotaEditor } from "./QuotaEditor";
 import {
   effectiveRatio,
   effectiveResetsAt,
   formatQuotaValue,
-  LEVEL_FILL,
   LEVEL_TEXT,
   quotaLevel,
   WINDOW_LABEL,
 } from "./quotaFormat";
+import { QuotaBar } from "./QuotaBar";
 import { ResetCountdown } from "./ResetCountdown";
 
 interface QuotaRowProps {
@@ -82,11 +80,7 @@ export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
       </div>
 
       {ratio != null && (
-        <Progress
-          value={Math.min(100, ratio * 100)}
-          className={cn("mt-3", LEVEL_FILL[level])}
-          aria-label={`Quota ${provider.label}`}
-        />
+        <QuotaBar ratio={ratio} resetsAt={resetsAt} level={level} label={`Quota ${provider.label}`} className="mt-3" />
       )}
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -120,14 +114,8 @@ export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
           <span />
         )}
 
-        <div className="inline-flex items-center gap-2">
-          {resetsAt != null && <ResetCountdown resetsAt={resetsAt} />}
-          {ratio != null && (
-            <span className="font-mono font-medium tabular-nums text-foreground">
-              {formatPercent(ratio)}
-            </span>
-          )}
-        </div>
+        {/* Without a bar (no limit known), the reset time stays here. */}
+        {ratio == null && resetsAt != null && <ResetCountdown resetsAt={resetsAt} />}
       </div>
     </div>
   );

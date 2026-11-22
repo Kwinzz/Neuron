@@ -7,7 +7,7 @@ use tauri::State;
 use ts_rs::TS;
 
 use crate::db::projects::{self, ProjectSummary};
-use crate::db::providers::{self, ProviderUpdate, ProviderUsage};
+use crate::db::providers::{self, AgentLiveQuotas, ProviderUpdate, ProviderUsage};
 use crate::db::threads::{self, ThreadSummary};
 use crate::db::usage::{self, UsageRange, UsageReport};
 use crate::error::{AppError, AppResult};
@@ -24,6 +24,8 @@ pub struct DashboardSnapshot {
     pub active_threads: Vec<ThreadSummary>,
     pub recent_threads: Vec<ThreadSummary>,
     pub projects: Vec<ProjectSummary>,
+    /// Subscription windows reported by each agent (5 h / weekly / 30 days).
+    pub live_quotas: Vec<AgentLiveQuotas>,
     /// Time spent in SQLite building this snapshot, in microseconds.
     #[ts(type = "number")]
     pub query_us: i64,
@@ -47,12 +49,14 @@ pub async fn dashboard_snapshot(
             let active_threads = threads::list_active(conn)?;
             let recent_threads = threads::list_recent(conn, RECENT_LIMIT)?;
             let projects = projects::list(conn)?;
+            let live_quotas = providers::live_quotas(conn)?;
             Ok(DashboardSnapshot {
                 providers,
                 usage,
                 active_threads,
                 recent_threads,
                 projects,
+                live_quotas,
                 query_us: i64::try_from(started.elapsed().as_micros()).unwrap_or(i64::MAX),
             })
         })

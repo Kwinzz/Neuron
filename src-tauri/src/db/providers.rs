@@ -143,16 +143,67 @@ pub struct LiveQuota {
 }
 
 /// Claude Code reports `five_hour` / `seven_day` windows in `rate_limit_event`.
-fn live_quota(conn: &Connection, provider: &Provider) -> AppResult<Option<LiveQuota>> {
-    if provider.agent != AgentKind::ClaudeCode {
-        return Ok(None);
+/// A subscription window as last reported by an agent.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LiveWindow {
+    /// `five_hour`, `seven_day`, `thirty_day`, `<n>_min`.
+    pub window: String,
+    /// 0–1.
+    pub utilization: f64,
+    #[ts(type = "number | null")]
+    pub resets_at: Option<i64>,
+}
+
+/// Every window an agent reported (chat header: 5 h and weekly quotas of the current provider).
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct AgentLiveQuotas {
+    pub agent: AgentKind,
+    #[ts(type = "number")]
+    pub reported_at: i64,
+    pub windows: Vec<LiveWindow>,
+}
+
+pub fn live_quotas(conn: &Connection) -> AppResult<Vec<AgentLiveQuotas>> {
+    let mut out = Vec::new();
+    for agent in [AgentKind::ClaudeCode, AgentKind::Codex, AgentKind::Antigravity] {
+        let Some(stored) = crate::db::settings::get(conn, &crate::db::settings::rate_limits_key(agent))? else {
+            continue;
+        };
+        let windows: Vec<LiveWindow> = stored
+            .get("windows")
+            .and_then(serde_json::Value::as_array)
+            .map(|ws| {
+                ws.iter()
+                    .filter_map(|w| {
+                        Some(LiveWindow {
+                            window: w.get("window")?.as_str()?.to_string(),
+                            utilization: w.get("utilization")?.as_f64()?,
+                            resets_at: w.get("resetsAt").and_then(serde_json::Value::as_i64),
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        if !windows.is_empty() {
+            let reported_at = stored.get("updatedAt").and_then(serde_json::Value::as_i64).unwrap_or(0);
+            out.push(AgentLiveQuotas { agent, reported_at, windows });
+        }
     }
+    Ok(out)
+}
+
+fn live_quota(conn: &Connection, provider: &Provider) -> AppResult<Option<LiveQuota>> {
     let window = match provider.window_kind {
         WindowKind::Rolling5h => "five_hour",
         WindowKind::Weekly => "seven_day",
+        WindowKind::Monthly => "thirty_day",
         _ => return Ok(None),
     };
-    let Some(stored) = crate::db::settings::get(conn, crate::db::settings::CLAUDE_RATE_LIMITS)? else {
+    let Some(stored) = crate::db::settings::get(conn, &crate::db::settings::rate_limits_key(provider.agent))? else {
         return Ok(None);
     };
     let reported_at = stored.get("updatedAt").and_then(serde_json::Value::as_i64).unwrap_or(0);
@@ -370,6 +421,9 @@ mod tests {
             let weekly = usage(conn, get(conn, "claude-weekly")?.unwrap(), now)?.live.unwrap();
             assert_eq!((weekly.utilization, weekly.resets_at, weekly.reported_at), (0.15, None, 5));
             assert!(usage(conn, get(conn, "codex")?.unwrap(), now)?.live.is_none());
+            let all = live_quotas(conn)?;
+            assert_eq!(all.len(), 1);
+            assert_eq!(all[0].windows.len(), 2);
             Ok(())
         })
         .await

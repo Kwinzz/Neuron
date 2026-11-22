@@ -3,6 +3,7 @@
 //! decides (manual/edits/auto → workspace-write, plan → read-only, bypass → no sandbox).
 //! The session task below hides that from the registry: it looks like any other long-lived session.
 
+pub mod limits;
 pub mod parser;
 
 use std::collections::VecDeque;
@@ -181,6 +182,12 @@ async fn session_loop(
                     format!("Codex : {detail}")
                 }),
             });
+        }
+        // Subscription windows: Codex writes them in its session file, not in the JSON stream.
+        if let Some(id) = thread.clone() {
+            if let Ok(Some(windows)) = tokio::task::spawn_blocking(move || limits::read_for_thread(&id)).await {
+                let _ = events.send(AdapterEvent::RateLimits(windows));
+            }
         }
         if shutdown {
             break 'session;

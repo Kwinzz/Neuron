@@ -22,6 +22,14 @@ pub fn set(conn: &Connection, key: &str, value: &Value) -> AppResult<()> {
 
 /// Latest Claude subscription windows reported by `rate_limit_event`.
 pub const CLAUDE_RATE_LIMITS: &str = "claude.rate_limits";
+
+/// Subscription windows reported by an agent (Claude: `rate_limit_event`; Codex: its session files).
+pub fn rate_limits_key(agent: crate::agents::events::AgentKind) -> String {
+    match agent {
+        crate::agents::events::AgentKind::ClaudeCode => CLAUDE_RATE_LIMITS.to_string(),
+        other => format!("{}.rate_limits", other.as_str()),
+    }
+}
 /// Last working directory used to create a thread.
 pub const LAST_CWD: &str = "threads.last_cwd";
 
