@@ -1,31 +1,67 @@
-import { type ComponentProps, useEffect, useState } from "react";
-import { BrainCircuit, CirclePlus, Database, FolderGit2, LayoutDashboard, MessageSquare, Search } from "lucide-react";
-import { useShallow } from "zustand/react/shallow";
+import { type ComponentProps, memo, useEffect, useMemo, useState } from "react";
+import {
+  BrainCircuit,
+  ChevronRight,
+  CirclePlus,
+  Database,
+  Folder,
+  FolderOpen,
+  FolderPlus,
+  Home,
+  MessageSquare,
+  MoreHorizontal,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
 import type { AppInfo } from "@/bindings/AppInfo";
+import type { ProjectSummary } from "@/bindings/ProjectSummary";
+import type { ThreadSummary } from "@/bindings/ThreadSummary";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { MOD_LABEL } from "@/components/ui/Kbd";
-import { StatusDot } from "@/components/ui/StatusDot";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
+  SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { ipc } from "@/lib/ipc";
+import { StatusDot } from "@/components/ui/StatusDot";
+import { ipc, ipcErrorMessage } from "@/lib/ipc";
+import { STATUS } from "@/lib/status";
 import { useDashboard } from "@/stores/dashboard";
 import { useLive } from "@/stores/live";
+import { useNav } from "@/stores/nav";
+import { toast } from "@/stores/toast";
 import { useUi } from "@/stores/ui";
 
-const RECENT_LIMIT = 8;
+/** Chats shown per project folder / in the loose "Chats" list before "Afficher plus". */
+const PAGE = 8;
 
 export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
+  useEffect(() => {
+    void useNav.getState().load();
+  }, []);
+
   return (
     <Sidebar {...props}>
       <SidebarHeader>
@@ -47,7 +83,7 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <MainNav />
         <ProjectsNav />
-        <RecentThreadsNav />
+        <LooseChatsNav />
       </SidebarContent>
 
       <SidebarFooter>
@@ -60,30 +96,28 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 
 function MainNav() {
   const isHome = useUi((s) => s.view.kind === "home");
+  const isDraft = useUi((s) => s.view.kind === "draft" && s.view.projectId === null);
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
         <SidebarMenu>
-          <SidebarMenuItem className="flex items-center gap-2">
+          <SidebarMenuItem>
             <SidebarMenuButton
-              tooltip={`Nouveau thread (${MOD_LABEL}+N)`}
-              onClick={() => useUi.getState().setNewThreadOpen(true)}
-              className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
+              tooltip={`Nouveau chat (${MOD_LABEL}+N)`}
+              isActive={isDraft}
+              onClick={() => useUi.getState().startChat(null)}
+              className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground data-[active=true]:bg-primary data-[active=true]:text-primary-foreground"
             >
               <CirclePlus />
-              <span>Nouveau thread</span>
+              <span>Nouveau chat</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              tooltip="Mission Control"
-              isActive={isHome}
-              onClick={() => useUi.getState().navigate({ kind: "home" })}
-            >
-              <LayoutDashboard />
-              <span>Mission Control</span>
+            <SidebarMenuButton tooltip="Accueil" isActive={isHome} onClick={() => useUi.getState().navigate({ kind: "home" })}>
+              <Home />
+              <span>Accueil</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
@@ -99,71 +133,217 @@ function MainNav() {
   );
 }
 
-function ProjectsNav() {
-  const projects = useDashboard((s) => s.snapshot?.projects);
-  const selected = useUi((s) => s.selectedProjectId);
-  if (!projects || projects.length === 0) return null;
-  return (
-    <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Projets</SidebarGroupLabel>
-      <SidebarMenu>
-        {projects.map((p) => {
-          const active = selected === p.id;
-          return (
-            <SidebarMenuItem key={p.id}>
-              <SidebarMenuButton
-                isActive={active}
-                title={`${p.path}\nFiltrer le dock sur ce projet`}
-                onClick={() => {
-                  useUi.getState().selectProject(active ? null : p.id);
-                  if (!active) useUi.getState().setDockOpen(true);
-                }}
-              >
-                <FolderGit2 />
-                <span>{p.name}</span>
-              </SidebarMenuButton>
-              <SidebarMenuBadge className={p.activeCount > 0 ? "text-live" : "text-muted-foreground"}>
-                {p.activeCount > 0 ? `${p.activeCount} actif${p.activeCount > 1 ? "s" : ""}` : p.threadCount}
-              </SidebarMenuBadge>
-            </SidebarMenuItem>
-          );
-        })}
-      </SidebarMenu>
-    </SidebarGroup>
-  );
+/** Chats grouped by project id ("" = no project), newest first. */
+function useChatsByProject(): Map<string, ThreadSummary[]> {
+  const chats = useNav((s) => s.chats);
+  return useMemo(() => {
+    const map = new Map<string, ThreadSummary[]>();
+    for (const c of chats) {
+      const key = c.projectId ?? "";
+      const list = map.get(key);
+      if (list) list.push(c);
+      else map.set(key, [c]);
+    }
+    return map;
+  }, [chats]);
 }
 
-function RecentThreadsNav() {
-  const openId = useUi((s) => (s.view.kind === "thread" ? s.view.id : null));
-  const threads = useLive(
-    useShallow((s) =>
-      // Return the store's own objects (stable references): mapping to new objects here would make
-      // useShallow see a "new" result on every read and loop forever.
-      Object.values(s.threads)
-        .sort((a, b) => b.updatedAt - a.updatedAt)
-        .slice(0, RECENT_LIMIT),
-    ),
-  );
-  if (threads.length === 0) return null;
+async function addProject() {
+  try {
+    const path = await ipc.pickDirectory();
+    if (!path) return;
+    const projects = await ipc.createProject(path);
+    useNav.getState().setProjects(projects);
+    const created = projects.find((p) => p.path === path);
+    if (created) useNav.getState().setProjectOpen(created.id, true);
+    void useDashboard.getState().load();
+  } catch (err) {
+    toast({ tone: "danger", title: "Projet non ajouté", description: ipcErrorMessage(err) });
+  }
+}
+
+function ProjectsNav() {
+  const projects = useNav((s) => s.projects);
+  const byProject = useChatsByProject();
   return (
-    <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Threads</SidebarGroupLabel>
+    <SidebarGroup>
+      <SidebarGroupLabel>Projets</SidebarGroupLabel>
+      <SidebarGroupAction title="Ajouter un projet (dossier)" onClick={() => void addProject()}>
+        <FolderPlus />
+        <span className="sr-only">Ajouter un projet</span>
+      </SidebarGroupAction>
       <SidebarMenu>
-        {threads.map((t) => (
-          <SidebarMenuItem key={t.id}>
-            <SidebarMenuButton isActive={openId === t.id} onClick={() => useUi.getState().focusThread(t.id)}>
-              <MessageSquare />
-              <span>{t.title || "Thread sans titre"}</span>
+        {projects.length === 0 && (
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={() => void addProject()} className="text-muted-foreground">
+              <FolderPlus />
+              <span>Ajouter un dossier…</span>
             </SidebarMenuButton>
-            <SidebarMenuBadge>
-              <StatusDot status={t.status} />
-            </SidebarMenuBadge>
           </SidebarMenuItem>
+        )}
+        {projects.map((p) => (
+          <ProjectFolder key={p.id} project={p} chats={byProject.get(p.id) ?? EMPTY} />
         ))}
       </SidebarMenu>
     </SidebarGroup>
   );
 }
+
+const EMPTY: ThreadSummary[] = [];
+
+const ProjectFolder = memo(function ProjectFolder({ project, chats }: { project: ProjectSummary; chats: ThreadSummary[] }) {
+  const open = useNav((s) => s.openProjects[project.id] ?? false);
+  const [showAll, setShowAll] = useState(false);
+  const draftHere = useUi((s) => s.view.kind === "draft" && s.view.projectId === project.id);
+  const activeCount = useLive((s) => chats.filter((c) => STATUS[s.threads[c.id]?.status ?? c.status].active).length);
+  const visible = showAll ? chats : chats.slice(0, PAGE);
+
+  const remove = async () => {
+    try {
+      useNav.getState().setProjects(await ipc.deleteProject(project.id));
+      void useNav.getState().load();
+      void useDashboard.getState().load();
+    } catch (err) {
+      toast({ tone: "danger", title: "Projet non retiré", description: ipcErrorMessage(err) });
+    }
+  };
+
+  return (
+    <Collapsible asChild open={open} onOpenChange={(o) => useNav.getState().setProjectOpen(project.id, o)}>
+      <SidebarMenuItem>
+        <CollapsibleTrigger asChild>
+          <SidebarMenuButton tooltip={project.path} className="group/folder">
+            {open ? <FolderOpen /> : <Folder />}
+            <span>{project.name}</span>
+            {activeCount > 0 && (
+              <span className="ml-auto flex items-center gap-1 text-xs text-live tabular-nums">
+                <span className="size-1.5 animate-pulse rounded-full bg-live" />
+                {activeCount}
+              </span>
+            )}
+            <ChevronRight
+              className={`text-muted-foreground transition-transform duration-200 ${activeCount > 0 ? "" : "ml-auto"} ${open ? "rotate-90" : ""}`}
+            />
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuAction showOnHover className="right-7">
+              <MoreHorizontal />
+              <span className="sr-only">Actions du projet</span>
+            </SidebarMenuAction>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="right" align="start" className="w-52">
+            <DropdownMenuItem onClick={() => useUi.getState().startChat(project.id)}>
+              <Plus />
+              Nouveau chat ici
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                useUi.getState().selectProject(project.id);
+                useUi.getState().setDockOpen(true);
+              }}
+            >
+              <MessageSquare />
+              Filtrer le dock sur ce projet
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onClick={() => void remove()}>
+              <Trash2 />
+              Retirer le projet
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <CollapsibleContent>
+          <SidebarMenuSub>
+            <SidebarMenuSubItem>
+              <SidebarMenuSubButton
+                isActive={draftHere}
+                onClick={() => useUi.getState().startChat(project.id)}
+                className="text-muted-foreground"
+              >
+                <Plus />
+                <span>Nouveau chat</span>
+              </SidebarMenuSubButton>
+            </SidebarMenuSubItem>
+            {visible.map((c) => (
+              <SidebarMenuSubItem key={c.id}>
+                <ChatLink chat={c} sub />
+              </SidebarMenuSubItem>
+            ))}
+            {chats.length > PAGE && (
+              <SidebarMenuSubItem>
+                <SidebarMenuSubButton onClick={() => setShowAll((v) => !v)} className="text-xs text-muted-foreground">
+                  <span>{showAll ? "Afficher moins" : `Afficher ${chats.length - PAGE} de plus`}</span>
+                </SidebarMenuSubButton>
+              </SidebarMenuSubItem>
+            )}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
+  );
+});
+
+function LooseChatsNav() {
+  const byProject = useChatsByProject();
+  const chats = byProject.get("") ?? EMPTY;
+  const [showAll, setShowAll] = useState(false);
+  if (chats.length === 0) return null;
+  const visible = showAll ? chats : chats.slice(0, PAGE);
+  return (
+    <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+      <SidebarGroupLabel>Chats</SidebarGroupLabel>
+      <SidebarMenu>
+        {visible.map((c) => (
+          <SidebarMenuItem key={c.id}>
+            <ChatLink chat={c} />
+          </SidebarMenuItem>
+        ))}
+        {chats.length > PAGE && (
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={() => setShowAll((v) => !v)} className="text-xs text-muted-foreground">
+              <span>{showAll ? "Afficher moins" : `Afficher ${chats.length - PAGE} de plus`}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        )}
+      </SidebarMenu>
+    </SidebarGroup>
+  );
+}
+
+/** A chat entry; title and status come from the live store when available. */
+const ChatLink = memo(function ChatLink({ chat, sub = false }: { chat: ThreadSummary; sub?: boolean }) {
+  const title = useLive((s) => s.threads[chat.id]?.title ?? chat.title);
+  const status = useLive((s) => s.threads[chat.id]?.status ?? chat.status);
+  const active = useUi((s) => s.view.kind === "thread" && s.view.id === chat.id);
+  const label = title || "Chat sans titre";
+  const open = () => useUi.getState().focusThread(chat.id);
+
+  if (sub) {
+    return (
+      <SidebarMenuSubButton isActive={active} onClick={open} title={label}>
+        <span className="truncate">{label}</span>
+        {STATUS[status].active && <StatusDot status={status} className="ml-auto" />}
+      </SidebarMenuSubButton>
+    );
+  }
+  return (
+    <>
+      <SidebarMenuButton isActive={active} onClick={open} tooltip={label}>
+        <MessageSquare />
+        <span>{label}</span>
+      </SidebarMenuButton>
+      {STATUS[status].active && (
+        <SidebarMenuBadge>
+          <StatusDot status={status} />
+        </SidebarMenuBadge>
+      )}
+    </>
+  );
+});
 
 function StatusFooter() {
   const [info, setInfo] = useState<AppInfo | null>(null);

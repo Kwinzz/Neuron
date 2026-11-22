@@ -38,6 +38,8 @@ struct ActiveSession {
     pending: HashMap<String, Value>,
     stop_requested: bool,
     shutdown_requested: bool,
+    /// Model/effort/permissions changed: restart (with --resume) before the next prompt.
+    stale: bool,
 }
 
 pub struct AgentRegistry {
@@ -140,8 +142,16 @@ impl AgentRegistry {
         runtime: &ThreadRuntime,
     ) -> AppResult<mpsc::UnboundedSender<SessionCommand>> {
         let mut generation = self.spawn_lock.lock().await;
-        if let Some(s) = self.lock().get(&runtime.id) {
-            return Ok(s.commands.clone());
+        let stale = self.lock().get(&runtime.id).map(|s| s.stale);
+        match stale {
+            Some(false) => {
+                if let Some(s) = self.lock().get(&runtime.id) {
+                    return Ok(s.commands.clone());
+                }
+            }
+            // Settings changed since this process started: restart it, the conversation resumes.
+            Some(true) => self.shutdown(&runtime.id),
+            None => {}
         }
         let adapter = self
             .adapters
@@ -158,6 +168,7 @@ impl AgentRegistry {
             thread_id: runtime.id.clone(),
             cwd,
             model: runtime.model.clone(),
+            effort: runtime.effort.clone(),
             permission_mode: runtime.permission_mode.clone(),
             resume: runtime.session_ref.clone(),
             append_system_prompt: None,
@@ -175,6 +186,7 @@ impl AgentRegistry {
                 pending: HashMap::new(),
                 stop_requested: false,
                 shutdown_requested: false,
+                stale: false,
             },
         );
         tracing::info!(thread = %runtime.id, pid = ?handle.pid, resume = spec.resume.is_some(), "agent session started");
@@ -249,6 +261,13 @@ impl AgentRegistry {
             }
         });
         Ok(())
+    }
+
+    /// The thread's settings changed: its running process (if any) restarts before the next prompt.
+    pub fn mark_stale(&self, thread_id: &str) {
+        if let Some(s) = self.lock().get_mut(thread_id) {
+            s.stale = true;
+        }
     }
 
     /// Terminate a thread's process (thread closed/deleted).

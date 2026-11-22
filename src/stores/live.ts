@@ -67,8 +67,21 @@ export const useLive = create<LiveState>((set, get) => ({
       const threads = { ...state.threads };
       for (const s of summaries) {
         const prev = threads[s.id];
-        // Never let an older DB snapshot overwrite fresher live state.
-        if (prev && prev.lastEventAt > s.updatedAt) continue;
+        // Never let an older DB snapshot overwrite fresher live state (status, tokens, timers)…
+        if (prev && prev.lastEventAt > s.updatedAt) {
+          // …but static fields (edited outside the event stream) always follow the database.
+          threads[s.id] = {
+            ...prev,
+            title: s.title,
+            model: s.model,
+            effort: s.effort,
+            permissionMode: s.permissionMode,
+            cwd: s.cwd,
+            projectId: s.projectId,
+            projectName: s.projectName,
+          };
+          continue;
+        }
         threads[s.id] = fromSummary(s, prev);
       }
       return { threads };

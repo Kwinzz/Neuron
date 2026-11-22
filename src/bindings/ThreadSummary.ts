@@ -10,4 +10,8 @@ tokens: number, costUsd: number,
 /**
  * Working directory of the agent process.
  */
-cwd: string | null, permissionMode: string, };
+cwd: string | null, permissionMode: string, 
+/**
+ * Reasoning effort (None = CLI default).
+ */
+effort: string | null, };

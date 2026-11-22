@@ -1,6 +1,11 @@
 import { create } from "zustand";
 
-export type View = { kind: "home" } | { kind: "thread"; id: string };
+/**
+ * - home: Accueil (dashboard)
+ * - draft: empty chat, created on its first message (optionally inside a project)
+ * - thread: an existing chat
+ */
+export type View = { kind: "home" } | { kind: "draft"; projectId: string | null } | { kind: "thread"; id: string };
 
 const DOCK_KEY = "neuron.dockOpen";
 
@@ -24,10 +29,9 @@ interface UiState {
   view: View;
   paletteOpen: boolean;
   dockOpen: boolean;
-  newThreadOpen: boolean;
-  /** Thread currently open in the chat view (dock highlight, attention suppression). */
+  /** Chat currently open (dock highlight, attention suppression). */
   focusedThreadId: string | null;
-  /** Project filter selected in the sidebar (null = all). */
+  /** Project filter selected for the dock (null = all). */
   selectedProjectId: string | null;
 
   navigate: (view: View) => void;
@@ -35,8 +39,9 @@ interface UiState {
   togglePalette: () => void;
   setDockOpen: (open: boolean) => void;
   toggleDock: () => void;
-  setNewThreadOpen: (open: boolean) => void;
-  /** Open a thread in the chat view (null = back to home). */
+  /** Open an empty chat (inside `projectId` when given). No dialog: the chat is created on send. */
+  startChat: (projectId?: string | null) => void;
+  /** Open an existing chat (null = back to Accueil). */
   focusThread: (id: string | null) => void;
   selectProject: (id: string | null) => void;
 }
@@ -45,11 +50,10 @@ export const useUi = create<UiState>((set, get) => ({
   view: { kind: "home" },
   paletteOpen: false,
   dockOpen: readDockPref(),
-  newThreadOpen: false,
   focusedThreadId: null,
   selectedProjectId: null,
 
-  navigate: (view) => set({ view, focusedThreadId: view.kind === "thread" ? view.id : null }),
+  navigate: (view) => set({ view, paletteOpen: false, focusedThreadId: view.kind === "thread" ? view.id : null }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   togglePalette: () => set({ paletteOpen: !get().paletteOpen }),
   setDockOpen: (dockOpen) => {
@@ -57,7 +61,7 @@ export const useUi = create<UiState>((set, get) => ({
     set({ dockOpen });
   },
   toggleDock: () => get().setDockOpen(!get().dockOpen),
-  setNewThreadOpen: (newThreadOpen) => set({ newThreadOpen, paletteOpen: false }),
+  startChat: (projectId = null) => get().navigate({ kind: "draft", projectId }),
   focusThread: (id) => get().navigate(id ? { kind: "thread", id } : { kind: "home" }),
   selectProject: (selectedProjectId) => set({ selectedProjectId }),
 }));

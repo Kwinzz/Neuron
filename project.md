@@ -1,7 +1,7 @@
 # Neuron — Contexte projet
 
 > Document vivant. **Mis à jour à chaque changement** (voir règle dans `CLAUDE.md`).
-> Dernière mise à jour : 2026-11-22 (Phase 2)
+> Dernière mise à jour : 2026-11-22 (shadcn + chats)
 
 ## Vision
 
@@ -31,22 +31,20 @@ graphique unifié.
 
 ## Direction artistique
 
-Style **« Vision UI »** (template MIT *Vision UI Dashboard Chakra* de Creative Tim) recréé en Tailwind v4 :
-fond navy dégradé, cartes « verre », violet de marque, cyan secondaire, valeurs blanches grasses sur libellés gris.
-(Remplace le style Linear/Raycast émeraude des phases 0–1, à la demande de l'utilisateur.)
+**shadcn/ui** (style `radix-nova`, base *Neutral*, sombre uniquement) — look Vercel/shadcn « dashboard-01 » :
+fond quasi noir, cartes plates à bordure fine, gris zinc, bouton principal blanc, beaucoup d'air.
+(Historique : Linear/émeraude en phases 0–1, puis Vision UI violet ; remplacé par shadcn à la demande de l'utilisateur.)
 
-| Token | Valeur |
+| Élément | Valeur |
 |---|---|
-| Fond de page | navy `#0E1030` traversé d'une bande diagonale bleu-violet lumineuse (radial-gradients, CSS maison) — c'est elle qui fait ressortir les cartes |
-| Carte | `linear-gradient(127.09deg, rgba(6,11,40,.94), rgba(10,14,35,.49))`, radius 20px, padding 22px |
-| Tuile / sidebar | `126.97deg #060C29 → rgba(4,12,48,.5)` / `111.84deg rgba(6,11,38,.94) → transparent` + blur 10px |
-| Surfaces | `#1A1F37` (pastilles, items actifs) · `#22234B` (hover) · piste `#2D2E5F` · grille charts `#56577A` |
-| Marque | Violet `#582CFF` (fonds) · texte violet `#9F8CFF` · cyan `#2CD9FF` |
-| Sémantique | ok `#01B574` · warn `#FFB547` · danger `#FF5B6B` (texte lisible) |
-| Agents (ordre fixe) | Claude `#d95926` · Antigravity `#3987e5` · Codex `#d55181` · Générique `#c98500` — revalidés sur la carte navy |
-| Typo | Plus Jakarta Sans (UI), JetBrains Mono (code + compteurs live) ; chiffres `tabular-nums` |
-| Rayons | 12px boutons/icon box · 15–16px items/panneaux · 20px cartes |
-| Motion | 150 ms, GPU (transform/opacity) ; flou réservé aux panneaux/overlays (perf) |
+| Fond / carte / popover | `oklch(0.145)` / `oklch(0.175)` / `oklch(0.205)` (neutres) |
+| Bordure / input | blanc 10 % / 15 % |
+| Primaire | `oklch(0.922)` (blanc cassé) sur texte `oklch(0.205)` |
+| Statuts | ok émeraude · warn ambre · destructive rouge · live bleu ciel (toujours avec icône/libellé) |
+| Agents = `chart-1..4` (ordre fixe) | Claude `#d95926` · Antigravity `#3987e5` · Codex `#d55181` · Générique `#c98500` — revalidés sur fond neutre |
+| Typo | Geist (UI), Geist Mono (code, compteurs) ; chiffres `tabular-nums` |
+| Rayon | `--radius` 0.625rem (échelle shadcn) |
+| Vocabulaire | « Accueil », « chat » (jamais « thread » à l'écran, sauf le panneau « Threads live ») |
 
 ## Décisions d'architecture
 
@@ -62,6 +60,10 @@ fond navy dégradé, cartes « verre », violet de marque, cyan secondaire, vale
 | Sous-agent **neon** → `agy -p --model gemini-4-neon-high` via `scripts/neon-bridge.sh` | parallélisation du travail UI ; mode par défaut `--dangerously-skip-permissions` (choix utilisateur), surcharge via `NEON_MODE` / `NEON_MODEL` |
 | DB dans `app_data_dir()/neuron.db` (WAL) | données app séparées de la mémoire utilisateur `~/.neuron/` |
 | Git : commit local par phase validée, pas de push | choix utilisateur |
+| **shadcn/ui** (vrais composants Radix, cmdk, Recharts, Sonner) | choix utilisateur après comparaison avec Vision ; composants copiés dans le repo, thème par variables CSS |
+| Nouveau chat sans pop-up : vue « brouillon », chat créé au 1er message | demande utilisateur ; aucun chat vide en base |
+| Modèle exact + niveau de raisonnement (`--effort`) par chat, modifiables en cours de chat | un changement marque la session « périmée » : elle redémarre avec `--resume` avant le message suivant (contexte conservé) |
+| Projets = dossiers locaux, affichés en dossiers repliables dans la sidebar | création d'un chat directement dans un projet (cwd = dossier du projet) |
 | **zustand** pour l'état front | sélecteurs fins → un event d'un thread ne re-rend que sa ligne ; pas de Provider |
 | Un seul aller-retour `dashboard_snapshot` pour l'accueil | < 1 ms de requêtes SQLite mesuré (affiché dans l'en-tête) |
 | Buckets d'usage en heure **locale** calculés par SQLite (CTE récursive) | pas de dépendance chrono, buckets vides inclus |
@@ -85,6 +87,23 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 - [ ] **Phase 5** — Adaptateurs Antigravity / Codex / Generic PTY, paramètres, raccourcis, fluidité
 
 ## Journal des changements
+
+### 2026-11-22 — shadcn/ui adopté, « chats », projets en dossiers, nouveau chat direct
+- La variante **shadcn/ui** (branche `design/shadcn`) est fusionnée dans `main` ; l'interface Vision est supprimée
+  (tokens, primitives Card/Button/Progress/RingGauge, vues orphelines, docs).
+- Correctif écran noir au lancement : sélecteur zustand qui créait des objets neufs → boucle de rendu infinie.
+  Ajout d'une **ErrorBoundary** (écran d'erreur lisible) et de `frontend_log` (erreurs front dans le log Rust).
+- Renommages UI : « Mission Control » → **Accueil**, « thread » → **chat** (le panneau « Threads live » garde son nom).
+- **Projets** : ajout d'un dossier (`create_project`, sélecteur natif), retrait (`delete_project`, les chats sont
+  conservés) ; sidebar en **dossiers repliables** (état mémorisé) avec « Nouveau chat » et la liste des chats du projet ;
+  section « Chats » pour les chats hors projet.
+- **Nouveau chat sans pop-up** (`Ctrl+N`, sidebar, en-tête, palette) : vue vide avec le composer ; le chat est créé
+  au premier message, dans le projet le cas échéant. Pop-up « Nouveau thread » supprimée.
+- **Sélecteur de modèle exact** (Opus 5.5, Sonnet 5.5, Haiku 5.5, Fable 5.2, défaut) et **niveau de raisonnement**
+  (faible → maximum, `claude --effort`), plus les permissions, dans la barre du composer — en brouillon comme dans un
+  chat existant (`update_thread_settings` ; redémarrage avec `--resume` au message suivant). Migration `0004` (effort).
+- 51 tests Rust, clippy propre, build OK ; montage vérifié via les logs front.
+
 
 ### 2026-11-22 — Phase 2 terminée : moteur d'agents + chat Claude Code
 - **Protocole vérifié en réel avant de coder** (sessions sondes) : `claude -p` en stream-json bidirectionnel garde

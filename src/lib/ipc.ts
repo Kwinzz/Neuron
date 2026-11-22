@@ -9,6 +9,7 @@ import type { AgentEventEnvelope } from "@/bindings/AgentEventEnvelope";
 import type { AppInfo } from "@/bindings/AppInfo";
 import type { ChatItem } from "@/bindings/ChatItem";
 import type { NewThreadInput } from "@/bindings/NewThreadInput";
+import type { ThreadSettingsInput } from "@/bindings/ThreadSettingsInput";
 import type { DashboardSnapshot } from "@/bindings/DashboardSnapshot";
 import type { IpcError } from "@/bindings/IpcError";
 import type { ProjectSummary } from "@/bindings/ProjectSummary";
@@ -47,7 +48,7 @@ export const ipc = {
   log: (level: "error" | "warn" | "info", message: string) =>
     invoke<void>("frontend_log", { level, message }).catch(() => undefined),
 
-  // Mission Control / dock / palette
+  // Accueil / dock / palette
   dashboardSnapshot: (range?: UsageRange) => invoke<DashboardSnapshot>("dashboard_snapshot", { range }),
   usageReport: (range: UsageRange) => invoke<UsageReport>("usage_report", { range }),
   updateProvider: (update: ProviderUpdate) => invoke<ProviderUsage>("update_provider", { update }),
@@ -67,6 +68,11 @@ export const ipc = {
   runningThreads: () => invoke<string[]>("running_threads"),
   promptHistory: (projectId?: string | null) => invoke<string[]>("prompt_history", { projectId: projectId ?? null }),
   defaultCwd: () => invoke<string>("default_cwd"),
+  updateThreadSettings: (threadId: string, settings: ThreadSettingsInput) =>
+    invoke<ThreadSummary>("update_thread_settings", { threadId, settings }),
+  createProject: (path: string, name?: string) =>
+    invoke<ProjectSummary[]>("create_project", { path, name: name ?? null }),
+  deleteProject: (projectId: string) => invoke<ProjectSummary[]>("delete_project", { projectId }),
   /** Native folder picker; resolves to null when cancelled. */
   pickDirectory: async (defaultPath?: string): Promise<string | null> => {
     const picked = await openDialog({ directory: true, multiple: false, ...(defaultPath ? { defaultPath } : {}) });

@@ -22,6 +22,9 @@ use parser::ClaudeParser;
 
 const STDERR_TAIL_BYTES: usize = 4096;
 
+/// Reasoning effort levels accepted by `claude --effort`.
+pub const EFFORT_LEVELS: &[&str] = &["low", "medium", "high", "xhigh", "max"];
+
 pub struct ClaudeCodeAdapter {
     /// Executable name or path (default `claude`, resolved through PATH).
     pub binary: String,
@@ -62,6 +65,9 @@ pub fn build_args(spec: &SessionSpec) -> Vec<String> {
     }
     if let Some(model) = spec.model.as_deref().filter(|m| !m.trim().is_empty()) {
         args.extend(["--model".into(), model.trim().into()]);
+    }
+    if let Some(effort) = spec.effort.as_deref().filter(|e| EFFORT_LEVELS.contains(e)) {
+        args.extend(["--effort".into(), effort.into()]);
     }
     if let Some(session) = spec.resume.as_deref().filter(|s| !s.is_empty()) {
         args.extend(["--resume".into(), session.into()]);
@@ -220,6 +226,7 @@ mod tests {
             thread_id: "t".into(),
             cwd: PathBuf::from("."),
             model: Some("sonnet".into()),
+            effort: Some("xhigh".into()),
             permission_mode: "acceptEdits".into(),
             resume: Some("abc".into()),
             append_system_prompt: None,
@@ -235,6 +242,10 @@ mod tests {
         assert!(joined.contains("--permission-mode acceptEdits"));
         assert!(joined.contains("--model sonnet"));
         assert!(joined.contains("--resume abc"));
+        assert!(joined.contains("--effort xhigh"));
+        let mut bad = spec();
+        bad.effort = Some("ultra; rm".into());
+        assert!(!build_args(&bad).contains(&"--effort".to_string()));
         assert!(!joined.contains("--allow-dangerously-skip-permissions"));
 
         let mut bypass = spec();

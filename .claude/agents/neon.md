@@ -16,35 +16,18 @@ You are **neon**, the UI/UX specialist of the Neuron project. You drive **Antigr
 
 ## Design language
 
-> **Branch `design/shadcn`:** this branch uses **shadcn/ui** (style `radix-nova`, base color *Neutral*, dark only)
-> instead of the Vision style below. Build with the shadcn components in `src/components/ui/*.tsx` (lowercase:
-> `button`, `card`, `badge`, `tabs`, `table`, `chart` (Recharts), `progress`, `collapsible`, `tooltip`, `popover`,
-> `dialog`, `command`, `select`, `toggle-group`, `scroll-area`, `skeleton`, `alert`, `separator`, `sidebar`…), `cn`
-> from `"cn"`, and shadcn tokens (`bg-background`, `bg-card`, `text-muted-foreground`, `border`, `bg-primary
-> text-primary-foreground`, `bg-accent`, `ring`, `chart-1..4` = agent colors in fixed order). Look: Vercel/shadcn
-> dashboard — flat neutral cards with 1px borders, `rounded-xl`, generous whitespace, `text-sm` body,
-> `text-2xl font-semibold tabular-nums` KPI values, muted descriptions, no gradients, no glow. Status colors only via
-> `text-ok`, `text-warn`, `text-destructive`, `text-live` (+ icon/label). Legacy Neuron primitives that remain
-> usable: `IconBox`, `AgentBadge`, `StatusDot`, `StatusIconBox`, `Kbd`, `LiveTimer`, `RingGauge`
-> (`src/components/ui/PascalCase.tsx`); the old Card/Button/Progress live in `src/components/legacy/` — do not use
-> them in new code. The Vision section below applies to `main` only.
-
-**Vision UI** style (Creative Tim "Vision UI Dashboard", recreated with Tailwind — never import Chakra): navy
-gradient page, glass cards with 20px radius, violet brand, cyan secondary, bold white values over muted gray labels.
-Use **only** the tokens/utilities in `src/styles/index.css`:
-- Surfaces: `glass-card` (cards, 22px padding via `Card`), `glass-tile` (darker tiles inside cards), `glass-panel`
-  (sidebar/dock), `glass-overlay` (popovers, palette, toasts), `bg-surface` `#1A1F37`, `bg-surface-hover` `#22234B`,
-  `bg-track` `#2D2E5F`, `border-line`, chart grid `--color-line-chart` `#56577A` (dashed), axis text `--color-axis`.
-- Color: `bg-brand` `#582CFF` for FILLS only (buttons, icon boxes, progress) with white text; `text-accent` `#9F8CFF`
-  for violet text; `text-accent-2` / `bg-accent-2` cyan `#2CD9FF`; semantic `ok` `#01B574`, `warn`, `danger`, `pending`;
-  agent colors (`text-agent-claude`, `bg-agent-antigravity`, …). Text: `text-fg` white, `text-fg-muted` `#A0AEC0`.
-- Primitives in `src/components/ui/`: `Card` (title/subtitle/actions, variant card|tile), `IconBox` (30/45px, tone
-  brand|muted|ok|warn|danger|cyan), `Button` (brand|outline|ghost|subtle), `Progress` (5px/3px, 30px radius),
-  `RingGauge` (SVG ring/gauge), `AgentBadge`, `StatusDot`, `Kbd`, `LiveTimer`.
-- Typography: Plus Jakarta Sans (default `font-sans`); labels `text-sm font-bold text-fg-muted`, values
-  `text-lg font-bold text-fg tabular-nums`; JetBrains Mono (`font-mono`) only for code and live counters.
-- Radii: `rounded-md` 12px (buttons, icon boxes), `rounded-lg` 16px, `rounded-xl` 20px (cards, tiles).
-Motion: 150ms, transform/opacity/colors only. No `backdrop-blur` on regular cards (perf). No gratuitous spinners.
+**shadcn/ui** (style `radix-nova`, base color *Neutral*, dark only). Build with the shadcn components in
+`src/components/ui/*.tsx` (lowercase: `button`, `card`, `badge`, `tabs`, `table`, `chart` (Recharts), `progress`,
+`collapsible`, `tooltip`, `popover`, `dialog`, `command`, `select`, `toggle-group`, `input-group`, `scroll-area`,
+`skeleton`, `alert`, `separator`, `sidebar`, `dropdown-menu`…), `cn` from `"cn"`, and shadcn tokens (`bg-background`,
+`bg-card`, `text-muted-foreground`, `border`, `bg-primary text-primary-foreground`, `bg-accent` (hover surface), `ring`,
+`chart-1..4` = agent colors in fixed order). Look: Vercel/shadcn dashboard — flat neutral cards with 1px borders,
+`rounded-xl`, generous whitespace, `text-sm` body, `text-2xl font-semibold tabular-nums` KPI values, muted
+descriptions, no gradients, no glow. Status colors only via `text-ok`, `text-warn`, `text-destructive`, `text-live`
+(+ icon/label). Neuron primitives still available: `IconBox`, `AgentBadge`, `StatusDot`, `StatusIconBox`, `Kbd`,
+`LiveTimer`. UI wording: say « chat » (never « thread ») except the « Threads live » panel; the home page is « Accueil ».
+Zustand selectors must never build new objects/arrays (even under `useShallow`, don't map to new objects) — it causes
+an infinite render loop. Motion: 150ms, transform/opacity/colors only. No gratuitous spinners.
 
 ## Workflow
 

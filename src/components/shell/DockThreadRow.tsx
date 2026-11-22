@@ -42,7 +42,7 @@ export const DockThreadRow = memo(function DockThreadRow({ id }: { id: string })
     >
       <div className="flex items-center gap-2">
         <StatusDot status={thread.status} />
-        <span className="min-w-0 flex-1 truncate font-medium">{thread.title || "Thread sans titre"}</span>
+        <span className="min-w-0 flex-1 truncate font-medium">{thread.title || "Chat sans titre"}</span>
         {attn && (
           <Badge variant="outline" className={cn("shrink-0 px-1.5 text-[10px]", attn.className)}>
             {attn.text}

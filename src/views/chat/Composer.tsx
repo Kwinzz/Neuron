@@ -4,6 +4,7 @@ import {
   memo,
   useEffect,
   useLayoutEffect,
+  type ReactNode,
   useRef,
   useState,
 } from "react";
@@ -12,10 +13,9 @@ import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
-  InputGroupText,
   InputGroupTextarea,
 } from "@/components/ui/input-group";
-import { Kbd } from "@/components/ui/Kbd";
+import { ThreadSettingsBar } from "@/components/chat/ThreadSettingsBar";
 import { ipc } from "@/lib/ipc";
 import { useChat } from "@/stores/chat";
 import { NewMessagesPill } from "./NewMessagesPill";
@@ -23,8 +23,14 @@ import { NewMessagesPill } from "./NewMessagesPill";
 const MAX_TEXTAREA_HEIGHT = 10 * 24 + 16;
 
 interface ComposerProps {
-  threadId: string;
+  /** null = draft chat (not created yet): `submit` handles the first message. */
+  threadId: string | null;
   projectId: string | null;
+  /** Custom submit (draft chat). Resolve true when the message was accepted. */
+  submit?: (text: string) => Promise<boolean>;
+  /** Left side of the bottom bar. Defaults to the chat's model / effort / permission selectors. */
+  toolbar?: ReactNode;
+  placeholder?: string;
   active: boolean;
   onSent: () => void;
   /** Show the floating "Nouveaux messages" pill above the input. */
@@ -36,6 +42,9 @@ interface ComposerProps {
 export const Composer = memo(function Composer({
   threadId,
   projectId,
+  submit,
+  toolbar,
+  placeholder,
   active,
   onSent,
   showPill,
@@ -83,7 +92,11 @@ export const Composer = memo(function Composer({
     draftRef.current = "";
     onSent();
 
-    const ok = await useChat.getState().send(threadId, trimmed);
+    const ok = submit
+      ? await submit(trimmed)
+      : threadId
+        ? await useChat.getState().send(threadId, trimmed)
+        : false;
     if (!ok) {
       setValue((current) => (current === "" ? previous : current));
       return;
@@ -187,29 +200,22 @@ export const Composer = memo(function Composer({
             onChange={onChange}
             onKeyDown={onKeyDown}
             aria-label="Message"
-            placeholder="Demandez quelque chose à l'agent…"
+            placeholder={placeholder ?? "Demandez quelque chose à l'agent… (Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne, ↑ historique)"}
             className="min-h-0 max-h-[256px] overflow-y-auto px-3.5 pt-3 text-sm leading-6 field-sizing-fixed"
           />
           <InputGroupAddon align="block-end">
-            <InputGroupText className="hidden gap-1.5 text-xs sm:flex">
-              <Kbd>Entrée</Kbd>
-              <span>envoyer</span>
-              <span>·</span>
-              <Kbd>Maj+Entrée</Kbd>
-              <span>nouvelle ligne</span>
-              <span>·</span>
-              <Kbd>↑</Kbd>
-              <span>historique</span>
-            </InputGroupText>
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+              {toolbar ?? (threadId ? <ThreadSettingsBar threadId={threadId} /> : null)}
+            </div>
             <div className="ml-auto flex items-center gap-1.5">
-              {active && (
+              {active && threadId && (
                 <InputGroupButton
                   variant="outline"
                   size="icon-sm"
                   className="rounded-full"
                   aria-label="Arrêter l'agent"
                   title="Arrêter"
-                  onClick={() => void useChat.getState().stop(threadId)}
+                  onClick={() => threadId && void useChat.getState().stop(threadId)}
                 >
                   <Square className="size-3.5 fill-current" />
                 </InputGroupButton>

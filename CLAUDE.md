@@ -40,7 +40,8 @@ src/
   components/shell/         AppShell, Sidebar, LiveDock, DockThreadRow, Toaster
   components/palette/       CommandPalette (Ctrl+K)
   components/ui/            primitives partagées (AgentBadge, StatusDot, Kbd, LiveTimer)
-  views/home/               Mission Control (périmètre neon)
+  views/home/               Accueil (dashboard)
+  views/chat/               ChatView (chat existant) + DraftChat (nouveau chat vide, créé au 1er message)
   styles/index.css          design tokens Tailwind v4 (@theme)
 scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
 .claude/agents/neon.md      définition du sous-agent neon
@@ -74,16 +75,22 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
 
 - `strict: true`, pas de `any`, pas de `as` non justifié. Types IPC importés depuis `src/bindings/`.
 - Aucun `invoke`/`listen` hors de `src/lib/ipc.ts`.
-- **Style « Vision UI »** (inspiré du template MIT Creative Tim, recréé en Tailwind — jamais Chakra) : fond navy
-  dégradé (`bg-app`), cartes `glass-card` (radius 20px, padding 22px via `<Card>`), tuiles `glass-tile`, panneaux
-  `glass-panel`, overlays `glass-overlay`. Primitives : `Card`, `IconBox`, `Button`, `Progress`, `RingGauge`,
-  `StatusIconBox` (`src/components/ui/`).
-- Couleurs, rayons, durées : **uniquement les tokens** de `src/styles/index.css`. `bg-brand` (#582CFF) = **fonds
-  uniquement** (texte blanc dessus) ; `text-accent` (#9F8CFF) = violet pour le texte ; `accent-2` = cyan ;
-  `text-fg` blanc / `text-fg-muted` gris. Pas de hex en dur dans les composants (les `var(--color-*)` sont OK).
-- Libellés `text-sm font-bold text-fg-muted`, valeurs `text-lg font-bold text-fg tabular-nums`. Police Plus Jakarta Sans ;
-  `font-mono` (JetBrains Mono) réservé au code et aux compteurs live du dock.
-- Pas de `backdrop-filter` sur les cartes ordinaires (perf WebView2) : seulement sidebar, navbar au scroll, palette, toasts.
+- **Design system : shadcn/ui** (style `radix-nova`, couleur de base *Neutral*, sombre uniquement — `<html class="dark">`).
+  Composants officiels dans `src/components/ui/*.tsx` (minuscules, ajoutés via `npx shadcn@latest add <nom>`),
+  `cn` depuis `"cn"`. Look Vercel/shadcn : cartes plates à bordure 1px, `rounded-xl`, beaucoup d'air, pas de dégradé.
+- Tokens shadcn (`bg-background`, `bg-card`, `text-muted-foreground`, `border`, `bg-primary text-primary-foreground`,
+  `bg-accent` = **fond de survol**, `ring`, `chart-1..4` = couleurs des agents dans l'ordre fixe). Tokens Neuron
+  complémentaires : `text-ok` / `text-warn` / `text-destructive` / `text-live`, `hl` (texte mis en avant),
+  `agent-*`. Pas de hex dans les composants.
+- Primitives Neuron restantes (`src/components/ui/PascalCase.tsx`) : `AgentBadge`, `StatusDot`, `StatusIconBox`,
+  `IconBox`, `Kbd`, `LiveTimer`. Barre de réglages de chat : `components/chat/ChatSettingsBar` (modèle exact,
+  niveau de raisonnement, permissions — options dans `lib/models.ts`).
+- Valeurs KPI `text-2xl font-semibold tabular-nums`, descriptions `text-muted-foreground`. Police Geist / Geist Mono.
+- **Vocabulaire UI** : on dit « chat » (pas « thread ») partout, sauf le panneau « Threads live ». L'accueil s'appelle
+  « Accueil ». Le code (types, tables, commandes) garde `thread`.
+- **Sélecteurs zustand** : ne jamais créer d'objets/tableaux neufs dans un sélecteur sans `useShallow`, et même avec
+  `useShallow`, ne pas `map` vers des objets neufs (boucle de rendu infinie → écran noir). Renvoyer des primitives ou
+  les objets du store.
 - Transitions : `150ms`, uniquement `transform`/`opacity`/`color`/`background-color` (GPU-friendly).
 - Pas de spinner inutile ; streaming sans re-render global (état par thread, mémoïsation).
 - Composants fonctionnels, un composant par fichier, nommage `PascalCase.tsx`.

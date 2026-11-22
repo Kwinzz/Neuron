@@ -1,6 +1,5 @@
 import { type CSSProperties, useEffect, useState } from "react";
 import { CommandPalette } from "@/components/palette/CommandPalette";
-import { NewThreadDialog } from "@/components/threads/NewThreadDialog";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,6 +10,7 @@ import { useDashboard } from "@/stores/dashboard";
 import { useLive } from "@/stores/live";
 import { useUi } from "@/stores/ui";
 import { ChatView } from "@/views/chat/ChatView";
+import { DraftChat } from "@/views/chat/DraftChat";
 import { MissionControl } from "@/views/home/MissionControl";
 import { AppSidebar } from "./AppSidebar";
 import { LiveDock } from "./LiveDock";
@@ -49,7 +49,7 @@ export function AppShell() {
 
   useHotkey("mod+k", () => useUi.getState().togglePalette());
   useHotkey("mod+j", () => useUi.getState().toggleDock());
-  useHotkey("mod+n", () => useUi.getState().setNewThreadOpen(true));
+  useHotkey("mod+n", () => useUi.getState().startChat(null));
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -60,6 +60,7 @@ export function AppShell() {
           <ScrollRootContext.Provider value={scrollRoot}>
             <div ref={setScrollRoot} className="min-h-0 flex-1 overflow-y-auto">
               {view.kind === "home" && <MissionControl />}
+              {view.kind === "draft" && <DraftChat key={`draft-${view.projectId ?? ""}`} projectId={view.projectId} />}
               {view.kind === "thread" && <ChatView key={view.id} threadId={view.id} />}
             </div>
           </ScrollRootContext.Provider>
@@ -67,7 +68,6 @@ export function AppShell() {
         <LiveDock />
       </SidebarProvider>
       <CommandPalette />
-      <NewThreadDialog />
       <Toaster theme="dark" position="bottom-right" richColors={false} />
     </TooltipProvider>
   );

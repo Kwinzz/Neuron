@@ -5,12 +5,18 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLive } from "@/stores/live";
+import { useNav } from "@/stores/nav";
 import { useUi, type View } from "@/stores/ui";
 
 function useViewTitle(view: View): { section: string; title: string } {
-  const threadTitle = useLive((s) => (view.kind === "thread" ? s.threads[view.id]?.title : undefined));
-  if (view.kind === "thread") return { section: "Threads", title: threadTitle || "Thread" };
-  return { section: "Neuron", title: "Mission Control" };
+  const chatTitle = useLive((s) => (view.kind === "thread" ? s.threads[view.id]?.title : undefined));
+  const projectName = useLive((s) => (view.kind === "thread" ? s.threads[view.id]?.projectName : undefined));
+  const draftProject = useNav((s) =>
+    view.kind === "draft" && view.projectId ? s.projects.find((p) => p.id === view.projectId)?.name : undefined,
+  );
+  if (view.kind === "thread") return { section: projectName ?? "Chats", title: chatTitle || "Chat" };
+  if (view.kind === "draft") return { section: draftProject ?? "Chats", title: "Nouveau chat" };
+  return { section: "Neuron", title: "Accueil" };
 }
 
 /** dashboard-01 site header: sidebar trigger · breadcrumb · actions. */
@@ -40,9 +46,9 @@ export function SiteHeader() {
               {MOD_LABEL} K
             </kbd>
           </Button>
-          <Button size="sm" onClick={() => useUi.getState().setNewThreadOpen(true)}>
+          <Button size="sm" onClick={() => useUi.getState().startChat(null)} title={`Nouveau chat (${MOD_LABEL}+N)`}>
             <Plus />
-            Nouveau thread
+            Nouveau chat
           </Button>
           <DockToggle />
         </div>

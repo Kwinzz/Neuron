@@ -25,7 +25,7 @@ export function ActiveThreadsCard() {
         <CardTitle>En cours</CardTitle>
         {!isLoading && (
           <CardDescription>
-            {count} {count <= 1 ? "thread actif" : "threads actifs"}
+            {count} {count <= 1 ? "chat actif" : "chats actifs"}
           </CardDescription>
         )}
       </CardHeader>
@@ -46,17 +46,17 @@ export function ActiveThreadsCard() {
             </div>
             <p className="font-medium">Aucun agent en cours</p>
             <p className="text-xs text-muted-foreground">
-              Lancez un thread pour le suivre ici.
+              Lance un chat pour le suivre ici.
             </p>
             <Button
               type="button"
               variant="outline"
               size="sm"
               className="mt-1"
-              onClick={() => useUi.getState().setNewThreadOpen(true)}
+              onClick={() => useUi.getState().startChat(null)}
             >
               <Plus />
-              Nouveau thread
+              Nouveau chat
             </Button>
           </div>
         ) : (

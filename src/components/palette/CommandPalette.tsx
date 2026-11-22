@@ -55,7 +55,7 @@ export function CommandPalette() {
       open={open}
       onOpenChange={setOpen}
       title="Palette de commandes"
-      description="Rechercher un thread, un projet ou une action"
+      description="Rechercher un chat, un projet ou une action"
       className="sm:max-w-xl"
     >
       {open && <PaletteContent />}
@@ -82,18 +82,18 @@ function useCommands(): Command[] {
       {
         id: "thread:new",
         group: "Actions",
-        title: "Nouveau thread",
-        subtitle: "Lancer un agent dans un dossier",
+        title: "Nouveau chat",
+        subtitle: "Ouvrir un chat vide avec Claude",
         keywords: "nouveau chat créer lancer agent claude",
         icon: <Plus size={15} />,
         hint: <CommandShortcut>{MOD_LABEL}+N</CommandShortcut>,
-        run: () => ui().setNewThreadOpen(true),
+        run: () => ui().startChat(null),
       },
       {
         id: "nav:home",
         group: "Navigation",
-        title: "Mission Control",
-        subtitle: "Accueil, quotas et consommation",
+        title: "Accueil",
+        subtitle: "Quotas, consommation et activité",
         keywords: "accueil home dashboard tableau de bord",
         icon: <LayoutDashboard size={15} />,
         run: () => ui().navigate({ kind: "home" }),
@@ -101,7 +101,7 @@ function useCommands(): Command[] {
       {
         id: "nav:dock",
         group: "Navigation",
-        title: dockOpen ? "Masquer le dock des threads" : "Afficher le dock des threads",
+        title: dockOpen ? "Masquer les threads live" : "Afficher les threads live",
         keywords: "dock threads live panneau",
         icon: <PanelRight size={15} />,
         hint: <CommandShortcut>{MOD_LABEL}+J</CommandShortcut>,
@@ -113,8 +113,8 @@ function useCommands(): Command[] {
       const active = STATUS[t.status].active;
       list.push({
         id: `thread:${t.id}`,
-        group: active ? "Threads actifs" : "Threads récents",
-        title: t.title || "Thread sans titre",
+        group: active ? "Chats actifs" : "Chats récents",
+        title: t.title || "Chat sans titre",
         subtitle: [t.projectName, active ? describeStatus(t.status, t.detail) : formatRelative(t.updatedAt)]
           .filter(Boolean)
           .join(" · "),
@@ -132,10 +132,9 @@ function useCommands(): Command[] {
         title: p.name,
         subtitle: p.path,
         icon: <FolderGit2 size={15} />,
-        hint: <CommandShortcut className="tracking-normal">{p.threadCount} threads</CommandShortcut>,
+        hint: <CommandShortcut className="tracking-normal">{p.threadCount} chats</CommandShortcut>,
         run: () => {
-          ui().selectProject(p.id);
-          ui().setDockOpen(true);
+          ui().startChat(p.id);
         },
       });
     }
@@ -147,7 +146,7 @@ function useCommands(): Command[] {
           id: "dev:seed",
           group: "Développement",
           title: "Générer des données de démo",
-          subtitle: "Projets, threads et 30 jours de consommation (préfixe demo-)",
+          subtitle: "Projets, chats et 30 jours de consommation (préfixe demo-)",
           keywords: "seed demo fake",
           icon: <Database size={15} />,
           run: async () => {
@@ -166,7 +165,7 @@ function useCommands(): Command[] {
           icon: <FlaskConical size={15} />,
           run: async () => {
             const n = await ipc.dev.simulateActivity();
-            toast({ tone: "info", title: "Simulation lancée", description: `${n} thread(s) actif(s)` });
+            toast({ tone: "info", title: "Simulation lancée", description: `${n} chat(s) actif(s)` });
           },
         },
         {
@@ -231,7 +230,7 @@ function PaletteContent() {
 
   return (
     <CommandRoot shouldFilter={false} loop>
-      <CommandInput value={query} onValueChange={setQuery} placeholder="Rechercher un thread, un projet, une action…" />
+      <CommandInput value={query} onValueChange={setQuery} placeholder="Rechercher un chat, un projet, une action…" />
       <CommandList className="max-h-[420px]">
         <CommandEmpty>Aucun résultat pour « {query} »</CommandEmpty>
         {groups.map(([group, items]) => (

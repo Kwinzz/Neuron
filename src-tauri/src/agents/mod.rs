@@ -24,6 +24,8 @@ pub struct SessionSpec {
     pub thread_id: String,
     pub cwd: PathBuf,
     pub model: Option<String>,
+    /// Reasoning effort (agent-specific levels; None = CLI default).
+    pub effort: Option<String>,
     pub permission_mode: String,
     /// Agent-native session id to resume (e.g. Claude Code `session_id`).
     pub resume: Option<String>,

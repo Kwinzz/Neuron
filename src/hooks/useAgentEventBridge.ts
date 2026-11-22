@@ -3,13 +3,14 @@ import { events } from "@/lib/ipc";
 import { useChat } from "@/stores/chat";
 import { useDashboard } from "@/stores/dashboard";
 import { type Attention, useLive } from "@/stores/live";
+import { useNav } from "@/stores/nav";
 import { toast } from "@/stores/toast";
 import { useUi } from "@/stores/ui";
 
 const ATTENTION_TOAST: Record<Attention, { tone: "ok" | "warn" | "danger"; title: string }> = {
-  done: { tone: "ok", title: "Thread terminé" },
+  done: { tone: "ok", title: "Chat terminé" },
   approval: { tone: "warn", title: "Approbation requise" },
-  error: { tone: "danger", title: "Thread en erreur" },
+  error: { tone: "danger", title: "Chat en erreur" },
 };
 
 /**
@@ -35,7 +36,7 @@ export function useAgentEventBridge(): void {
           toast({
             tone: meta.tone,
             title: meta.title,
-            description: thread?.title || "Thread sans titre",
+            description: thread?.title || "Chat sans titre",
             onClick: () => {
               useUi.getState().focusThread(envelope.threadId);
               useUi.getState().setDockOpen(true);
@@ -47,6 +48,7 @@ export function useAgentEventBridge(): void {
         const kind = envelope.event.kind;
         if (kind === "TokenUsageUpdate" || kind === "ThreadStatusChanged" || kind === "ThreadError") {
           useDashboard.getState().scheduleRefresh();
+          useNav.getState().scheduleRefresh();
         }
       })
       .then((fn) => {

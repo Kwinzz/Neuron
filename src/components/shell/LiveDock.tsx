@@ -67,7 +67,7 @@ function DockPanel() {
             <div className="flex flex-col items-center gap-1 px-6 py-12 text-center">
               <p className="text-sm font-medium">Aucun thread actif</p>
               <p className="text-xs text-muted-foreground">
-                Les threads en cours, tous projets confondus, apparaissent ici en temps réel.
+                Les chats en cours, tous projets confondus, apparaissent ici en temps réel.
               </p>
             </div>
           ) : (

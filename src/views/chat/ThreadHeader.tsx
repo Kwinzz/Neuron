@@ -124,7 +124,7 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={onInputKeyDown}
               onBlur={() => void commit()}
-              aria-label="Nom du thread"
+              aria-label="Nom du chat"
               className="h-8 max-w-[480px] rounded-md bg-transparent px-2 text-base font-semibold md:text-base dark:bg-transparent"
             />
           ) : (
