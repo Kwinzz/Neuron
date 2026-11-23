@@ -48,8 +48,8 @@ src/
   views/project/            page projet (éditeur context.md, git, fichiers récents, chats du projet)
   components/context/       indicateur de contexte injecté (en-tête de chat, nouveau chat)
   components/markdown/      rendu Markdown partagé (chat + aperçus) : Markdown, CodeBlock, markdown.css
-  views/memory/             vue Mémoire (souvenirs par catégorie, recherche, état MCP des agents)
-  views/settings/           Paramètres (agents inactifs, notifications, contexte injecté, CLI génériques, raccourcis)
+  views/memory/             vue Mémoire (souvenirs par catégorie, recherche)
+  views/settings/           Paramètres (agents inactifs, Agents & MCP, notifications, contexte injecté, CLI génériques, raccourcis)
   lib/shortcuts.ts          liste unique des raccourcis globaux (aide + palette)
   styles/index.css          design tokens Tailwind v4 (@theme)
 scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
@@ -139,7 +139,7 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
   via hash dans `settings`, réécrit après chaque changement ; `<NEURON_DATA_DIR>/.neuron` en dev). Injectée dans chaque
   nouveau chat. Serveur MCP = le même exécutable lancé en `neuron --mcp-memory --db … --memory-file … --agent …`
   (logs sur stderr, stdout = protocole). Claude : `--mcp-config=` + `--allowedTools=` ; Codex : `-c mcp_servers.neuron.*` ;
-  Antigravity : pas de MCP par session → inscription `agy mcp add` déclenchée **par l'utilisateur** depuis la vue Mémoire.
+  Antigravity : pas de MCP par session → inscription `agy mcp add` déclenchée **par l'utilisateur** depuis Paramètres → Agents & MCP.
   Événement `memory://changed` (watcher de memory.md) en plus de `agent://event`.
 - **CLI génériques (Phase 5)** : profils dans Paramètres (`GenericCliProfile` : commande, args avec `{prompt}` sinon
   stdin, `pty`). Le chat `generic` stocke l'id du profil dans `model`. Un processus par message, sortie streamée en
@@ -155,6 +155,12 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
   téléchargée ≤ 1×/jour, cache `<data_dir>/prices.json`, entrées des éditeurs uniquement, repli sur la table intégrée).
   Affichage via `components/ui/CostLabel` (« ≈ » pour les estimations). C'est le seul appel réseau de l'app.
 - `rate_limit_event` (fenêtres 5h / 7j de l'abonnement Claude) → `settings.claude.rate_limits` → `ProviderUsage.live`.
+- **Quotas Antigravity** : `agy --print /quota --output-format json` (répondu par le CLI, 0 token, **refusé dans une
+  session stream-json**) → groupes de modèles × fenêtres 5 h / hebdo (`antigravity/quota.rs`), rafraîchi après chaque
+  tour agy et toutes les 15 min, événement `quotas://changed`. Dans un chat agy, `/quota`, `/usage`, `/credits` sont
+  interceptés par `send_prompt` et exécutés de la même façon (carte de commande).
+- **Commandes locales** (Claude `/usage`, `/context`… repérées par `local_command` dans `result`) : `ChatItem::Command`,
+  pas de marqueur de fin de tour.
 - Front : `useChat` (timeline par thread, événements appliqués **une fois par frame**), `ChatItem` = même type
   pour l'historique et le live.
 

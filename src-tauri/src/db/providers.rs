@@ -154,6 +154,27 @@ pub struct LiveWindow {
     pub utilization: f64,
     #[ts(type = "number | null")]
     pub resets_at: Option<i64>,
+    /// Quota group when the provider has several (Antigravity: « Gemini Models », « Claude and GPT models »…).
+    pub group: Option<String>,
+    /// Model names sharing this group's quota (match a model label by prefix).
+    pub models: Vec<String>,
+}
+
+/// Save the windows an agent just reported (replaces the previous report).
+pub fn store_live_windows(
+    conn: &Connection,
+    agent: AgentKind,
+    windows: &[crate::agents::RateLimitWindow],
+    now: i64,
+) -> AppResult<()> {
+    let value = serde_json::json!({
+        "updatedAt": now,
+        "windows": windows.iter().map(|w| serde_json::json!({
+            "window": w.window, "utilization": w.utilization, "resetsAt": w.resets_at,
+            "group": w.group, "models": w.models,
+        })).collect::<Vec<_>>(),
+    });
+    crate::db::settings::set(conn, &crate::db::settings::rate_limits_key(agent), &value)
 }
 
 /// Every window an agent reported (chat header: 5 h and weekly quotas of the current provider).
@@ -183,6 +204,12 @@ pub fn live_quotas(conn: &Connection) -> AppResult<Vec<AgentLiveQuotas>> {
                             window: w.get("window")?.as_str()?.to_string(),
                             utilization: w.get("utilization")?.as_f64()?,
                             resets_at: w.get("resetsAt").and_then(serde_json::Value::as_i64),
+                            group: w.get("group").and_then(serde_json::Value::as_str).map(str::to_string),
+                            models: w
+                                .get("models")
+                                .and_then(serde_json::Value::as_array)
+                                .map(|ms| ms.iter().filter_map(|m| m.as_str().map(str::to_string)).collect())
+                                .unwrap_or_default(),
                         })
                     })
                     .collect()
@@ -207,10 +234,18 @@ fn live_quota(conn: &Connection, provider: &Provider) -> AppResult<Option<LiveQu
         return Ok(None);
     };
     let reported_at = stored.get("updatedAt").and_then(serde_json::Value::as_i64).unwrap_or(0);
+    // Several quota groups (Antigravity): the most used one is the binding constraint.
     Ok(stored
         .get("windows")
         .and_then(serde_json::Value::as_array)
-        .and_then(|ws| ws.iter().find(|w| w.get("window").and_then(serde_json::Value::as_str) == Some(window)))
+        .and_then(|ws| {
+            ws.iter()
+                .filter(|w| w.get("window").and_then(serde_json::Value::as_str) == Some(window))
+                .max_by(|a, b| {
+                    let u = |w: &serde_json::Value| w.get("utilization").and_then(serde_json::Value::as_f64).unwrap_or(0.0);
+                    u(a).total_cmp(&u(b))
+                })
+        })
         .and_then(|w| {
             Some(LiveQuota {
                 utilization: w.get("utilization")?.as_f64()?,

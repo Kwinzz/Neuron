@@ -47,6 +47,7 @@ pub fn run() {
             commands::memory::spawn_memory_watcher(app.handle());
             commands::settings::spawn_idle_reaper(app.handle());
             commands::pricing::spawn_price_refresh(app.handle());
+            commands::pricing::spawn_agy_quota_refresh(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

@@ -3,6 +3,7 @@ import {
   Bell,
   Keyboard,
   Layers,
+  Plug,
   SlidersHorizontal,
   SquareTerminal,
   type LucideIcon,
@@ -17,6 +18,7 @@ interface SettingsNavItem {
 
 const NAV_ITEMS: readonly SettingsNavItem[] = [
   { id: "general", label: "Général", icon: SlidersHorizontal },
+  { id: "agents", label: "Agents & MCP", icon: Plug },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "context", label: "Contexte injecté", icon: Layers },
   { id: "generic", label: "CLI génériques", icon: SquareTerminal },

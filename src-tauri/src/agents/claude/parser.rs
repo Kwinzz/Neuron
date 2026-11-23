@@ -317,6 +317,7 @@ impl ClaudeParser {
                     window: name.clone(),
                     utilization: w.get("utilization").and_then(Value::as_f64)?,
                     resets_at: w.get("resetsAt").and_then(Value::as_i64).map(|secs| secs * 1000),
+                    ..Default::default()
                 })
             })
             .collect();

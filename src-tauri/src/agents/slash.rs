@@ -3,7 +3,7 @@
 //! - Claude Code: `initialize` control request → `commands` (built-ins, skills, plugins) with descriptions. Sent
 //!   as-is in the prompt (`/compact`, `/context`, `/<skill>`…), Claude expands them itself.
 //! - Antigravity: `agy acp` → `available_commands_update` (built-ins + skills). Sent as-is: agy expands slash
-//!   commands in print mode.
+//!   commands in print mode. Plus `/quota`, `/usage`, `/credits`, run by Neuron (`antigravity::quota`).
 //! - Codex: `codex exec` has no slash commands. Neuron offers `/review` (→ `codex exec review`) and the Codex
 //!   skills (`~/.codex/skills`, `~/.agents/skills`, `<cwd>/.agents/skills`, `<cwd>/.codex/skills`), rewritten into
 //!   an explicit instruction pointing at the skill file.
@@ -56,7 +56,15 @@ pub async fn list(agent: AgentKind, cwd: &Path) -> Vec<SlashCommand> {
     }
     let result = match agent {
         AgentKind::ClaudeCode => tokio::time::timeout(LIST_TIMEOUT, claude(cwd)).await.ok().flatten(),
-        AgentKind::Antigravity => tokio::time::timeout(LIST_TIMEOUT, antigravity(cwd)).await.ok().flatten(),
+        AgentKind::Antigravity => tokio::time::timeout(LIST_TIMEOUT, antigravity(cwd)).await.ok().flatten().map(|mut list| {
+            // Answered by the CLI itself (not listed by ACP): Neuron runs them with `agy --print`.
+            list.extend(crate::agents::antigravity::quota::LOCAL_COMMANDS.iter().map(|(name, description)| SlashCommand {
+                name: (*name).into(),
+                description: (*description).into(),
+                argument_hint: None,
+            }));
+            list
+        }),
         AgentKind::Codex => Some(codex(cwd)),
         AgentKind::Generic => Some(Vec::new()),
     };

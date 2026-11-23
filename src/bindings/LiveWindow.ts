@@ -12,4 +12,12 @@ window: string,
 /**
  * 0–1.
  */
-utilization: number, resetsAt: number | null, };
+utilization: number, resetsAt: number | null, 
+/**
+ * Quota group when the provider has several (Antigravity: « Gemini Models », « Claude and GPT models »…).
+ */
+group: string | null, 
+/**
+ * Model names sharing this group's quota (match a model label by prefix).
+ */
+models: Array<string>, };

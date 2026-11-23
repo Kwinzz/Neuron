@@ -51,6 +51,16 @@ export function useAgentEventBridge(): void {
     let disposed = false;
     void useSettings.getState().load().catch(() => undefined);
     let unlisten: (() => void) | null = null;
+    let unlistenQuotas: (() => void) | null = null;
+
+    // Antigravity quotas are fetched apart from the turns (`agy --print /quota`).
+    events
+      .onQuotasChanged(() => useDashboard.getState().scheduleRefresh())
+      .then((fn) => {
+        if (disposed) fn();
+        else unlistenQuotas = fn;
+      })
+      .catch(() => undefined);
 
     events
       .onAgentEvent((envelope) => {
@@ -95,6 +105,7 @@ export function useAgentEventBridge(): void {
     return () => {
       disposed = true;
       unlisten?.();
+      unlistenQuotas?.();
     };
   }, []);
 }

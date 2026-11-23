@@ -20,7 +20,7 @@ export type OutputBlock =
   | { kind: "text"; text: string };
 
 /** « Current session: 2% used · resets Nov 23, 10pm » */
-const METER = /^\s*([^:]{1,80}):\s*(\d+(?:[.,]\d+)?)\s*%\s*used\b(?:\s*[·•-]\s*(.+?))?\s*$/i;
+const METER = /^\s*([^:]{1,80}):\s*(\d+(?:[.,]\d+)?)\s*%\s*(?:used|utilisée?s?)(?![\p{L}\w])(?:\s*[·•\-]\s*(.+?))?\s*$/iu;
 
 /** Markdown output (/context): headings, tables or bold. */
 export function looksLikeMarkdown(text: string): boolean {

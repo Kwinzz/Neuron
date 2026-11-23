@@ -114,7 +114,7 @@ function useCommands(): Command[] {
         id: "nav:settings",
         group: "Navigation",
         title: "Paramètres",
-        subtitle: "Agents inactifs, notifications, contexte injecté, CLI génériques",
+        subtitle: "Agents inactifs, agents & MCP, notifications, contexte injecté, CLI génériques",
         keywords: "paramètres settings préférences options notifications cli générique pty",
         icon: <Settings size={15} />,
         hint: <CommandShortcut>{MOD_LABEL}+,</CommandShortcut>,

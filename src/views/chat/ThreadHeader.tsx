@@ -153,7 +153,7 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <HeaderQuotas agent={live.agent} />
+          <HeaderQuotas agent={live.agent} model={live.model} />
           <Badge
             variant="outline"
             className={cn("hidden max-w-60 gap-1.5 bg-card sm:inline-flex", TONE_TEXT[statusMeta.tone])}

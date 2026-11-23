@@ -88,6 +88,17 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Quotas Antigravity, /quota /usage /credits, Agents & MCP dans Paramètres
+- **Quotas Antigravity** (`agents/antigravity/quota.rs`) : `agy --print /quota --output-format json` (répondu par le
+  CLI, aucun token ; refusé dans une session stream-json) → groupes de modèles (« Gemini Models », « Claude and GPT
+  models », « Gemini 4 Argon ») × fenêtres 5 h / hebdo. Stockés comme ceux de Claude/Codex (`store_live_windows`,
+  fenêtres avec `group` + `models`), rafraîchis après chaque tour agy et toutes les 15 min (+ 5 s après le
+  lancement), événement `quotas://changed` → rechargement de l'Accueil. Accueil : fenêtre hebdo du groupe le plus
+  consommé ; en-tête de chat : 5 h + hebdo du groupe du modèle du chat.
+- **/quota, /usage, /credits dans un chat Antigravity** : interceptés par `send_prompt`, exécutés en `agy --print`,
+  affichés dans la carte de commande (jauges « N% utilisé · reset dans … ») ; ajoutés au menu « / ».
+- **Agents & MCP** : la carte quitte la vue Mémoire (désormais sur une colonne) pour une section de Paramètres.
+
 ### 2026-11-23 — Commandes locales affichées à part, niveau de raisonnement plus court
 - **Commandes locales Claude** (`/usage`, `/context`, `/cost`…) : le message `<synthetic>` est retenu par le parseur
   jusqu'au `result` ; si celui-ci porte `local_command`, il devient `AdapterEvent::CommandOutput` → rôle `command`

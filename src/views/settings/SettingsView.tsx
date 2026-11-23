@@ -6,6 +6,7 @@ import { ipcErrorMessage } from "@/lib/ipc";
 import { useSettings } from "@/stores/settings";
 import { toast } from "@/stores/toast";
 import { useUi, type SettingsSection } from "@/stores/ui";
+import { AgentsSection } from "./AgentsSection";
 import { ContextSection } from "./ContextSection";
 import { GeneralSection } from "./GeneralSection";
 import { PricingCard } from "./PricingCard";
@@ -70,6 +71,8 @@ export function SettingsView({ section }: SettingsViewProps) {
         >
           {active === "shortcuts" ? (
             <ShortcutsSection />
+          ) : active === "agents" ? (
+            <AgentsSection />
           ) : loadError !== null && settings === null ? (
             <Alert variant="destructive" className="has-data-[slot=alert-action]:pr-28">
               <AlertCircle aria-hidden />

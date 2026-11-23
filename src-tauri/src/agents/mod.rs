@@ -93,13 +93,17 @@ pub struct PermissionDecision {
 }
 
 /// One usage window reported by the agent's provider (e.g. Claude 5-hour / 7-day limits).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct RateLimitWindow {
     pub window: String,
     /// 0–1.
     pub utilization: f64,
     /// Unix ms.
     pub resets_at: Option<i64>,
+    /// Quota group when the provider has several (Antigravity: « Gemini Models », « Claude and GPT models »…).
+    pub group: Option<String>,
+    /// Model names sharing this group's quota.
+    pub models: Vec<String>,
 }
 
 /// Normalized events produced by adapters, consumed by the registry pump.

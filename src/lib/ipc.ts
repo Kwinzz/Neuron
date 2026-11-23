@@ -44,6 +44,8 @@ import type { UsageReport } from "@/bindings/UsageReport";
 export const AGENT_EVENT_CHANNEL = "agent://event";
 /** memory.md edited outside the app, or an agent saved a memory through MCP. */
 export const MEMORY_CHANGED_CHANNEL = "memory://changed";
+/** Subscription windows refreshed outside a chat turn (Antigravity `/quota`). */
+export const QUOTAS_CHANGED_CHANNEL = "quotas://changed";
 
 /** True when running inside the Tauri webview (false in a plain browser via `npm run dev`). */
 export const isTauri = (): boolean => "__TAURI_INTERNALS__" in window;
@@ -156,6 +158,7 @@ export const events = {
   onAgentEvent: (handler: (payload: AgentEventEnvelope) => void): Promise<UnlistenFn> =>
     listen<AgentEventEnvelope>(AGENT_EVENT_CHANNEL, (e) => handler(e.payload)),
   onMemoryChanged: (handler: () => void): Promise<UnlistenFn> => listen(MEMORY_CHANGED_CHANNEL, () => handler()),
+  onQuotasChanged: (handler: () => void): Promise<UnlistenFn> => listen(QUOTAS_CHANGED_CHANNEL, () => handler()),
 } as const;
 
 /** Native desktop notifications (asks the OS permission once). */

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMemory } from "@/stores/memory";
-import { AgentsMcpCard } from "./AgentsMcpCard";
 import { CATEGORY_ORDER } from "./categories";
 import { MemoryCategoryCard } from "./MemoryCategoryCard";
 import { MemoryComposer } from "./MemoryComposer";
@@ -34,7 +33,6 @@ export function MemoryView() {
 
   useEffect(() => {
     void useMemory.getState().load();
-    void useMemory.getState().refreshAgy().catch(() => undefined);
   }, []);
 
   const triggerHighlight = useCallback((id: string) => {
@@ -165,84 +163,78 @@ export function MemoryView() {
         onJumpToCategory={handleJumpToCategory}
       />
 
-      <div className="grid min-w-0 gap-4 md:gap-6 min-[1100px]:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="flex min-w-0 flex-col gap-4 md:gap-6">
-          {error !== null && (
-            <Alert
-              variant="destructive"
-              className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 has-data-[slot=alert-action]:pr-28"
-            >
-              <AlertCircle aria-hidden />
-              <AlertTitle>Mémoire indisponible</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-              <AlertAction>
-                <Button
-                  type="button"
-                  size="xs"
-                  variant="outline"
-                  onClick={handleRetry}
-                >
-                  Réessayer
-                </Button>
-              </AlertAction>
-            </Alert>
-          )}
+      <div className="flex min-w-0 flex-col gap-4 md:gap-6">
+        {error !== null && (
+          <Alert
+            variant="destructive"
+            className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 has-data-[slot=alert-action]:pr-28"
+          >
+            <AlertCircle aria-hidden />
+            <AlertTitle>Mémoire indisponible</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+            <AlertAction>
+              <Button
+                type="button"
+                size="xs"
+                variant="outline"
+                onClick={handleRetry}
+              >
+                Réessayer
+              </Button>
+            </AlertAction>
+          </Alert>
+        )}
 
-          {!blockingError && (
-            <>
-              <MemoryComposer
-                textareaRef={composerRef}
-                onCreated={triggerHighlight}
+        {!blockingError && (
+          <>
+            <MemoryComposer
+              textareaRef={composerRef}
+              onCreated={triggerHighlight}
+            />
+
+            <MemorySearchBar
+              value={query}
+              onChange={setQuery}
+              inputRef={searchInputRef}
+            />
+
+            {!loaded ? (
+              <div className="flex min-w-0 flex-col gap-4">
+                {[0, 1, 2].map((i) => (
+                  <Card key={i} size="sm" className="min-w-0">
+                    <CardHeader>
+                      <Skeleton className="h-4 w-36" />
+                      <Skeleton className="h-3.5 w-64 max-w-full" />
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-2.5">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-3/4" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : search.active ? (
+              <MemorySearchResults
+                query={query}
+                hits={search.hits}
+                searching={search.searching}
+                error={search.error}
+                highlightId={highlightId}
               />
-
-              <MemorySearchBar
-                value={query}
-                onChange={setQuery}
-                inputRef={searchInputRef}
-              />
-
-              {!loaded ? (
-                <div className="flex min-w-0 flex-col gap-4">
-                  {[0, 1, 2].map((i) => (
-                    <Card key={i} size="sm" className="min-w-0">
-                      <CardHeader>
-                        <Skeleton className="h-4 w-36" />
-                        <Skeleton className="h-3.5 w-64 max-w-full" />
-                      </CardHeader>
-                      <CardContent className="flex flex-col gap-2.5">
-                        <Skeleton className="h-4 w-full" />
-                        <Skeleton className="h-4 w-3/4" />
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : search.active ? (
-                <MemorySearchResults
-                  query={query}
-                  hits={search.hits}
-                  searching={search.searching}
-                  error={search.error}
-                  highlightId={highlightId}
-                />
-              ) : (
-                <div className="flex min-w-0 flex-col gap-4">
-                  {visibleCategories.map((category) => (
-                    <MemoryCategoryCard
-                      key={category}
-                      category={category}
-                      items={grouped[category]}
-                      highlightId={highlightId}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        <div className="min-w-0 self-start min-[1100px]:sticky min-[1100px]:top-4">
-          <AgentsMcpCard />
-        </div>
+            ) : (
+              <div className="flex min-w-0 flex-col gap-4">
+                {visibleCategories.map((category) => (
+                  <MemoryCategoryCard
+                    key={category}
+                    category={category}
+                    items={grouped[category]}
+                    highlightId={highlightId}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

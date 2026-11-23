@@ -40,7 +40,7 @@ pub fn parse_rate_limits(limits: &Value) -> Vec<RateLimitWindow> {
                 .and_then(Value::as_i64)
                 .map(|s| s * 1000)
                 .or_else(|| w.get("resets_in_seconds").and_then(Value::as_i64).map(|s| crate::util::now_ms() + s * 1000));
-            Some(RateLimitWindow { window: window_name(minutes), utilization: (used / 100.0).clamp(0.0, 1.0), resets_at })
+            Some(RateLimitWindow { window: window_name(minutes), utilization: (used / 100.0).clamp(0.0, 1.0), resets_at, ..Default::default() })
         })
         .collect()
 }

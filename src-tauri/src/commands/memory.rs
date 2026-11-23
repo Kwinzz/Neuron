@@ -177,7 +177,7 @@ pub async fn antigravity_mcp_status(state: State<'_, AppState>) -> AppResult<Agy
     agy_status(&state).await
 }
 
-/// `agy mcp add neuron -- <neuron.exe> --mcp-memory …` (explicit user action from the Memory view).
+/// `agy mcp add neuron -- <neuron.exe> --mcp-memory …` (explicit user action from Paramètres → Agents & MCP).
 #[tauri::command]
 pub async fn connect_antigravity_mcp(state: State<'_, AppState>) -> AppResult<AgyMcpStatus> {
     let launch = launch_for(&state, "antigravity")?;

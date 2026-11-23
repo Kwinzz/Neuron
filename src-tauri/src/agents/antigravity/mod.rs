@@ -4,6 +4,7 @@
 //! resumes the conversation with `--conversation <id>`.
 
 pub mod parser;
+pub mod quota;
 
 use serde_json::json;
 
@@ -23,7 +24,7 @@ pub struct AntigravityAdapter {
 
 impl Default for AntigravityAdapter {
     fn default() -> Self {
-        Self { binary: std::env::var("NEURON_AGY_BIN").unwrap_or_else(|_| "agy".into()) }
+        Self { binary: quota::binary() }
     }
 }
 
@@ -51,7 +52,7 @@ pub fn build_args(spec: &SessionSpec) -> Vec<String> {
     if let Some(mcp) = &spec.mcp {
         use crate::memory::mcp::{SERVER_NAME, TOOL_NAMES};
         // agy has no per-session MCP servers: the server is registered once in its own config (`agy mcp add`,
-        // done by the user from the Memory view). Here we only pre-approve its tools for this session.
+        // done by the user from Paramètres → Agents & MCP). Here we only pre-approve its tools for this session.
         let _ = &mcp.command;
         let settings = json!({
             "permissions": { "allow": TOOL_NAMES.iter().map(|t| format!("mcp({SERVER_NAME}/{t})")).collect::<Vec<_>>() },

@@ -25,7 +25,7 @@ use crate::agents::{
 };
 use crate::db::chat::{self, ToolStatus};
 use crate::db::threads::{self, ThreadRuntime};
-use crate::db::{Db, settings};
+use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::util::now_ms;
 
@@ -61,6 +61,49 @@ pub struct AgentRegistry {
 impl Default for AgentRegistry {
     fn default() -> Self {
         Self::new(None)
+    }
+}
+
+
+/// Run an Antigravity local command (`/quota`…) for a chat: its output becomes a command card.
+async fn run_agy_command(app: AppHandle, db: Db, rt: ThreadRuntime, name: &'static str, track_status: bool) {
+    use crate::agents::antigravity::quota;
+    let cwd = rt.cwd.as_deref().map(PathBuf::from).filter(|p| p.is_dir()).unwrap_or_else(std::env::temp_dir);
+    let id = rt.id.clone();
+    let (outcome, windows) = match quota::run(name, &cwd).await {
+        Ok(result) => {
+            let windows = if name == "credits" { Vec::new() } else { quota::windows(&result) };
+            (Ok(quota::render(name, &result, now_ms())), windows)
+        }
+        Err(err) => (Err(err.to_string()), Vec::new()),
+    };
+    quota::store(&db, &app, windows).await;
+    let status = if outcome.is_ok() { ThreadStatus::Done } else { ThreadStatus::Error };
+    let item_id = uuid::Uuid::new_v4().to_string();
+    let saved = {
+        let (tid, mid, outcome) = (id.clone(), item_id.clone(), outcome.clone());
+        db.call(move |c| {
+            let now = now_ms();
+            match &outcome {
+                Ok(text) => chat::insert_message(c, &mid, &tid, "command", text, Some(&json!({ "name": name })), now)?,
+                Err(message) => chat::insert_message(c, &mid, &tid, "error", message, None, now)?,
+            }
+            if track_status {
+                threads::set_status(c, &tid, status, now)?;
+            }
+            Ok(())
+        })
+        .await
+    };
+    if let Err(err) = saved {
+        tracing::warn!(thread = %id, %err, "agy command not saved");
+    }
+    match outcome {
+        Ok(text) => emit(&app, &id, AgentEvent::CommandOutput { message_id: item_id, name: name.to_string(), text }),
+        Err(message) => emit(&app, &id, AgentEvent::ThreadError { message, fatal: false }),
+    }
+    if track_status {
+        emit(&app, &id, AgentEvent::ThreadStatusChanged { status, detail: None });
     }
 }
 
@@ -128,6 +171,14 @@ impl AgentRegistry {
         }
         .ok_or_else(|| AppError::NotFound(format!("thread {thread_id}")))?;
 
+        // Antigravity /quota, /usage, /credits: answered by a separate `agy --print` (refused in a session).
+        let local = (runtime.agent == AgentKind::Antigravity && attachments.is_empty())
+            .then(|| crate::agents::antigravity::quota::local_command(&text))
+            .flatten();
+        // A command typed while the agent works must not touch the turn's status.
+        let busy = self.lock().get(thread_id).is_some_and(|s| s.busy);
+        let track_status = local.is_none() || !busy;
+
         // Persist the user message first so it is never lost, even if the spawn fails.
         let first_message = {
             let (id, t, project) = (thread_id.to_string(), text.clone(), runtime.project_id.clone());
@@ -145,11 +196,21 @@ impl AgentRegistry {
                     (t, _) => title_from_prompt(t),
                 };
                 threads::set_title_if_empty(c, &id, &title)?;
-                threads::set_status(c, &id, ThreadStatus::Starting, now)?;
+                if track_status {
+                    threads::set_status(c, &id, ThreadStatus::Starting, now)?;
+                }
                 Ok(first)
             })
             .await?
         };
+        if let Some(name) = local {
+            if track_status {
+                emit(app, thread_id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::Starting, detail: None });
+            }
+            let (app, db, runtime) = (app.clone(), db.clone(), runtime.clone());
+            tauri::async_runtime::spawn(async move { run_agy_command(app, db, runtime, name, track_status).await });
+            return Ok(());
+        }
         // Agents without a system-prompt option get the project context in front of the first message
         // (the stored message stays what the user typed).
         let supports_system = self.adapters.get(&runtime.agent).is_some_and(|a| a.supports_system_prompt());
@@ -506,6 +567,10 @@ impl AgentRegistry {
                 }
                 AdapterEvent::TurnComplete { mut usage, duration_ms, error } => {
                     let (stopped, _) = self.take_flags(&id, generation);
+                    // Antigravity doesn't stream its quotas: ask for them after each turn (no token used).
+                    if rt.agent == AgentKind::Antigravity {
+                        tauri::async_runtime::spawn(crate::agents::antigravity::quota::refresh(db.clone(), app.clone()));
+                    }
                     // CLIs that only report tokens (Codex, Antigravity): price them at the public API rate.
                     if usage.cost_usd == 0.0 && rt.agent != AgentKind::ClaudeCode {
                         if let Some(cost) = model.as_deref().and_then(|m| crate::pricing::estimate(m, &usage)) {
@@ -557,14 +622,8 @@ impl AgentRegistry {
                     emit(&app, &id, AgentEvent::ThreadStatusChanged { status, detail: None });
                 }
                 AdapterEvent::RateLimits(windows) => {
-                    let value = json!({
-                        "updatedAt": now_ms(),
-                        "windows": windows.iter().map(|w| json!({
-                            "window": w.window, "utilization": w.utilization, "resetsAt": w.resets_at
-                        })).collect::<Vec<_>>(),
-                    });
-                    let key = settings::rate_limits_key(rt.agent);
-                    persist!(move |c| settings::set(c, &key, &value));
+                    let agent = rt.agent;
+                    persist!(move |c| crate::db::providers::store_live_windows(c, agent, &windows, now_ms()));
                 }
                 AdapterEvent::Subagent { tool_call_id, description, subagent_type, status, tool_uses, tokens, last_tool } => {
                     emit(
