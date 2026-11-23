@@ -88,6 +88,19 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Les agents connaissent Neuron, modifient la mémoire et le contexte du projet
+- **Icône** : l'exe n'avait pas été recompilé (cargo ne voit pas les icônes) → `build.rs` déclare
+  `rerun-if-changed=icons` ; exe recompilé, icône vérifiée dans la ressource de l'exe.
+- **Présentation de Neuron** (`context::neuron_intro`) donnée à chaque session : où l'agent tourne, la mémoire
+  globale et comment la lire / l'enrichir / la corriger, le `.neuron/context.md` du projet à tenir à jour. Claude :
+  dans `--append-system-prompt` (avec le contexte figé) ; Codex / Antigravity : dans le préambule du 1er message.
+  Repli sans outils MCP : modifier directement `memory.md` (réimporté par Neuron) et `.neuron/context.md`.
+- **Serveur MCP étendu** (7 outils) : `neuron_memory_update` / `neuron_memory_delete` (identifiants courts affichés
+  par read / search), `neuron_project_context_read` / `neuron_project_context_update` (réécriture complète,
+  100 Ko max) — listés seulement quand le serveur connaît le projet (`--project <dossier>` pour les chats de
+  projet ; sinon dossier courant s'il contient `.neuron/context.md`, cas d'Antigravity inscrit globalement).
+  Essai réel (Claude Haiku + vrai serveur) : souvenir enregistré et contexte du projet complété.
+
 ### 2026-11-23 — Nouvelle icône, en-tête « Neuron »
 - Icône de l'app (réseau de nœuds blanc sur fond noir) : source 905×955 centrée sur un carré noir de 1024 px, puis
   `tauri icon` → mêmes fichiers que avant dans `src-tauri/icons` (ico, icns, PNG, logos Windows Store).

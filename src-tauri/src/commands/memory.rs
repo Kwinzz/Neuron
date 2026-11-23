@@ -82,7 +82,7 @@ pub async fn memory_info(state: State<'_, AppState>) -> AppResult<MemoryInfo> {
             db_path: state.paths.db_path.clone(),
             file_path: state.paths.memory_file.clone(),
         };
-        memory::mcp::McpLaunch::new(exe, &paths, "<agent>").display()
+        memory::mcp::McpLaunch::new(exe, &paths, "<agent>", None).display()
     });
     Ok(MemoryInfo {
         file_path: state.paths.memory_file.display().to_string(),
@@ -154,7 +154,7 @@ pub enum AgyMcpStatus {
 fn launch_for(state: &AppState, agent: &str) -> AppResult<memory::mcp::McpLaunch> {
     let exe = std::env::current_exe()?;
     let paths = memory::MemoryPaths { db_path: state.paths.db_path.clone(), file_path: state.paths.memory_file.clone() };
-    Ok(memory::mcp::McpLaunch::new(exe, &paths, agent))
+    Ok(memory::mcp::McpLaunch::new(exe, &paths, agent, None))
 }
 
 async fn agy_status(state: &AppState) -> AppResult<AgyMcpStatus> {

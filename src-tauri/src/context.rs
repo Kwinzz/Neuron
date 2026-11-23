@@ -311,6 +311,55 @@ pub fn with_memory(
     }
 }
 
+/// What every agent is told about Neuron: where it runs, the global memory it can read and edit, and the
+/// project context file it can maintain. Given at each session start (not frozen with the chat).
+pub fn neuron_intro(memory_file: Option<&Path>, project: Option<&Path>) -> String {
+    let mut md = String::from(
+        "# Neuron\n\
+         Tu es lancé par **Neuron**, l'application de bureau de l'utilisateur qui pilote ses agents IA (Claude Code, \
+         Codex, Antigravity…) dans une interface graphique. Il lit tes réponses dans le chat de Neuron : Markdown \
+         rendu, et les fichiers que tu modifies y apparaissent automatiquement sous forme de diff.\n\n\
+         ## Mémoire globale\n\
+         Neuron tient une mémoire partagée par tous les agents de l'utilisateur — profil, préférences techniques, \
+         style de code, règles strictes —, comme la mémoire d'un assistant web. Elle t'est donnée au démarrage du \
+         chat quand elle n'est pas vide, et tu y accèdes avec les outils MCP du serveur `neuron` :\n\
+         - `neuron_memory_read` / `neuron_memory_search` pour la consulter (chaque souvenir a un identifiant) ;\n\
+         - `neuron_memory_save` pour ajouter un souvenir durable ;\n\
+         - `neuron_memory_update` / `neuron_memory_delete` pour corriger ou retirer un souvenir devenu faux.\n\
+         Quand l'utilisateur te demande de retenir, corriger ou oublier quelque chose, fais-le avec ces outils et \
+         dis-le-lui en une phrase. Enregistre aussi de toi-même une préférence ou une règle permanente qu'il exprime \
+         clairement ; jamais d'information passagère ni de secret.\n",
+    );
+    if let Some(file) = memory_file {
+        md.push_str(&format!(
+            "Si ces outils ne sont pas disponibles, modifie directement le fichier `{}` (une puce par souvenir sous \
+             la bonne section) : Neuron reprend ses modifications.\n",
+            file.display()
+        ));
+    }
+    if let Some(root) = project {
+        md.push_str(&format!(
+            "\n## Contexte du projet\n\
+             Ce chat appartient à un projet Neuron. Son fichier de contexte `{}` (dans `{}`) est injecté dans chaque \
+             nouveau chat du projet. Tiens-le à jour quand tu apprends ou décides quelque chose de durable : \
+             objectif, architecture, décisions, conventions, commandes utiles. Utilise \
+             `neuron_project_context_read` / `neuron_project_context_update` (ou tes outils de fichiers). Lis-le \
+             avant de le modifier, garde ce qui reste vrai et reste concis.\n",
+            CONTEXT_REL,
+            root.display()
+        ));
+    }
+    md
+}
+
+/// System prompt / preamble of a session: Neuron intro + the context frozen with the chat.
+pub fn session_instructions(intro: &str, frozen: Option<&str>) -> String {
+    match frozen.filter(|c| !c.trim().is_empty()) {
+        Some(ctx) => format!("{intro}\n{ctx}"),
+        None => intro.to_string(),
+    }
+}
+
 /// Preamble for agents without a system-prompt option (Codex, Antigravity): sent before the first message.
 pub fn as_preamble(context: &str, prompt: &str) -> String {
     format!("<contexte_neuron>\n{context}\n</contexte_neuron>\n\n{prompt}")

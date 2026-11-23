@@ -47,6 +47,22 @@ const MCP_TOOLS: ReadonlyArray<{ name: string; description: string }> = [
     name: "neuron_memory_save",
     description: "Enregistre un nouveau souvenir durable.",
   },
+  {
+    name: "neuron_memory_update",
+    description: "Corrige un souvenir (texte ou catégorie).",
+  },
+  {
+    name: "neuron_memory_delete",
+    description: "Retire un souvenir devenu faux.",
+  },
+  {
+    name: "neuron_project_context_read",
+    description: "Lit le .neuron/context.md du projet du chat.",
+  },
+  {
+    name: "neuron_project_context_update",
+    description: "Met à jour le .neuron/context.md du projet.",
+  },
 ];
 
 export function AgentsMcpCard() {

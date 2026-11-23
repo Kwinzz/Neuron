@@ -141,6 +141,9 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
   (logs sur stderr, stdout = protocole). Claude : `--mcp-config=` + `--allowedTools=` ; Codex : `-c mcp_servers.neuron.*` ;
   Antigravity : pas de MCP par session → inscription `agy mcp add` déclenchée **par l'utilisateur** depuis Paramètres → Agents & MCP.
   Événement `memory://changed` (watcher de memory.md) en plus de `agent://event`.
+- **Présentation de Neuron** (`context::neuron_intro`) : chaque agent apprend qu'il tourne dans Neuron, qu'il peut
+  lire / ajouter / corriger / supprimer des souvenirs et tenir à jour `.neuron/context.md` (outils MCP
+  `neuron_memory_*`, `neuron_project_context_*` ; `--project` passé au serveur pour les chats de projet).
 - **CLI génériques (Phase 5)** : profils dans Paramètres (`GenericCliProfile` : commande, args avec `{prompt}` sinon
   stdin, `pty`). Le chat `generic` stocke l'id du profil dans `model`. Un processus par message, sortie streamée en
   texte (ANSI retiré via `vte`). PTY = `portable-pty` (ConPTY) : **répondre à la requête de position du curseur

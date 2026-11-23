@@ -126,7 +126,21 @@ pub fn title_from_prompt(prompt: &str) -> String {
     }
 }
 
+/// Root of the chat's project (its working directory), when the chat belongs to one.
+fn project_root(runtime: &ThreadRuntime) -> Option<&std::path::Path> {
+    runtime.project_id.as_ref().and(runtime.cwd.as_deref()).map(std::path::Path::new)
+}
+
 impl AgentRegistry {
+    /// What the agent is told about Neuron (memory, project context). None for generic CLIs.
+    fn intro(&self, runtime: &ThreadRuntime) -> Option<String> {
+        if runtime.agent == AgentKind::Generic {
+            return None;
+        }
+        let memory_file = self.mcp.as_ref().map(|(_, paths)| paths.file_path.as_path());
+        Some(crate::context::neuron_intro(memory_file, project_root(runtime)))
+    }
+
     pub fn new(mcp: Option<(PathBuf, crate::memory::MemoryPaths)>) -> Self {
         let mut adapters: HashMap<AgentKind, Arc<dyn AgentAdapter>> = HashMap::new();
         adapters.insert(AgentKind::ClaudeCode, Arc::new(ClaudeCodeAdapter::default()));
@@ -213,12 +227,19 @@ impl AgentRegistry {
             tauri::async_runtime::spawn(async move { run_agy_command(app, db, runtime, name, track_status).await });
             return Ok(());
         }
-        // Agents without a system-prompt option get the project context in front of the first message
-        // (the stored message stays what the user typed).
+        // Agents without a system-prompt option get the Neuron intro + project context in front of the first
+        // message (the stored message stays what the user typed).
         let supports_system = self.adapters.get(&runtime.agent).is_some_and(|a| a.supports_system_prompt());
-        let text = match (&runtime.context, first_message && !supports_system) {
-            (Some(ctx), true) => crate::context::as_preamble(ctx, &text),
-            _ => text,
+        let text = if first_message && !supports_system {
+            match (self.intro(&runtime), runtime.context.as_deref()) {
+                (Some(intro), ctx) => {
+                    crate::context::as_preamble(&crate::context::session_instructions(&intro, ctx), &text)
+                }
+                (None, Some(ctx)) => crate::context::as_preamble(ctx, &text),
+                (None, None) => text,
+            }
+        } else {
+            text
         };
         emit(app, thread_id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::Starting, detail: None });
 
@@ -288,12 +309,22 @@ impl AgentRegistry {
             effort: runtime.effort.clone(),
             permission_mode: runtime.permission_mode.clone(),
             resume: runtime.session_ref.clone(),
-            // Project context: system prompt when the CLI supports it (re-applied on every restart/resume).
-            append_system_prompt: runtime.context.clone().filter(|_| adapter.supports_system_prompt()),
+            // Neuron intro + project context: system prompt when the CLI supports it (re-applied on every
+            // restart/resume).
+            append_system_prompt: if adapter.supports_system_prompt() {
+                match self.intro(runtime) {
+                    Some(intro) => Some(crate::context::session_instructions(&intro, runtime.context.as_deref())),
+                    None => runtime.context.clone(),
+                }
+            } else {
+                None
+            },
             mcp: self
                 .mcp
                 .as_ref()
-                .map(|(exe, paths)| crate::memory::mcp::McpLaunch::new(exe.clone(), paths, runtime.agent.as_str()))
+                .map(|(exe, paths)| {
+                    crate::memory::mcp::McpLaunch::new(exe.clone(), paths, runtime.agent.as_str(), project_root(runtime))
+                })
                 .filter(|_| runtime.agent != AgentKind::Generic),
             generic,
         };
