@@ -4,6 +4,7 @@ import type { AgentKind } from "@/bindings/AgentKind";
 import type { ChatItem } from "@/bindings/ChatItem";
 import { Markdown } from "@/components/markdown/Markdown";
 import { useReveal } from "@/stores/reveal";
+import { AgentImages } from "./AgentImages";
 import { useSmoothText } from "./useSmoothText";
 
 type TextItem = Extract<ChatItem, { kind: "text" }>;
@@ -14,9 +15,14 @@ interface AssistantTextProps {
   fresh: boolean;
   /** Kept for the item API (the agent cursor now lives at the timeline level). */
   agent: AgentKind;
+  threadId: string;
 }
 
-export const AssistantText = memo(function AssistantText({ item, fresh }: AssistantTextProps) {
+export const AssistantText = memo(function AssistantText({
+  item,
+  fresh,
+  threadId,
+}: AssistantTextProps) {
   const { text, revealing } = useSmoothText(item.text, fresh || item.streaming);
   const writing = item.streaming || revealing;
 
@@ -27,17 +33,25 @@ export const AssistantText = memo(function AssistantText({ item, fresh }: Assist
   useEffect(() => () => useReveal.getState().set(item.id, false), [item.id]);
 
   return (
-    <Markdown
-      className={cn(
-        "min-h-7 min-w-0 text-foreground",
-        writing && "chat-streaming",
-        fresh && "chat-reveal",
-      )}
-      /* Before the first block exists, show a standalone caret; afterwards chat.css draws it
+    <>
+      <Markdown
+        className={cn(
+          "min-h-7 min-w-0 text-foreground",
+          writing && "chat-streaming",
+          fresh && "chat-reveal",
+        )}
+        /* Before the first block exists, show a standalone caret; afterwards chat.css draws it
          inline at the end of the last block (`.chat-streaming > :last-child::after`). */
-      trailing={writing && !text.trim() ? <span className="chat-caret" aria-hidden /> : null}
-    >
-      {text}
-    </Markdown>
+        trailing={
+          writing && !text.trim() ? (
+            <span className="chat-caret" aria-hidden />
+          ) : null
+        }
+      >
+        {text}
+      </Markdown>
+      {/* Images the agent produced or referenced, once its message is complete. */}
+      {!writing && <AgentImages threadId={threadId} text={item.text} />}
+    </>
   );
 });

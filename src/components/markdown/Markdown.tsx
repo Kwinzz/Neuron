@@ -17,6 +17,20 @@ const COMPONENTS: Components = {
       {children}
     </a>
   ),
+  // Local files can't be loaded from markdown (the chat shows an agent's images under its message instead);
+  // remote images are blocked by the CSP, so they become links.
+  img: ({ src, alt }) => {
+    const url = typeof src === "string" ? src : "";
+    if (url.startsWith("data:image/")) return <img src={url} alt={alt ?? ""} />;
+    if (/^https?:/i.test(url)) {
+      return (
+        <a href={url} target="_blank" rel="noreferrer">
+          {alt || url}
+        </a>
+      );
+    }
+    return null;
+  },
   table: ({ children }) => (
     <div className="md-table">
       <table>{children}</table>

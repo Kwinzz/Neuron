@@ -70,6 +70,7 @@ pub fn run() {
             commands::threads::send_message,
             commands::threads::import_attachments,
             commands::threads::list_slash_commands,
+            commands::threads::agent_images,
             commands::threads::paste_attachment,
             commands::threads::respond_permission,
             commands::threads::stop_thread,

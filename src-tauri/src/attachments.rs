@@ -40,6 +40,9 @@ fn mime_of(name: &str) -> &'static str {
         "jpg" | "jpeg" => "image/jpeg",
         "gif" => "image/gif",
         "webp" => "image/webp",
+        "bmp" => "image/bmp",
+        "svg" => "image/svg+xml",
+        "avif" => "image/avif",
         "pdf" => "application/pdf",
         "json" => "application/json",
         "md" | "markdown" => "text/markdown",
@@ -53,6 +56,36 @@ fn mime_of(name: &str) -> &'static str {
 /// Images every agent can look at (Claude inline, Codex `--image`, Antigravity through its file tool).
 fn is_image_mime(mime: &str) -> bool {
     matches!(mime, "image/png" | "image/jpeg" | "image/gif" | "image/webp")
+}
+
+/// Largest image file an agent can show in the chat.
+const MAX_AGENT_IMAGE: u64 = 40 * 1024 * 1024;
+
+/// Image formats the chat can display (an `<img>` never runs an SVG's scripts).
+fn is_displayable_image(mime: &str) -> bool {
+    is_image_mime(mime) || matches!(mime, "image/bmp" | "image/svg+xml" | "image/avif")
+}
+
+/// An image file an agent mentioned (`path` absolute or relative to `cwd`), described like an attachment so the
+/// chat reuses its thumbnails and viewer. `None` unless it is an existing image file of a sane size.
+pub fn local_image(path: &str, cwd: Option<&Path>) -> Option<Attachment> {
+    let raw = path.trim().trim_matches(|c| c == '"' || c == '\'' || c == '<' || c == '>');
+    let raw = raw.strip_prefix("file:///").unwrap_or(raw);
+    if raw.is_empty() || raw.contains("://") {
+        return None;
+    }
+    let mut full = PathBuf::from(raw);
+    if full.is_relative() {
+        full = cwd?.join(full);
+    }
+    let name = full.file_name()?.to_str()?.to_string();
+    let mime = mime_of(&name);
+    if !is_displayable_image(mime) {
+        return None;
+    }
+    let meta = std::fs::metadata(&full).ok().filter(|m| m.is_file() && m.len() <= MAX_AGENT_IMAGE)?;
+    let path = full.display().to_string();
+    Some(Attachment { id: path.clone(), name, path, mime: mime.to_string(), size: meta.len(), is_image: true })
 }
 
 /// Keep a readable, filesystem-safe file name.
@@ -165,4 +198,23 @@ mod tests {
         assert!(note(&[&file]).contains(&file.path));
         let _ = std::fs::remove_dir_all(dir);
     }
+
+    #[test]
+    fn local_images_mentioned_by_agents() {
+        let dir = std::env::temp_dir().join(format!("neuron-local-image-{}", uuid::Uuid::new_v4().simple()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("fox.png"), b"png").unwrap();
+        std::fs::write(dir.join("notes.txt"), b"txt").unwrap();
+
+        let found = local_image("fox.png", Some(&dir)).unwrap();
+        assert_eq!((found.name.as_str(), found.mime.as_str(), found.size, found.is_image), ("fox.png", "image/png", 3, true));
+        let absolute = dir.join("fox.png").display().to_string();
+        assert!(local_image(&format!("`{absolute}`").replace('`', "\""), None).is_some());
+        assert!(local_image("notes.txt", Some(&dir)).is_none(), "not an image");
+        assert!(local_image("missing.png", Some(&dir)).is_none(), "missing file");
+        assert!(local_image("fox.png", None).is_none(), "relative path without a folder");
+        assert!(local_image("https://example.com/a.png", Some(&dir)).is_none(), "remote");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
 }

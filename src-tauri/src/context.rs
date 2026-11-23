@@ -318,7 +318,9 @@ pub fn neuron_intro(memory_file: Option<&Path>, project: Option<&Path>) -> Strin
         "# Neuron\n\
          Tu es lancé par **Neuron**, l'application de bureau de l'utilisateur qui pilote ses agents IA (Claude Code, \
          Codex, Antigravity…) dans une interface graphique. Il lit tes réponses dans le chat de Neuron : Markdown \
-         rendu, et les fichiers que tu modifies y apparaissent automatiquement sous forme de diff.\n\n\
+         rendu, et les fichiers que tu modifies y apparaissent automatiquement sous forme de diff. Pour montrer \
+         une image (png, jpg, webp, gif, svg…) que tu as créée ou trouvée, cite son chemin dans ta réponse \
+         (absolu, ou relatif au dossier du chat) : Neuron l'affiche sous ton message.\n\n\
          ## Mémoire globale\n\
          Neuron tient une mémoire partagée par tous les agents de l'utilisateur — profil, préférences techniques, \
          style de code, règles strictes —, comme la mémoire d'un assistant web. Elle t'est donnée au démarrage du \

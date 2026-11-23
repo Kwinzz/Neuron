@@ -88,6 +88,18 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Images des agents affichées dans le chat
+- Génération d'images testée en direct : `agy` CLI n'a pas d'outil d'image ; Claude Code non plus ; Codex a
+  `image_gen` (feature `image_generation` active) mais répond « indisponible dans cette session » en `codex exec`
+  (compte sans abonnement, probablement). Décision utilisateur : afficher les images, pas d'API payante.
+- `extractImagePaths` (`views/chat/imagePaths.ts`) repère les chemins d'images d'un message d'agent (cibles de
+  liens Markdown, code inline, chemins nus ; png/jpg/webp/gif/bmp/svg/avif). `AgentImages` les envoie à la nouvelle
+  commande `agent_images(threadId, paths)` : `attachments::local_image` garde les fichiers image existants (relatifs
+  résolus sur le dossier du chat, ≤ 40 Mo) et chacun est ouvert au protocole asset (`allow_file`). Affichage sous le
+  message, une fois écrit, avec les vignettes + visionneuse de `MessageAttachments`.
+- Markdown : `![](local)` ne s'affiche plus en image cassée (l'image passe par la galerie), image distante = lien (CSP).
+- `neuron_intro` : les agents savent qu'il suffit de citer le chemin d'une image pour qu'elle s'affiche.
+
 ### 2026-11-23 — Logo dans la barre latérale, barre latérale redimensionnable
 - En-tête de la barre latérale : glyphe de l'app (sans la tuile noire) à côté de « Neuron ». `src/assets/neuron-mark.png`
   = glyphe blanc extrait de l'icône (alpha), peint en `bg-foreground` via `mask` (suit la couleur du texte).

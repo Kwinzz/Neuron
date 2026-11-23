@@ -87,6 +87,9 @@ export const ipc = {
   /** Slash commands of a provider in a folder (« / » menu; cached 15 min server-side). */
   listSlashCommands: (agent: AgentKind, cwd: string | null) =>
     invoke<SlashCommand[]>("list_slash_commands", { agent, cwd }),
+  /** Existing image files among the paths an agent mentioned in a chat (served to the webview). */
+  agentImages: (threadId: string, paths: string[]) =>
+    invoke<Attachment[]>("agent_images", { threadId, paths }),
   /** Copy files into Neuron's attachments folder (« + » button). */
   importAttachments: (paths: string[]) => invoke<Attachment[]>("import_attachments", { paths }),
   /** Save a pasted image (base64 without the data: prefix). */

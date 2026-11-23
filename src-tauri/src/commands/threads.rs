@@ -374,3 +374,35 @@ pub async fn list_models(
     }
     Ok(list)
 }
+
+/// Images an agent mentioned in a message (paths found in its text by the chat), made viewable: existing image
+/// files only, relative paths resolved against the chat's folder, each one opened to the asset protocol.
+#[tauri::command]
+pub async fn agent_images(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    thread_id: String,
+    paths: Vec<String>,
+) -> AppResult<Vec<crate::attachments::Attachment>> {
+    const MAX: usize = 24;
+    let id = thread_id.clone();
+    let cwd = state.db.call(move |conn| threads::get(conn, &id)).await?.and_then(|t| t.cwd);
+    let images = tokio::task::spawn_blocking(move || {
+        let cwd = cwd.map(std::path::PathBuf::from);
+        let mut seen = std::collections::HashSet::new();
+        paths
+            .iter()
+            .filter_map(|p| crate::attachments::local_image(p, cwd.as_deref()))
+            .filter(|a| seen.insert(a.path.to_lowercase()))
+            .take(MAX)
+            .collect::<Vec<_>>()
+    })
+    .await?;
+    let scope = tauri::Manager::asset_protocol_scope(&app);
+    for image in &images {
+        if let Err(err) = scope.allow_file(&image.path) {
+            tracing::warn!(%err, path = %image.path, "agent image not served");
+        }
+    }
+    Ok(images)
+}
