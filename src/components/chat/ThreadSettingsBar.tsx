@@ -31,6 +31,7 @@ export const ThreadSettingsBar = memo(function ThreadSettingsBar({ threadId }: {
 
   return (
     <ChatSettingsBar
+      key={threadId}
       value={{ agent, model, effort, permissionMode }}
       onChange={onChange}
       lockAgent

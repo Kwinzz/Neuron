@@ -93,7 +93,7 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
   `agent-*`. Pas de hex dans les composants.
 - Primitives Neuron restantes (`src/components/ui/PascalCase.tsx`) : `AgentBadge`, `StatusDot`, `StatusIconBox`,
   `IconBox`, `Kbd`, `LiveTimer`. Barre de réglages de chat : `components/chat/ChatSettingsBar` (modèle exact,
-  niveau de raisonnement, permissions — options dans `lib/models.ts`).
+  niveau de raisonnement, permissions d'exécution + bascule `ModeSwitch` Exécuter/Planifier, Maj+Tab — options dans `lib/models.ts`).
 - Valeurs KPI `text-2xl font-semibold tabular-nums`, descriptions `text-muted-foreground`. Police Geist / Geist Mono.
 - **Vocabulaire UI** : on dit « chat » (pas « thread ») partout, sauf le panneau « Threads live ». L'accueil s'appelle
   « Accueil ». Le code (types, tables, commandes) garde `thread`.

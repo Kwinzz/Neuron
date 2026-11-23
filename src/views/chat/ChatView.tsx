@@ -135,6 +135,7 @@ export function ChatView({ threadId }: { threadId: string }) {
         onSent={handleSent}
         showPill={showPill}
         onPillClick={handlePillClick}
+        timelineGutter
       />
     </div>
   );

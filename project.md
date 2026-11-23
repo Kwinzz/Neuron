@@ -88,6 +88,13 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Composer aligné, bascule Exécuter / Planifier
+- La zone de saisie reprend la colonne des messages (même gouttière `pl-10` que le curseur de l'agent), via
+  `Composer timelineGutter` ; menu « / » et pastille « Nouveaux messages » restent centrés sur elle.
+- **Bascule de mode** (`components/chat/ModeSwitch`) à côté des permissions : Exécuter ⇄ Planifier. Le menu
+  Permissions ne garde que les modes d'exécution (Demander, Éditions auto, Auto, Tout autoriser) ; en Plan, il
+  choisit le mode repris en sortant du Plan. **Maj+Tab** dans la zone de saisie bascule (événement `neuron:toggle-plan`).
+
 ### 2026-11-23 — Modes Plan / Auto pris en charge
 - **Mode Auto** proposé dans le sélecteur (Claude `--permission-mode auto`, agy `--mode auto`, Codex `workspace-write`).
 - **Changement de mode à chaud pour Claude** : `update_thread_settings` envoie `set_permission_mode` à la session

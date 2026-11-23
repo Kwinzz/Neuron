@@ -12,9 +12,11 @@ import {
   useState,
 } from "react";
 import { ArrowUp, Plus, Square } from "lucide-react";
+import { cn } from "cn";
 import type { AgentKind } from "@/bindings/AgentKind";
 import type { Attachment } from "@/bindings/Attachment";
 import type { SlashCommand } from "@/bindings/SlashCommand";
+import { TOGGLE_PLAN_EVENT } from "@/components/chat/ModeSwitch";
 import { SlashMenu } from "@/components/chat/SlashMenu";
 import { AGENTS } from "@/lib/agents";
 import { fuzzyScore, normalize } from "@/lib/fuzzy";
@@ -70,6 +72,8 @@ interface ComposerProps {
   /** Provider + folder for the « / » menu (draft chat). Existing chats read them from the live store. */
   slashAgent?: AgentKind;
   slashCwd?: string | null;
+  /** Same column as the timeline, whose left gutter (pl-10) holds the agent cursor. */
+  timelineGutter?: boolean;
 }
 
 /** Max rows in the « / » menu. */
@@ -99,6 +103,7 @@ export const Composer = memo(function Composer({
   onPillClick,
   slashAgent,
   slashCwd,
+  timelineGutter = false,
 }: ComposerProps) {
   const [value, setValue] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -300,6 +305,12 @@ export const Composer = memo(function Composer({
         return;
       }
     }
+    // Maj+Tab: Exécuter ⇄ Planifier (as in Claude Code).
+    if (e.key === "Tab" && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      e.preventDefault();
+      window.dispatchEvent(new Event(TOGGLE_PLAN_EVENT));
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       if (canSend) {
@@ -333,86 +344,88 @@ export const Composer = memo(function Composer({
 
   return (
     <div className="sticky bottom-0 z-10 -mx-4 bg-linear-to-t from-background via-background/90 to-transparent px-4 pb-4 pt-6 md:-mx-6 md:px-6">
-      <div className="relative mx-auto w-full max-w-3xl">
-        {slashOpen && agent && (
-          <div className="absolute inset-x-0 bottom-full z-20 mb-2">
-            <SlashMenu
-              commands={slashFiltered}
-              query={slashQuery ?? ""}
-              activeIndex={slashIndex}
-              loading={slashEntry?.loading ?? true}
-              providerLabel={AGENTS[agent].label}
-              onPick={pickSlash}
-              onHover={setSlashIndex}
-            />
-          </div>
-        )}
-        {showPill && (
-          <div className="absolute -top-10 left-1/2 -translate-x-1/2">
-            <NewMessagesPill onClick={onPillClick} />
-          </div>
-        )}
-        <InputGroup className="rounded-xl bg-card shadow-sm transition-[border-color,box-shadow,background-color] duration-200 ease-snappy dark:bg-card">
-          {(attachments.length > 0 || importing > 0) && (
-            <InputGroupAddon align="block-start" className="p-0">
-              <AttachmentTray items={attachments} pending={importing} onRemove={removeAttachment} />
-            </InputGroupAddon>
+      <div className={cn("mx-auto w-full max-w-3xl", timelineGutter && "pl-10")}>
+        <div className="relative">
+          {slashOpen && agent && (
+            <div className="absolute inset-x-0 bottom-full z-20 mb-2">
+              <SlashMenu
+                commands={slashFiltered}
+                query={slashQuery ?? ""}
+                activeIndex={slashIndex}
+                loading={slashEntry?.loading ?? true}
+                providerLabel={AGENTS[agent].label}
+                onPick={pickSlash}
+                onHover={setSlashIndex}
+              />
+            </div>
           )}
-          <InputGroupTextarea
-            ref={textareaRef}
-            data-composer
-            rows={1}
-            value={value}
-            onChange={onChange}
-            onKeyDown={onKeyDown}
-            onPaste={onPaste}
-            aria-expanded={slashOpen}
-            aria-controls={slashOpen ? "slash-menu-listbox" : undefined}
-            aria-activedescendant={slashOpen && slashFiltered.length > 0 ? `slash-option-${slashIndex}` : undefined}
-            aria-label="Message"
-            placeholder={placeholder ?? "Demandez quelque chose à l'agent… (Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne, ↑ historique)"}
-            className="min-h-0 max-h-[256px] overflow-y-auto px-3.5 pt-3 text-sm leading-6 field-sizing-fixed"
-          />
-          <InputGroupAddon align="block-end">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
-              <InputGroupButton
-                variant="ghost"
-                size="icon-sm"
-                className="rounded-full text-muted-foreground hover:text-foreground"
-                aria-label="Joindre des fichiers"
-                title="Joindre des fichiers (ou coller une image)"
-                onClick={() => void pickFiles()}
-              >
-                <Plus />
-              </InputGroupButton>
-              {toolbar ?? (threadId ? <ThreadSettingsBar threadId={threadId} /> : null)}
+          {showPill && (
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2">
+              <NewMessagesPill onClick={onPillClick} />
             </div>
-            <div className="ml-auto flex items-center gap-1.5">
-              {active && threadId && (
+          )}
+          <InputGroup className="rounded-xl bg-card shadow-sm transition-[border-color,box-shadow,background-color] duration-200 ease-snappy dark:bg-card">
+            {(attachments.length > 0 || importing > 0) && (
+              <InputGroupAddon align="block-start" className="p-0">
+                <AttachmentTray items={attachments} pending={importing} onRemove={removeAttachment} />
+              </InputGroupAddon>
+            )}
+            <InputGroupTextarea
+              ref={textareaRef}
+              data-composer
+              rows={1}
+              value={value}
+              onChange={onChange}
+              onKeyDown={onKeyDown}
+              onPaste={onPaste}
+              aria-expanded={slashOpen}
+              aria-controls={slashOpen ? "slash-menu-listbox" : undefined}
+              aria-activedescendant={slashOpen && slashFiltered.length > 0 ? `slash-option-${slashIndex}` : undefined}
+              aria-label="Message"
+              placeholder={placeholder ?? "Demandez quelque chose à l'agent… (Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne, ↑ historique)"}
+              className="min-h-0 max-h-[256px] overflow-y-auto px-3.5 pt-3 text-sm leading-6 field-sizing-fixed"
+            />
+            <InputGroupAddon align="block-end">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
                 <InputGroupButton
-                  variant="outline"
+                  variant="ghost"
                   size="icon-sm"
-                  className="rounded-full animate-in fade-in-0 zoom-in-75 duration-150"
-                  aria-label="Arrêter l'agent"
-                  title="Arrêter"
-                  onClick={() => threadId && void useChat.getState().stop(threadId)}
+                  className="rounded-full text-muted-foreground hover:text-foreground"
+                  aria-label="Joindre des fichiers"
+                  title="Joindre des fichiers (ou coller une image)"
+                  onClick={() => void pickFiles()}
                 >
-                  <Square className="size-3.5 fill-current" />
+                  <Plus />
                 </InputGroupButton>
-              )}
-              <InputGroupButton
-                variant="default"
-                size="icon-sm"
-                className="rounded-full active:scale-95"
-                aria-label="Envoyer"
-                disabled={!canSend}
-                onClick={() => void sendCurrent()}
-              >
-                <ArrowUp />
-              </InputGroupButton>
-            </div>
-          </InputGroupAddon>
-        </InputGroup>
+                {toolbar ?? (threadId ? <ThreadSettingsBar threadId={threadId} /> : null)}
+              </div>
+              <div className="ml-auto flex items-center gap-1.5">
+                {active && threadId && (
+                  <InputGroupButton
+                    variant="outline"
+                    size="icon-sm"
+                    className="rounded-full animate-in fade-in-0 zoom-in-75 duration-150"
+                    aria-label="Arrêter l'agent"
+                    title="Arrêter"
+                    onClick={() => threadId && void useChat.getState().stop(threadId)}
+                  >
+                    <Square className="size-3.5 fill-current" />
+                  </InputGroupButton>
+                )}
+                <InputGroupButton
+                  variant="default"
+                  size="icon-sm"
+                  className="rounded-full active:scale-95"
+                  aria-label="Envoyer"
+                  disabled={!canSend}
+                  onClick={() => void sendCurrent()}
+                >
+                  <ArrowUp />
+                </InputGroupButton>
+              </div>
+            </InputGroupAddon>
+          </InputGroup>
+        </div>
       </div>
     </div>
   );
