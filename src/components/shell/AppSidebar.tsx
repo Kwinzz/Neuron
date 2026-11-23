@@ -2,7 +2,6 @@ import { type ComponentProps, memo, useEffect, useMemo, useState } from "react";
 import {
   Brain,
   Settings,
-  BrainCircuit,
   ChevronRight,
   CirclePlus,
   Database,
@@ -70,14 +69,17 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" onClick={() => useUi.getState().navigate({ kind: "home" })} tooltip="Neuron">
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <BrainCircuit className="size-4" />
-              </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">Neuron</span>
-                <span className="truncate text-xs text-muted-foreground">Poste de pilotage IA</span>
-              </div>
+            <SidebarMenuButton
+              size="lg"
+              onClick={() => useUi.getState().navigate({ kind: "home" })}
+              tooltip="Neuron"
+              className="justify-center"
+            >
+              <span className="truncate text-base font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
+                Neuron
+              </span>
+              {/* Collapsed sidebar: no room for the word. */}
+              <span className="hidden text-sm font-semibold group-data-[collapsible=icon]:inline">N</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

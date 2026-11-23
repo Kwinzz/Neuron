@@ -88,6 +88,12 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Nouvelle icône, en-tête « Neuron »
+- Icône de l'app (réseau de nœuds blanc sur fond noir) : source 905×955 centrée sur un carré noir de 1024 px, puis
+  `tauri icon` → mêmes fichiers que avant dans `src-tauri/icons` (ico, icns, PNG, logos Windows Store).
+- Barre latérale : l'en-tête n'affiche plus que « Neuron » centré (plus d'icône ni de « Poste de pilotage IA ») ;
+  « N » quand la barre est réduite.
+
 ### 2026-11-23 — Durée de chaque requête, questions de l'agent
 - **Temps total** sous chaque requête (tokens · coût · ⏱ durée) : mesuré par le registre de l'envoi du premier
   message à la fin du tour (approbations comprises), repli sur la durée du CLI ; `TokenUsageUpdate.durationMs`
