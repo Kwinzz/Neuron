@@ -213,8 +213,26 @@ npm run tauri dev               # app complète en dev
 npm run build                   # tsc -b + vite build  (doit passer à chaque phase)
 cd src-tauri && cargo check     # (doit passer à chaque phase)
 cd src-tauri && cargo test      # tests + régénération des bindings TS
+cd src-tauri && cargo fmt       # format Rust (rustfmt.toml) ; cargo clippy --all-targets doit rester muet
+npm run tauri build             # installateur Windows : src-tauri/target/release/bundle/nsis/Neuron_<version>_x64-setup.exe
 scripts/neon-bridge.sh -d . -f brief.md     # déléguer une tâche UI à Antigravity
 ```
+
+## Installateur Windows
+
+- Bundle **NSIS uniquement** (`bundle.targets = ["nsis"]`), `installMode: "perMachine"` → droits administrateur,
+  installation dans Program Files, raccourci menu Démarrer (dossier « Neuron »), installateur en français.
+- Le modèle NSIS de Tauri gère : installation existante détectée (désinstaller puis réinstaller / réparer),
+  Neuron en cours d'exécution fermé, raccourci bureau et « Lancer Neuron » en fin d'installation, suppression
+  optionnelle des données à la désinstallation.
+- `src-tauri/installer/hooks.nsh` (UTF-8 **avec BOM**, sinon les accents sont cassés) : question « lancer avec
+  Windows ? » → même entrée `HKCU\…\Run` que `tauri-plugin-autostart` (`"<exe>" --background`) ; la
+  désinstallation retire cette entrée et l'identité de notification. `installer/sidebar.bmp` (164×314) et
+  `header.bmp` (150×57) : visuels générés depuis `src/assets/neuron-mark.png`.
+- Au démarrage de l'app installée, l'entrée de démarrage du système fait foi et met à jour le réglage
+  `background.launchAtLogin` (`desktop::sync_autostart_setting`) ; un build de dev ne touche jamais au démarrage.
+- Dev et app installée partagent l'identifiant `dev.neuron.app` : mêmes données, et une seule instance à la fois
+  (lancer l'une pendant que l'autre tourne ramène simplement la fenêtre existante).
 
 ## Workflow par phase
 

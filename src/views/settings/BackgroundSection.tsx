@@ -106,7 +106,11 @@ export function BackgroundSection({ settings }: { settings: AppSettings }) {
           <SettingRow
             id="bg-autostart"
             label="Lancer avec Windows"
-            description="Démarre Neuron discrètement dans la zone de notification à l'ouverture de session."
+            description={
+              import.meta.env.DEV
+                ? "Démarre Neuron discrètement dans la zone de notification à l'ouverture de session (sans effet en mode dev : seule l'app installée s'inscrit au démarrage)."
+                : "Démarre Neuron discrètement dans la zone de notification à l'ouverture de session."
+            }
             control={
               <SettingSwitch
                 id="bg-autostart"

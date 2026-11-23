@@ -113,8 +113,12 @@ fn apply_shortcut(app: &AppHandle, settings: &AppSettings) -> Result<(), String>
     Ok(())
 }
 
-/// Start with Windows: keep the OS entry in line with the setting.
+/// Start with Windows: keep the OS entry in line with the setting. Installed builds only: a dev build must
+/// never point the login entry at `target/debug`.
 fn apply_autostart(app: &AppHandle, settings: &AppSettings) -> Result<(), String> {
+    if cfg!(debug_assertions) {
+        return Ok(());
+    }
     let manager = app.autolaunch();
     let wanted = settings.background.launch_at_login;
     if manager.is_enabled().unwrap_or(!wanted) == wanted {
@@ -122,6 +126,32 @@ fn apply_autostart(app: &AppHandle, settings: &AppSettings) -> Result<(), String
     }
     let result = if wanted { manager.enable() } else { manager.disable() };
     result.map_err(|e| format!("démarrage avec Windows : {e}"))
+}
+
+/// At startup the OS entry is the truth: it may have been set by the installer (« Lancer Neuron avec Windows ? »)
+/// or turned off in the Task Manager. The setting follows it; an enabled entry is rewritten so it points at
+/// this exe (path changed after a reinstall elsewhere).
+fn sync_autostart_setting(app: &AppHandle, settings: &AppSettings) -> AppSettings {
+    let mut settings = settings.clone();
+    if cfg!(debug_assertions) {
+        return settings;
+    }
+    let manager = app.autolaunch();
+    let Ok(enabled) = manager.is_enabled() else { return settings };
+    if enabled {
+        if let Err(err) = manager.enable() {
+            tracing::warn!(%err, "autostart entry not refreshed");
+        }
+    }
+    if enabled != settings.background.launch_at_login {
+        settings.background.launch_at_login = enabled;
+        let state = app.state::<crate::state::AppState>();
+        let next = settings.clone();
+        if let Err(err) = tauri::async_runtime::block_on(state.db.call(move |c| crate::app_settings::save(c, next))) {
+            tracing::warn!(%err, "autostart setting not synced");
+        }
+    }
+    settings
 }
 
 /// Applies the desktop part of the settings (startup and after each save). Returns the problems to show.
@@ -140,7 +170,8 @@ pub fn setup(app: &AppHandle, settings: &AppSettings) {
     if let Err(err) = build_tray(app) {
         tracing::warn!(%err, "tray icon not created");
     }
-    apply(app, settings);
+    let settings = sync_autostart_setting(app, settings);
+    apply(app, &settings);
     let background = std::env::args().any(|a| a == BACKGROUND_ARG);
     if !background {
         show_main(app);

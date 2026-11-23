@@ -88,6 +88,16 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-24 — Installateur Windows
+- `tauri.conf.json` : bundle NSIS seul, `perMachine` (droits admin, Program Files), français, icône, visuels
+  (`installer/sidebar.bmp`, `header.bmp`), dossier menu Démarrer « Neuron », métadonnées (éditeur, description,
+  catégorie). Installation existante : le modèle Tauri propose de désinstaller puis réinstaller.
+- `installer/hooks.nsh` : fin d'installation → « Lancer Neuron automatiquement à l'ouverture de session ? »
+  (écrit l'entrée de démarrage de `tauri-plugin-autostart`) ; désinstallation → entrée de démarrage et identité
+  de notification retirées.
+- App : `sync_autostart_setting` (au démarrage, l'entrée du système fait foi pour le réglage et est réécrite vers
+  l'exe courant) ; en build de dev, le démarrage avec Windows n'est jamais modifié (mention dans Paramètres).
+
 ### 2026-11-24 — Tour du projet : mise en ordre
 - Rust : `rustfmt.toml` (`max_width = 120`, `use_small_heuristics = "Max"`, le style déjà utilisé) et `cargo fmt`
   sur tout `src-tauri/` ; `cargo clippy --all-targets` sans avertissement.
