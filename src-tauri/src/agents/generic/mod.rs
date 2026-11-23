@@ -150,7 +150,10 @@ fn start_pty(profile: &GenericCliProfile, spec: &SessionSpec, prompt: &str) -> A
     let mut cmd = CommandBuilder::new(&profile.command);
     cmd.args(&args);
     cmd.cwd(&spec.cwd);
-    let mut child = pair.slave.spawn_command(cmd).map_err(|e| spawn_error(&profile.command, std::io::Error::other(e.to_string())))?;
+    let mut child = pair
+        .slave
+        .spawn_command(cmd)
+        .map_err(|e| spawn_error(&profile.command, std::io::Error::other(e.to_string())))?;
     drop(pair.slave);
     let mut killer = child.clone_killer();
     let mut reader = pair.master.try_clone_reader().map_err(|e| pty_err(&e))?;
@@ -207,7 +210,10 @@ async fn session_loop(
     mut commands: mpsc::UnboundedReceiver<SessionCommand>,
     events: mpsc::UnboundedSender<AdapterEvent>,
 ) {
-    let _ = events.send(AdapterEvent::SessionInit { session_ref: format!("generic-{}", profile.id), model: Some(profile.id.clone()) });
+    let _ = events.send(AdapterEvent::SessionInit {
+        session_ref: format!("generic-{}", profile.id),
+        model: Some(profile.id.clone()),
+    });
     let mut queue: VecDeque<crate::agents::UserTurn> = VecDeque::new();
     'session: loop {
         let prompt = match queue.pop_front() {
@@ -225,7 +231,11 @@ async fn session_loop(
         let mut turn = match turn {
             Ok(t) => t,
             Err(err) => {
-                let _ = events.send(AdapterEvent::TurnComplete { usage: TokenUsage::default(), duration_ms: elapsed(), error: Some(err.to_string()) });
+                let _ = events.send(AdapterEvent::TurnComplete {
+                    usage: TokenUsage::default(),
+                    duration_ms: elapsed(),
+                    error: Some(err.to_string()),
+                });
                 continue;
             }
         };
@@ -294,7 +304,8 @@ async fn session_loop(
 
         let text = full.trim_end().to_string();
         if !text.is_empty() {
-            let _ = events.send(AdapterEvent::BlockCompleted { item_id, channel: DeltaChannel::Text, text: text.clone() });
+            let _ =
+                events.send(AdapterEvent::BlockCompleted { item_id, channel: DeltaChannel::Text, text: text.clone() });
         }
         let error = if stopped || shutdown || code == Some(0) {
             None
@@ -393,7 +404,13 @@ mod tests {
                 pty,
             }
         } else {
-            GenericCliProfile { id: "echo".into(), name: "Echo".into(), command: "echo".into(), args: vec!["{prompt}".into()], pty }
+            GenericCliProfile {
+                id: "echo".into(),
+                name: "Echo".into(),
+                command: "echo".into(),
+                args: vec!["{prompt}".into()],
+                pty,
+            }
         }
     }
 

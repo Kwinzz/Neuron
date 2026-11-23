@@ -46,10 +46,9 @@ pub fn run() {
             );
             // Thumbnails of attachments are served through the asset protocol, limited to their folder.
             let attachments_dir = attachments::root(&state.paths.data_dir);
-            if let Err(err) = std::fs::create_dir_all(&attachments_dir)
-                .map_err(|e| e.to_string())
-                .and_then(|()| app.asset_protocol_scope().allow_directory(&attachments_dir, true).map_err(|e| e.to_string()))
-            {
+            if let Err(err) = std::fs::create_dir_all(&attachments_dir).map_err(|e| e.to_string()).and_then(|()| {
+                app.asset_protocol_scope().allow_directory(&attachments_dir, true).map_err(|e| e.to_string())
+            }) {
                 tracing::warn!(%err, "attachments folder not served");
             }
             {
@@ -135,8 +134,8 @@ pub fn run() {
 }
 
 fn init_tracing() {
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("warn,neuron_lib=info,frontend=info"));
+    let filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn,neuron_lib=info,frontend=info"));
     // `try_init` so tests or re-entrant calls never panic.
     let _ = tracing_subscriber::fmt().with_env_filter(filter).try_init();
 }

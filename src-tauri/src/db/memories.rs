@@ -31,13 +31,7 @@ pub fn get(conn: &Connection, id: &str) -> AppResult<Option<Memory>> {
     Ok(conn.query_row(&format!("{SELECT} WHERE m.id = ?1"), [id], map_row).optional()?)
 }
 
-pub fn insert(
-    conn: &Connection,
-    category: MemoryCategory,
-    content: &str,
-    source: &str,
-    now: i64,
-) -> AppResult<Memory> {
+pub fn insert(conn: &Connection, category: MemoryCategory, content: &str, source: &str, now: i64) -> AppResult<Memory> {
     let content = content.trim();
     if content.is_empty() {
         return Err(AppError::Invalid("souvenir vide".into()));
@@ -111,10 +105,8 @@ pub fn replace_all(
     let mut kept = vec![false; existing.len()];
     let mut to_insert = Vec::new();
     for (category, content) in desired {
-        let found = existing
-            .iter()
-            .enumerate()
-            .find(|(i, m)| !kept[*i] && m.category == *category && m.content == *content);
+        let found =
+            existing.iter().enumerate().find(|(i, m)| !kept[*i] && m.category == *category && m.content == *content);
         match found {
             Some((i, _)) => kept[i] = true,
             None => to_insert.push((*category, content.clone())),

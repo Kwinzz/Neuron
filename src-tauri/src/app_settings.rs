@@ -125,16 +125,20 @@ pub struct GenericCliProfile {
 
 impl Default for GenericCliProfile {
     fn default() -> Self {
-        Self { id: String::new(), name: String::new(), command: String::new(), args: vec!["{prompt}".into()], pty: false }
+        Self {
+            id: String::new(),
+            name: String::new(),
+            command: String::new(),
+            args: vec!["{prompt}".into()],
+            pty: false,
+        }
     }
 }
 
 pub const PROMPT_PLACEHOLDER: &str = "{prompt}";
 
 pub fn load(conn: &Connection) -> AppResult<AppSettings> {
-    Ok(settings::get(conn, KEY)?
-        .and_then(|v| serde_json::from_value(v).ok())
-        .unwrap_or_default())
+    Ok(settings::get(conn, KEY)?.and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default())
 }
 
 fn slug(s: &str) -> String {

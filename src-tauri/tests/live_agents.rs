@@ -21,7 +21,7 @@ fn spec(model: &str, effort: Option<&str>) -> SessionSpec {
         resume: None,
         append_system_prompt: None,
         mcp: None,
-            generic: None,
+        generic: None,
     }
 }
 
@@ -180,7 +180,8 @@ async fn ask_with_memory(adapter: &dyn AgentAdapter, mut spec: SessionSpec, agen
 #[tokio::test]
 #[ignore]
 async fn memory_mcp_claude() {
-    let (answer, tools) = ask_with_memory(&ClaudeCodeAdapter::default(), spec("claude-haiku-5-5", Some("low")), "claude_code").await;
+    let (answer, tools) =
+        ask_with_memory(&ClaudeCodeAdapter::default(), spec("claude-haiku-5-5", Some("low")), "claude_code").await;
     println!("claude tools={tools:?} answer={answer}");
     assert!(answer.to_uppercase().contains("KIWI"));
 }
@@ -196,7 +197,8 @@ async fn memory_mcp_codex() {
 #[tokio::test]
 #[ignore]
 async fn memory_mcp_antigravity() {
-    let (answer, tools) = ask_with_memory(&AntigravityAdapter::default(), spec("gemini-4-neon-low", None), "antigravity").await;
+    let (answer, tools) =
+        ask_with_memory(&AntigravityAdapter::default(), spec("gemini-4-neon-low", None), "antigravity").await;
     println!("antigravity tools={tools:?} answer={answer}");
     assert!(answer.to_uppercase().contains("KIWI"));
 }
@@ -255,7 +257,11 @@ async fn image_attachment_all_agents() {
         attachments: vec![image],
     };
     for (name, adapter, spec) in [
-        ("claude", Box::new(ClaudeCodeAdapter::default()) as Box<dyn AgentAdapter>, spec("claude-haiku-5-5", Some("low"))),
+        (
+            "claude",
+            Box::new(ClaudeCodeAdapter::default()) as Box<dyn AgentAdapter>,
+            spec("claude-haiku-5-5", Some("low")),
+        ),
         ("codex", Box::new(CodexAdapter::default()), spec("gpt-6-luna", Some("low"))),
         ("antigravity", Box::new(AntigravityAdapter::default()), spec("gemini-4-neon-low", None)),
     ] {
@@ -264,9 +270,9 @@ async fn image_attachment_all_agents() {
         let mut out = String::new();
         while let Ok(Some(ev)) = tokio::time::timeout(Duration::from_secs(180), handle.events.recv()).await {
             match ev {
-                AdapterEvent::BlockCompleted { text, channel: neuron_lib::agents::events::DeltaChannel::Text, .. } => {
-                    out.push_str(&text)
-                }
+                AdapterEvent::BlockCompleted {
+                    text, channel: neuron_lib::agents::events::DeltaChannel::Text, ..
+                } => out.push_str(&text),
                 AdapterEvent::TurnComplete { error, .. } => {
                     assert!(error.is_none(), "{name}: {error:?}");
                     handle.commands.send(SessionCommand::Shutdown).unwrap();
@@ -288,7 +294,11 @@ async fn slash_command_lists() {
     let dir = PathBuf::from(std::env::var("NEURON_LIVE_DIR").unwrap());
     for agent in [AgentKind::ClaudeCode, AgentKind::Antigravity, AgentKind::Codex] {
         let list = neuron_lib::agents::slash::list(agent, &dir).await;
-        println!("{agent:?}: {} commands, e.g. {:?}", list.len(), list.iter().take(6).map(|c| &c.name).collect::<Vec<_>>());
+        println!(
+            "{agent:?}: {} commands, e.g. {:?}",
+            list.len(),
+            list.iter().take(6).map(|c| &c.name).collect::<Vec<_>>()
+        );
         assert!(!list.is_empty(), "{agent:?}");
     }
 }

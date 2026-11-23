@@ -29,10 +29,8 @@ impl Default for AntigravityAdapter {
 }
 
 pub fn build_args(spec: &SessionSpec) -> Vec<String> {
-    let mut args: Vec<String> = ["--input-format", "stream-json", "--output-format", "stream-json"]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+    let mut args: Vec<String> =
+        ["--input-format", "stream-json", "--output-format", "stream-json"].iter().map(|s| s.to_string()).collect();
     match spec.permission_mode.as_str() {
         "acceptEdits" => args.extend(["--mode".into(), "accept-edits".into()]),
         "auto" => args.extend(["--mode".into(), "auto".into()]),

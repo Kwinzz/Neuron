@@ -210,10 +210,8 @@ pub fn parse_agy_models(raw: &str) -> Vec<ModelInfo> {
     for family in &mut families {
         if let Some(map) = &family.effort_models {
             family.efforts = AGY_LEVELS.iter().filter(|l| map.contains_key(**l)).map(|l| l.to_string()).collect();
-            family.default_effort = ["medium", "high", "low", "xhigh", "max"]
-                .iter()
-                .find(|l| map.contains_key(**l))
-                .map(|l| l.to_string());
+            family.default_effort =
+                ["medium", "high", "low", "xhigh", "max"].iter().find(|l| map.contains_key(**l)).map(|l| l.to_string());
         }
     }
     families
@@ -301,7 +299,10 @@ mod tests {
         ));
         assert_eq!(agy.len(), 3, "variants folded into families");
         let neon = &agy[0];
-        assert_eq!((neon.id.as_str(), neon.label.as_str(), neon.vendor.as_str()), ("gemini-4-neon", "Gemini 4 Neon", "google"));
+        assert_eq!(
+            (neon.id.as_str(), neon.label.as_str(), neon.vendor.as_str()),
+            ("gemini-4-neon", "Gemini 4 Neon", "google")
+        );
         assert_eq!(neon.efforts, ["low", "high", "xhigh"], "ordered weakest first");
         assert_eq!(neon.default_effort.as_deref(), Some("high"));
         assert_eq!(neon.effort_models.as_ref().unwrap()["xhigh"], "gemini-4-neon-xhigh");

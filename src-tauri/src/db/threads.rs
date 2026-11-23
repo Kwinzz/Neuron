@@ -235,10 +235,7 @@ pub fn list_recent(conn: &Connection, limit: u32) -> AppResult<Vec<ThreadSummary
 }
 
 pub fn list_active(conn: &Connection) -> AppResult<Vec<ThreadSummary>> {
-    let sql = format!(
-        "{SELECT} WHERE t.status IN ({}) ORDER BY t.updated_at DESC",
-        ThreadStatus::active_sql_list()
-    );
+    let sql = format!("{SELECT} WHERE t.status IN ({}) ORDER BY t.updated_at DESC", ThreadStatus::active_sql_list());
     let mut stmt = conn.prepare_cached(&sql)?;
     let rows = stmt.query_map([], from_row)?;
     Ok(rows.collect::<Result<_, _>>()?)

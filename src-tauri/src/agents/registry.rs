@@ -16,16 +16,12 @@ use crate::agents::activity::tool_activity;
 use crate::agents::antigravity::AntigravityAdapter;
 use crate::agents::claude::ClaudeCodeAdapter;
 use crate::agents::codex::CodexAdapter;
+use crate::agents::events::{AGENT_EVENT_CHANNEL, AgentEvent, AgentEventEnvelope, AgentKind, ThreadStatus, TokenUsage};
 use crate::agents::generic::GenericAdapter;
-use crate::agents::events::{
-    AGENT_EVENT_CHANNEL, AgentEvent, AgentEventEnvelope, AgentKind, ThreadStatus, TokenUsage,
-};
-use crate::agents::{
-    AdapterEvent, AgentAdapter, PermissionDecision, SessionCommand, SessionSpec, kill_process_tree,
-};
+use crate::agents::{AdapterEvent, AgentAdapter, PermissionDecision, SessionCommand, SessionSpec, kill_process_tree};
+use crate::db::Db;
 use crate::db::chat::{self, ToolStatus};
 use crate::db::threads::{self, ThreadRuntime};
-use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::util::now_ms;
 
@@ -65,7 +61,6 @@ impl Default for AgentRegistry {
         Self::new(None)
     }
 }
-
 
 /// Run an Antigravity local command (`/quota`…) for a chat: its output becomes a command card.
 async fn run_agy_command(app: AppHandle, db: Db, rt: ThreadRuntime, name: &'static str, track_status: bool) {
@@ -296,11 +291,7 @@ impl AgentRegistry {
         // Generic CLIs: the chat's model is the profile id, resolved from Paramètres at each spawn.
         let generic = if runtime.agent == AgentKind::Generic {
             let wanted = runtime.model.clone().unwrap_or_default();
-            db.call(|c| crate::app_settings::load(c))
-                .await?
-                .generic_clis
-                .into_iter()
-                .find(|p| p.id == wanted)
+            db.call(|c| crate::app_settings::load(c)).await?.generic_clis.into_iter().find(|p| p.id == wanted)
         } else {
             None
         };
@@ -326,7 +317,12 @@ impl AgentRegistry {
                 .mcp
                 .as_ref()
                 .map(|(exe, paths)| {
-                    crate::memory::mcp::McpLaunch::new(exe.clone(), paths, runtime.agent.as_str(), project_root(runtime))
+                    crate::memory::mcp::McpLaunch::new(
+                        exe.clone(),
+                        paths,
+                        runtime.agent.as_str(),
+                        project_root(runtime),
+                    )
                 })
                 .filter(|_| runtime.agent != AgentKind::Generic),
             generic,
@@ -540,12 +536,13 @@ impl AgentRegistry {
             }};
         }
 
-        let set_status = |status: ThreadStatus, detail: Option<String>, last: &mut Option<(ThreadStatus, Option<String>)>| {
-            let changed = last.as_ref() != Some(&(status, detail.clone()));
-            let status_changed = last.as_ref().map(|(s, _)| *s) != Some(status);
-            *last = Some((status, detail.clone()));
-            (changed, status_changed, detail)
-        };
+        let set_status =
+            |status: ThreadStatus, detail: Option<String>, last: &mut Option<(ThreadStatus, Option<String>)>| {
+                let changed = last.as_ref() != Some(&(status, detail.clone()));
+                let status_changed = last.as_ref().map(|(s, _)| *s) != Some(status);
+                *last = Some((status, detail.clone()));
+                (changed, status_changed, detail)
+            };
 
         while let Some(event) = events.recv().await {
             match event {
@@ -638,23 +635,23 @@ impl AgentRegistry {
                         s.pending.insert(request_id.clone(), input.clone());
                     }
                     let detail = Some(tool_name.clone());
-                    let (_, status_changed, detail) = set_status(ThreadStatus::AwaitingApproval, detail, &mut last_status);
+                    let (_, status_changed, detail) =
+                        set_status(ThreadStatus::AwaitingApproval, detail, &mut last_status);
                     if status_changed {
                         let tid = id.clone();
                         persist!(move |c| threads::set_status(c, &tid, ThreadStatus::AwaitingApproval, now_ms()));
                     }
                     emit(&app, &id, AgentEvent::PermissionRequest { request_id, tool_name, description, input });
-                    emit(
-                        &app,
-                        &id,
-                        AgentEvent::ThreadStatusChanged { status: ThreadStatus::AwaitingApproval, detail },
-                    );
+                    emit(&app, &id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::AwaitingApproval, detail });
                 }
                 AdapterEvent::TurnComplete { mut usage, duration_ms, error } => {
                     let (stopped, _) = self.take_flags(&id, generation);
                     // Antigravity doesn't stream its quotas: ask for them after each turn (no token used).
                     if rt.agent == AgentKind::Antigravity {
-                        tauri::async_runtime::spawn(crate::agents::antigravity::quota::refresh(db.clone(), app.clone()));
+                        tauri::async_runtime::spawn(crate::agents::antigravity::quota::refresh(
+                            db.clone(),
+                            app.clone(),
+                        ));
                     }
                     // CLIs that only report tokens (Codex, Antigravity): price them at the public API rate.
                     if usage.cost_usd == 0.0 && rt.agent != AgentKind::ClaudeCode {
@@ -666,7 +663,8 @@ impl AgentRegistry {
                     if let Some(s) = self.lock().get_mut(&id).filter(|s| s.generation == generation) {
                         s.busy = false;
                         s.idle_since = Instant::now();
-                        wall_ms = s.turn_started.take().map(|t| i64::try_from(t.elapsed().as_millis()).unwrap_or(i64::MAX));
+                        wall_ms =
+                            s.turn_started.take().map(|t| i64::try_from(t.elapsed().as_millis()).unwrap_or(i64::MAX));
                     }
                     // Total time of the request as the user lived it (send → answer, approvals included);
                     // the CLI's own figure when Neuron didn't see the start (resumed process).
@@ -679,7 +677,15 @@ impl AgentRegistry {
                         persist!(move |c| {
                             let now = now_ms();
                             if let Some(message) = &err {
-                                chat::insert_message(c, &uuid::Uuid::new_v4().to_string(), &tid, "error", message, None, now)?;
+                                chat::insert_message(
+                                    c,
+                                    &uuid::Uuid::new_v4().to_string(),
+                                    &tid,
+                                    "error",
+                                    message,
+                                    None,
+                                    now,
+                                )?;
                             }
                             if silent {
                                 return chat::close_dangling_tools(c, &tid, now);
@@ -724,7 +730,15 @@ impl AgentRegistry {
                     let agent = rt.agent;
                     persist!(move |c| crate::db::providers::store_live_windows(c, agent, &windows, now_ms()));
                 }
-                AdapterEvent::Subagent { tool_call_id, description, subagent_type, status, tool_uses, tokens, last_tool } => {
+                AdapterEvent::Subagent {
+                    tool_call_id,
+                    description,
+                    subagent_type,
+                    status,
+                    tool_uses,
+                    tokens,
+                    last_tool,
+                } => {
                     emit(
                         &app,
                         &id,
@@ -762,11 +776,18 @@ impl AgentRegistry {
                             chat::close_dangling_tools(c, &tid, now)?;
                             threads::set_status(c, &tid, ThreadStatus::Cancelled, now)
                         });
-                        emit(&app, &id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::Cancelled, detail: None });
+                        emit(
+                            &app,
+                            &id,
+                            AgentEvent::ThreadStatusChanged { status: ThreadStatus::Cancelled, detail: None },
+                        );
                     } else if was_active && !shutdown {
                         let tail = stderr_tail.trim();
                         let message = if tail.is_empty() {
-                            format!("Le processus de l'agent s'est arrêté (code {}).", code.map_or("?".into(), |c| c.to_string()))
+                            format!(
+                                "Le processus de l'agent s'est arrêté (code {}).",
+                                code.map_or("?".into(), |c| c.to_string())
+                            )
                         } else {
                             format!("Le processus de l'agent s'est arrêté : {}", tail.lines().last().unwrap_or(tail))
                         };
@@ -774,7 +795,15 @@ impl AgentRegistry {
                             let (tid, m) = (id.clone(), message.clone());
                             persist!(move |c| {
                                 let now = now_ms();
-                                chat::insert_message(c, &uuid::Uuid::new_v4().to_string(), &tid, "error", &m, None, now)?;
+                                chat::insert_message(
+                                    c,
+                                    &uuid::Uuid::new_v4().to_string(),
+                                    &tid,
+                                    "error",
+                                    &m,
+                                    None,
+                                    now,
+                                )?;
                                 chat::close_dangling_tools(c, &tid, now)?;
                                 threads::set_status(c, &tid, ThreadStatus::Error, now)
                             });

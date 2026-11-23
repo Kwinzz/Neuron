@@ -160,10 +160,7 @@ pub fn report(conn: &Connection, range: UsageRange, now: i64) -> AppResult<Usage
         rows.collect::<Result<_, _>>()?
     };
 
-    let mut buckets: Vec<UsageBucket> = keys
-        .into_iter()
-        .map(|key| UsageBucket { key, by_agent: Vec::new() })
-        .collect();
+    let mut buckets: Vec<UsageBucket> = keys.into_iter().map(|key| UsageBucket { key, by_agent: Vec::new() }).collect();
 
     {
         let sql = format!(
@@ -216,11 +213,7 @@ pub fn report(conn: &Connection, range: UsageRange, now: i64) -> AppResult<Usage
         );
         let mut stmt = conn.prepare_cached(&sql)?;
         let rows = stmt.query_map([since], |r| {
-            Ok(ProjectUsage {
-                project_id: r.get(0)?,
-                name: r.get(1)?,
-                sums: UsageSums::from_row(r, 2)?,
-            })
+            Ok(ProjectUsage { project_id: r.get(0)?, name: r.get(1)?, sums: UsageSums::from_row(r, 2)? })
         })?;
         rows.collect::<Result<Vec<_>, _>>()?
     };
@@ -240,15 +233,7 @@ pub fn report(conn: &Connection, range: UsageRange, now: i64) -> AppResult<Usage
         stmt.query_row(params![prev_since, prev_until], |r| UsageSums::from_row(r, 0))?
     };
 
-    Ok(UsageReport {
-        range,
-        since,
-        buckets,
-        by_agent,
-        by_project,
-        totals,
-        previous,
-    })
+    Ok(UsageReport { range, since, buckets, by_agent, by_project, totals, previous })
 }
 
 #[cfg(test)]

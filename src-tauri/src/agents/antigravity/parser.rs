@@ -46,7 +46,10 @@ impl AntigravityParser {
             return Vec::new();
         }
         let Ok(v) = serde_json::from_str::<Value>(line) else {
-            return vec![AdapterEvent::Warning(format!("ligne non JSON : {}", line.chars().take(200).collect::<String>()))];
+            return vec![AdapterEvent::Warning(format!(
+                "ligne non JSON : {}",
+                line.chars().take(200).collect::<String>()
+            ))];
         };
         match v.get("event").and_then(Value::as_str) {
             Some("init") => {
@@ -143,11 +146,7 @@ impl AntigravityParser {
         self.texts.clear();
         let ok = r.get("status").and_then(Value::as_str) == Some("SUCCESS");
         let error = (!ok).then(|| {
-            r.get("error")
-                .and_then(Value::as_str)
-                .filter(|e| !e.is_empty())
-                .unwrap_or("Erreur Antigravity")
-                .to_string()
+            r.get("error").and_then(Value::as_str).filter(|e| !e.is_empty()).unwrap_or("Erreur Antigravity").to_string()
         });
         let duration_ms = r.get("duration_seconds").and_then(Value::as_f64).map(|s| (s * 1000.0) as i64);
         vec![AdapterEvent::TurnComplete { usage, duration_ms, error }]

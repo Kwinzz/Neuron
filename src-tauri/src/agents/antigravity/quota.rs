@@ -87,7 +87,9 @@ fn window_name(window: &str) -> String {
 fn group_models(description: &str) -> Vec<String> {
     description
         .split_once("Models within this group:")
-        .map(|(_, list)| list.split(',').map(|m| m.trim().trim_end_matches('.').to_string()).filter(|m| !m.is_empty()).collect())
+        .map(|(_, list)| {
+            list.split(',').map(|m| m.trim().trim_end_matches('.').to_string()).filter(|m| !m.is_empty()).collect()
+        })
         .unwrap_or_default()
 }
 
@@ -218,9 +220,8 @@ pub async fn store(db: &Db, app: &AppHandle, windows: Vec<RateLimitWindow>) {
         return;
     }
     LAST_REFRESH.store(now_ms(), Ordering::Relaxed);
-    let saved = db
-        .call(move |c| crate::db::providers::store_live_windows(c, AgentKind::Antigravity, &windows, now_ms()))
-        .await;
+    let saved =
+        db.call(move |c| crate::db::providers::store_live_windows(c, AgentKind::Antigravity, &windows, now_ms())).await;
     match saved {
         Ok(()) => {
             let _ = app.emit(QUOTAS_CHANGED_EVENT, ());
@@ -253,7 +254,8 @@ mod tests {
         let v: Value = serde_json::from_str(QUOTA).unwrap();
         let w = windows(&v);
         assert!(w.len() >= 4);
-        let gemini_5h = w.iter().find(|w| w.group.as_deref() == Some("Gemini Models") && w.window == "five_hour").unwrap();
+        let gemini_5h =
+            w.iter().find(|w| w.group.as_deref() == Some("Gemini Models") && w.window == "five_hour").unwrap();
         assert!(gemini_5h.utilization >= 0.0 && gemini_5h.utilization <= 1.0);
         assert!(gemini_5h.models.iter().any(|m| m == "Gemini 4 Neon"));
         assert!(gemini_5h.resets_at.is_some());

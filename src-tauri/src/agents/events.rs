@@ -21,12 +21,8 @@ pub enum AgentKind {
 }
 
 impl AgentKind {
-    pub const ALL: [AgentKind; 4] = [
-        AgentKind::ClaudeCode,
-        AgentKind::Antigravity,
-        AgentKind::Codex,
-        AgentKind::Generic,
-    ];
+    pub const ALL: [AgentKind; 4] =
+        [AgentKind::ClaudeCode, AgentKind::Antigravity, AgentKind::Codex, AgentKind::Generic];
 
     pub fn as_str(self) -> &'static str {
         match self {
@@ -39,10 +35,7 @@ impl AgentKind {
 
     /// Unknown values map to [`AgentKind::Generic`].
     pub fn parse(value: &str) -> Self {
-        Self::ALL
-            .into_iter()
-            .find(|k| k.as_str() == value)
-            .unwrap_or(AgentKind::Generic)
+        Self::ALL.into_iter().find(|k| k.as_str() == value).unwrap_or(AgentKind::Generic)
     }
 }
 
@@ -95,10 +88,7 @@ impl ThreadStatus {
 
     /// Unknown values map to [`ThreadStatus::Idle`].
     pub fn parse(value: &str) -> Self {
-        Self::ALL
-            .into_iter()
-            .find(|s| s.as_str() == value)
-            .unwrap_or(ThreadStatus::Idle)
+        Self::ALL.into_iter().find(|s| s.as_str() == value).unwrap_or(ThreadStatus::Idle)
     }
 
     /// SQL list of active statuses, for `status IN (...)` filters.
@@ -113,10 +103,7 @@ impl ThreadStatus {
 
     /// True while the agent process is doing work.
     pub fn is_active(self) -> bool {
-        !matches!(
-            self,
-            ThreadStatus::Idle | ThreadStatus::Done | ThreadStatus::Error | ThreadStatus::Cancelled
-        )
+        !matches!(self, ThreadStatus::Idle | ThreadStatus::Done | ThreadStatus::Error | ThreadStatus::Cancelled)
     }
 }
 
@@ -165,11 +152,7 @@ impl TokenUsage {
 #[ts(export)]
 pub enum AgentEvent {
     /// Incremental assistant text (or thinking) for a message.
-    MessageDelta {
-        message_id: String,
-        channel: DeltaChannel,
-        text: String,
-    },
+    MessageDelta { message_id: String, channel: DeltaChannel, text: String },
     /// A text/thinking item finished streaming (its full text is persisted).
     MessageCompleted { message_id: String },
     /// Output of a slash command run by the CLI itself, without the model (`/usage`, `/context`…).
@@ -192,12 +175,7 @@ pub enum AgentEvent {
         changes: Vec<crate::agents::file_changes::FileChange>,
     },
     /// The agent asks for approval before running a tool.
-    PermissionRequest {
-        request_id: String,
-        tool_name: String,
-        description: String,
-        input: serde_json::Value,
-    },
+    PermissionRequest { request_id: String, tool_name: String, description: String, input: serde_json::Value },
     /// Usage of the latest turn plus the running total for the thread.
     TokenUsageUpdate {
         delta: TokenUsage,
@@ -207,16 +185,10 @@ pub enum AgentEvent {
         duration_ms: Option<i64>,
     },
     /// Status transition; `detail` refines it (e.g. file name being edited).
-    ThreadStatusChanged {
-        status: ThreadStatus,
-        detail: Option<String>,
-    },
+    ThreadStatusChanged { status: ThreadStatus, detail: Option<String> },
     /// End of a turn, judged by the agent itself (its hidden summary line) — sent just before the final
     /// `ThreadStatusChanged`, for the notification.
-    TurnSummary {
-        outcome: crate::agents::summary::TurnOutcome,
-        summary: String,
-    },
+    TurnSummary { outcome: crate::agents::summary::TurnOutcome, summary: String },
     /// The chat's permission mode changed on the agent side (plan approved, `EnterPlanMode`...).
     PermissionModeChanged { mode: String },
     /// Error reported by the adapter or the process. `fatal` ends the thread.

@@ -165,9 +165,8 @@ pub fn git_snapshot(root: &Path) -> Option<GitSnapshot> {
     let changed = git(root, &["status", "--porcelain"])
         .map(|s| s.lines().take(30).map(|l| l.trim_end().to_string()).collect())
         .unwrap_or_default();
-    let recent_commits = git(root, &["log", "--oneline", "-5"])
-        .map(|s| s.lines().map(str::to_string).collect())
-        .unwrap_or_default();
+    let recent_commits =
+        git(root, &["log", "--oneline", "-5"]).map(|s| s.lines().map(str::to_string).collect()).unwrap_or_default();
     Some(GitSnapshot { branch: (!branch.is_empty()).then_some(branch), changed, recent_commits })
 }
 
@@ -291,10 +290,7 @@ pub fn build(
 
 /// Add the global memory to a (possibly absent) project bundle. Chats outside a project get a bundle
 /// with only the memory; None when there is nothing to inject.
-pub fn with_memory(
-    bundle: Option<ContextBundle>,
-    memory: Option<(String, ContextSource)>,
-) -> Option<ContextBundle> {
+pub fn with_memory(bundle: Option<ContextBundle>, memory: Option<(String, ContextSource)>) -> Option<ContextBundle> {
     match (bundle, memory) {
         (bundle, None) => bundle,
         (Some(mut b), Some((md, source))) => {

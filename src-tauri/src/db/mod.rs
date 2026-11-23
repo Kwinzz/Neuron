@@ -40,9 +40,7 @@ impl Db {
     }
 
     fn from_conn(conn: Connection) -> Self {
-        Self {
-            conn: Arc::new(Mutex::new(conn)),
-        }
+        Self { conn: Arc::new(Mutex::new(conn)) }
     }
 
     /// Synchronous access, for startup code that runs before the async runtime is relevant.
@@ -50,10 +48,7 @@ impl Db {
     where
         F: FnOnce(&mut Connection) -> AppResult<T>,
     {
-        let mut guard = self
-            .conn
-            .lock()
-            .map_err(|_| AppError::Other("database mutex poisoned".into()))?;
+        let mut guard = self.conn.lock().map_err(|_| AppError::Other("database mutex poisoned".into()))?;
         f(&mut guard)
     }
 
@@ -65,9 +60,7 @@ impl Db {
     {
         let conn = Arc::clone(&self.conn);
         tokio::task::spawn_blocking(move || {
-            let mut guard = conn
-                .lock()
-                .map_err(|_| AppError::Other("database mutex poisoned".into()))?;
+            let mut guard = conn.lock().map_err(|_| AppError::Other("database mutex poisoned".into()))?;
             f(&mut guard)
         })
         .await?
@@ -94,10 +87,7 @@ mod tests {
     #[tokio::test]
     async fn call_runs_on_blocking_pool() {
         let db = Db::open_in_memory().expect("open");
-        let fk: i64 = db
-            .call(|c| Ok(c.query_row("PRAGMA foreign_keys", [], |r| r.get(0))?))
-            .await
-            .expect("query");
+        let fk: i64 = db.call(|c| Ok(c.query_row("PRAGMA foreign_keys", [], |r| r.get(0))?)).await.expect("query");
         assert_eq!(fk, 1);
     }
 }

@@ -64,11 +64,7 @@ const LEVELS: &[&str] = &["-minimal", "-low", "-medium", "-high", "-xhigh", "-ma
 
 fn family(model: &str) -> String {
     let model = model.trim().to_ascii_lowercase();
-    LEVELS
-        .iter()
-        .find_map(|s| model.strip_suffix(s))
-        .map(str::to_string)
-        .unwrap_or(model)
+    LEVELS.iter().find_map(|s| model.strip_suffix(s)).map(str::to_string).unwrap_or(model)
 }
 
 // ---- LiteLLM ---------------------------------------------------------------------------------------
@@ -105,7 +101,11 @@ pub fn parse_litellm(json: &str, fetched_at: i64) -> AppResult<RemotePrices> {
         // Bare name: `gemini-4-neon`, `gemini/gemini-4-neon`, `vertex_ai/gemini-4-neon` — not regional variants.
         let bare = match key.split_once('/') {
             None => key.as_str(),
-            Some((prefix, rest)) if matches!(prefix, "gemini" | "vertex_ai" | "openai" | "anthropic") && !rest.contains('/') => rest,
+            Some((prefix, rest))
+                if matches!(prefix, "gemini" | "vertex_ai" | "openai" | "anthropic") && !rest.contains('/') =>
+            {
+                rest
+            }
             _ => continue,
         };
         let m = 1_000_000.0;
@@ -198,9 +198,8 @@ fn install(prices: RemotePrices) {
 
 /// Load the cached list (instant, offline). Returns its age check: true when a download is due.
 pub fn load_cache(data_dir: &Path, now_ms: i64) -> bool {
-    let cached = std::fs::read_to_string(cache_path(data_dir))
-        .ok()
-        .and_then(|s| serde_json::from_str::<RemotePrices>(&s).ok());
+    let cached =
+        std::fs::read_to_string(cache_path(data_dir)).ok().and_then(|s| serde_json::from_str::<RemotePrices>(&s).ok());
     match cached {
         Some(prices) => {
             let due = now_ms - prices.fetched_at > MAX_AGE_MS;
@@ -353,8 +352,16 @@ fn real_litellm_file() {
     println!("first-party models: {}", prices.models.len());
     install(prices);
     for m in [
-        "gpt-6-luna", "gpt-5.6-terra", "gpt-5.6-luna", "gemini-4-neon-high", "gemini-4-argon-low", "gemini-4-hydrogen-xhigh",
-        "gemini-3.8-flash-medium", "claude-opus-5-5-high", "claude-sonnet-5-5-low", "gpt-oss-120b-medium",
+        "gpt-6-luna",
+        "gpt-5.6-terra",
+        "gpt-5.6-luna",
+        "gemini-4-neon-high",
+        "gemini-4-argon-low",
+        "gemini-4-hydrogen-xhigh",
+        "gemini-3.8-flash-medium",
+        "claude-opus-5-5-high",
+        "claude-sonnet-5-5-low",
+        "gpt-oss-120b-medium",
         "gemini-pro-orchestrator-neon",
     ] {
         println!("{m:32} {:?}", price_of(m).map(|p| (p.input, p.cached_input, p.output)));

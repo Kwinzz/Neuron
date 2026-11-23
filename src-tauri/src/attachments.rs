@@ -46,9 +46,8 @@ fn mime_of(name: &str) -> &'static str {
         "pdf" => "application/pdf",
         "json" => "application/json",
         "md" | "markdown" => "text/markdown",
-        "txt" | "log" | "csv" | "rs" | "ts" | "tsx" | "js" | "jsx" | "py" | "toml" | "yaml" | "yml" | "html" | "css" => {
-            "text/plain"
-        }
+        "txt" | "log" | "csv" | "rs" | "ts" | "tsx" | "js" | "jsx" | "py" | "toml" | "yaml" | "yml" | "html"
+        | "css" => "text/plain",
         _ => "application/octet-stream",
     }
 }
@@ -91,15 +90,18 @@ pub fn local_image(path: &str, cwd: Option<&Path>) -> Option<Attachment> {
 /// Keep a readable, filesystem-safe file name.
 fn safe_name(name: &str) -> String {
     let base = Path::new(name).file_name().and_then(|n| n.to_str()).unwrap_or("fichier");
-    let cleaned: String = base
-        .chars()
-        .map(|c| if c.is_control() || r#"<>:"/\|?*"#.contains(c) { '_' } else { c })
-        .collect();
+    let cleaned: String =
+        base.chars().map(|c| if c.is_control() || r#"<>:"/\|?*"#.contains(c) { '_' } else { c }).collect();
     let cleaned = cleaned.trim().trim_matches('.').to_string();
     if cleaned.is_empty() { "fichier".into() } else { cleaned.chars().take(120).collect() }
 }
 
-fn store(root: &Path, name: &str, mime: Option<&str>, write: impl FnOnce(&Path) -> std::io::Result<u64>) -> AppResult<Attachment> {
+fn store(
+    root: &Path,
+    name: &str,
+    mime: Option<&str>,
+    write: impl FnOnce(&Path) -> std::io::Result<u64>,
+) -> AppResult<Attachment> {
     let id = uuid::Uuid::new_v4().simple().to_string();
     let name = safe_name(name);
     let dir = root.join(&id);
@@ -117,7 +119,11 @@ pub fn import_file(root: &Path, source: &Path) -> AppResult<Attachment> {
         return Err(AppError::Invalid(format!("pas un fichier : {}", source.display())));
     }
     if meta.len() > MAX_BYTES {
-        return Err(AppError::Invalid(format!("fichier trop lourd (max {} Mo) : {}", MAX_BYTES / 1_048_576, source.display())));
+        return Err(AppError::Invalid(format!(
+            "fichier trop lourd (max {} Mo) : {}",
+            MAX_BYTES / 1_048_576,
+            source.display()
+        )));
     }
     let name = source.file_name().and_then(|n| n.to_str()).unwrap_or("fichier").to_string();
     store(root, &name, None, |dest| std::fs::copy(source, dest))
@@ -183,7 +189,10 @@ mod tests {
         std::fs::write(&src, "# hello").unwrap();
 
         let file = import_file(&root, &src).unwrap();
-        assert_eq!((file.name.as_str(), file.mime.as_str(), file.size, file.is_image), ("notes de réunion.md", "text/markdown", 7, false));
+        assert_eq!(
+            (file.name.as_str(), file.mime.as_str(), file.size, file.is_image),
+            ("notes de réunion.md", "text/markdown", 7, false)
+        );
         assert!(Path::new(&file.path).starts_with(&root));
 
         let png = base64::engine::general_purpose::STANDARD.encode([0x89, b'P', b'N', b'G']);
@@ -207,7 +216,10 @@ mod tests {
         std::fs::write(dir.join("notes.txt"), b"txt").unwrap();
 
         let found = local_image("fox.png", Some(&dir)).unwrap();
-        assert_eq!((found.name.as_str(), found.mime.as_str(), found.size, found.is_image), ("fox.png", "image/png", 3, true));
+        assert_eq!(
+            (found.name.as_str(), found.mime.as_str(), found.size, found.is_image),
+            ("fox.png", "image/png", 3, true)
+        );
         let absolute = dir.join("fox.png").display().to_string();
         assert!(local_image(&format!("`{absolute}`").replace('`', "\""), None).is_some());
         assert!(local_image("notes.txt", Some(&dir)).is_none(), "not an image");
@@ -216,5 +228,4 @@ mod tests {
         assert!(local_image("https://example.com/a.png", Some(&dir)).is_none(), "remote");
         std::fs::remove_dir_all(&dir).unwrap();
     }
-
 }

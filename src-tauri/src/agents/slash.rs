@@ -56,15 +56,15 @@ pub async fn list(agent: AgentKind, cwd: &Path) -> Vec<SlashCommand> {
     }
     let result = match agent {
         AgentKind::ClaudeCode => tokio::time::timeout(LIST_TIMEOUT, claude(cwd)).await.ok().flatten(),
-        AgentKind::Antigravity => tokio::time::timeout(LIST_TIMEOUT, antigravity(cwd)).await.ok().flatten().map(|mut list| {
-            // Answered by the CLI itself (not listed by ACP): Neuron runs them with `agy --print`.
-            list.extend(crate::agents::antigravity::quota::LOCAL_COMMANDS.iter().map(|(name, description)| SlashCommand {
-                name: (*name).into(),
-                description: (*description).into(),
-                argument_hint: None,
-            }));
-            list
-        }),
+        AgentKind::Antigravity => {
+            tokio::time::timeout(LIST_TIMEOUT, antigravity(cwd)).await.ok().flatten().map(|mut list| {
+                // Answered by the CLI itself (not listed by ACP): Neuron runs them with `agy --print`.
+                list.extend(crate::agents::antigravity::quota::LOCAL_COMMANDS.iter().map(|(name, description)| {
+                    SlashCommand { name: (*name).into(), description: (*description).into(), argument_hint: None }
+                }));
+                list
+            })
+        }
         AgentKind::Codex => Some(codex(cwd)),
         AgentKind::Generic => Some(Vec::new()),
     };
@@ -88,14 +88,11 @@ async fn claude(cwd: &Path) -> Option<Vec<SlashCommand>> {
         .iter()
         .map(|s| s.to_string())
         .collect();
-    let mut child = command(&binary, &args, cwd)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .ok()?;
+    let mut child =
+        command(&binary, &args, cwd).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().ok()?;
     let mut stdin = child.stdin.take()?;
-    let request = json!({ "type": "control_request", "request_id": "neuron-slash", "request": { "subtype": "initialize" } });
+    let request =
+        json!({ "type": "control_request", "request_id": "neuron-slash", "request": { "subtype": "initialize" } });
     stdin.write_all(format!("{request}\n").as_bytes()).await.ok()?;
     stdin.flush().await.ok()?;
     let mut lines = BufReader::new(child.stdout.take()?).lines();
@@ -125,7 +122,11 @@ fn parse_claude(cmds: &[Value]) -> Vec<SlashCommand> {
             Some(SlashCommand {
                 name,
                 description: first_line(c.get("description").and_then(Value::as_str).unwrap_or(""), 160),
-                argument_hint: c.get("argumentHint").and_then(Value::as_str).filter(|s| !s.is_empty()).map(str::to_string),
+                argument_hint: c
+                    .get("argumentHint")
+                    .and_then(Value::as_str)
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_string),
             })
         })
         .collect()
@@ -163,7 +164,8 @@ async fn antigravity(cwd: &Path) -> Option<Vec<SlashCommand>> {
         }
         let update = v.pointer("/params/update");
         if update.and_then(|u| u.get("sessionUpdate")).and_then(Value::as_str) == Some("available_commands_update") {
-            found = update.and_then(|u| u.get("availableCommands")).and_then(Value::as_array).map(|cmds| parse_acp(cmds));
+            found =
+                update.and_then(|u| u.get("availableCommands")).and_then(Value::as_array).map(|cmds| parse_acp(cmds));
             break;
         }
     }
@@ -259,7 +261,8 @@ pub fn codex_skills(cwd: &Path) -> Vec<Skill> {
 fn codex(cwd: &Path) -> Vec<SlashCommand> {
     let mut list = vec![SlashCommand {
         name: "review".into(),
-        description: "Revue de code des modifications non commitées (codex exec review), ou selon tes instructions".into(),
+        description: "Revue de code des modifications non commitées (codex exec review), ou selon tes instructions"
+            .into(),
         argument_hint: Some("[instructions]".into()),
     }];
     list.extend(codex_skills(cwd).into_iter().map(|s| SlashCommand {
@@ -299,7 +302,9 @@ mod tests {
 
     #[test]
     fn parses_front_matter() {
-        let fm = front_matter("---\nname: run-workflow\ndescription: >-\n  How to write\n  a workflow.\nother: x\n---\n# Body");
+        let fm = front_matter(
+            "---\nname: run-workflow\ndescription: >-\n  How to write\n  a workflow.\nother: x\n---\n# Body",
+        );
         assert_eq!(fm["name"], "run-workflow");
         assert_eq!(fm["description"], "How to write a workflow.");
         assert_eq!(fm["other"], "x");
@@ -318,7 +323,8 @@ mod tests {
         assert_eq!(list[0].description, "Clear history but keep a summary");
         assert_eq!(list[0].argument_hint.as_deref(), Some("<instructions>"));
         let a: Vec<Value> =
-            serde_json::from_str(r#"[{"name":"goal","description":"Run until done","input":{"hint":"objectif"}}]"#).unwrap();
+            serde_json::from_str(r#"[{"name":"goal","description":"Run until done","input":{"hint":"objectif"}}]"#)
+                .unwrap();
         assert_eq!(parse_acp(&a)[0].argument_hint.as_deref(), Some("objectif"));
     }
 
@@ -332,7 +338,9 @@ mod tests {
         assert_eq!(codex_rewrite(&cwd, "/review"), Some(CodexSlash::Review(None)));
         assert_eq!(codex_rewrite(&cwd, "/review  focus perf"), Some(CodexSlash::Review(Some("focus perf".into()))));
         match codex_rewrite(&cwd, "/lint-fix src/main.rs") {
-            Some(CodexSlash::Prompt(p)) => assert!(p.starts_with("$lint-fix") && p.contains("SKILL.md") && p.ends_with("src/main.rs")),
+            Some(CodexSlash::Prompt(p)) => {
+                assert!(p.starts_with("$lint-fix") && p.contains("SKILL.md") && p.ends_with("src/main.rs"))
+            }
             other => panic!("{other:?}"),
         }
         assert_eq!(codex_rewrite(&cwd, "/unknown x"), None);

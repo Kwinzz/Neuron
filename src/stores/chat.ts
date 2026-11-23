@@ -247,5 +247,3 @@ export const useChat = create<ChatState>((set, get) => {
   };
 });
 
-/** Exposed for tests / debugging. */
-export const __reduceChat = reduce;

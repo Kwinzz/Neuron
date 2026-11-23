@@ -15,7 +15,7 @@ Neuron est une app desktop personnelle (Tauri v2) qui centralise et pilote les a
 | DB | **SQLite** via `rusqlite` (feature `bundled`, FTS5 inclus), migrations SQL embarquées |
 | IPC typé | `ts-rs` → types générés dans `src/bindings/` (versionnés) |
 | Frontend | React 19 + TypeScript strict + Vite + **Tailwind CSS v4** (`@tailwindcss/vite`) + `lucide-react` |
-| Polices | `@fontsource-variable/inter` (UI), `@fontsource-variable/jetbrains-mono` (code, tokens, chronos) — locales, zéro réseau |
+| Polices | `@fontsource-variable/geist` (UI), `@fontsource-variable/geist-mono` (code, tokens, chronos) — locales, zéro réseau |
 
 ## Arborescence
 
@@ -23,7 +23,7 @@ Neuron est une app desktop personnelle (Tauri v2) qui centralise et pilote les a
 src-tauri/
   migrations/NNNN_*.sql     migrations SQL (append-only, jamais modifier une migration publiée)
   src/
-    lib.rs                  bootstrap Tauri, setup (DB, état), registre des commandes
+    lib.rs                  bootstrap Tauri, plugins, setup (DB, état, bureau), registre des commandes
     error.rs                AppError (thiserror) sérialisé vers le front
     state.rs                AppState partagé (managed state Tauri)
     db/                     connexion, PRAGMAs, migrations (PRAGMA user_version) + requêtes par domaine
@@ -33,23 +33,34 @@ src-tauri/
     context.rs              contexte projet : .neuron/context.md, instantané git, fichiers récents, assemblage
     memory/                 mémoire globale (memory.md ⇄ SQLite) + serveur MCP stdio embarqué (mcp.rs)
     commands/               commandes #[tauri::command] groupées par domaine
-    agents/                 trait AgentAdapter, adaptateurs, registre de processus, events normalisés
+    agents/                 trait AgentAdapter, adaptateurs, registre de processus, events normalisés,
+                            diffs des fichiers modifiés, résumé de fin de tour (summary.rs)
+    desktop.rs              zone de notification, croix = cacher, démarrage avec Windows, raccourci global
+    notifications.rs        notifications natives (identité Windows « Neuron » + icône)
+    attachments.rs          pièces jointes + images citées par les agents
+    pricing.rs              prix LiteLLM (estimation Codex / Antigravity)
+  installer/                hooks NSIS de l'installateur Windows
+  rustfmt.toml              `max_width = 120`, `use_small_heuristics = "Max"` (`cargo fmt` avant chaque commit)
 src/
   bindings/                 GÉNÉRÉ par `cargo test` (ts-rs) — ne pas éditer à la main
   lib/ipc.ts                SEUL point d'accès à invoke()/listen()
-  lib/                      agents.ts (méta + ordre), status.ts, format.ts, fuzzy.ts
-  stores/                   zustand : ui, live (threads temps réel), dashboard, toast
+  lib/                      agents.ts (méta + ordre), status.ts, format.ts, fuzzy.ts, models.ts, chatDefaults.ts,
+                            turnSummary.ts, browserKeys.ts (raccourcis du navigateur désactivés)
+  stores/                   zustand : ui, live (threads temps réel), chat, dashboard, nav, models, settings,
+                            layout (largeur de la barre latérale), toast
   hooks/                    useAgentEventBridge, useHotkey, useNow
   components/shell/         AppShell, Sidebar, SiteHeader (= barre de titre, `decorations: false`), WindowControls, LiveDock, Toaster
   components/palette/       CommandPalette (Ctrl+K)
   components/ui/            primitives partagées (AgentBadge, StatusDot, Kbd, LiveTimer)
   views/home/               Accueil (dashboard)
   views/chat/               ChatView (chat existant) + DraftChat (nouveau chat vide, créé au 1er message)
+  views/quick/              QuickLauncher : fenêtre `quick` de la demande rapide (raccourci global)
   views/project/            page projet (éditeur context.md, git, fichiers récents, chats du projet)
   components/context/       indicateur de contexte injecté (en-tête de chat, nouveau chat)
   components/markdown/      rendu Markdown partagé (chat + aperçus) : Markdown, CodeBlock, markdown.css
   views/memory/             vue Mémoire (souvenirs par catégorie, recherche)
-  views/settings/           Paramètres (agents inactifs, Agents & MCP, notifications, contexte injecté, CLI génériques, raccourcis)
+  views/settings/           Paramètres (général, arrière-plan & raccourci, Agents & MCP, notifications, contexte injecté,
+                            CLI génériques, raccourcis)
   lib/shortcuts.ts          liste unique des raccourcis globaux (aide + palette)
   styles/index.css          design tokens Tailwind v4 (@theme)
 scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon

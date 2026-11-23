@@ -34,10 +34,7 @@ pub struct DashboardSnapshot {
 const RECENT_LIMIT: u32 = 12;
 
 #[tauri::command]
-pub async fn dashboard_snapshot(
-    state: State<'_, AppState>,
-    range: Option<UsageRange>,
-) -> AppResult<DashboardSnapshot> {
+pub async fn dashboard_snapshot(state: State<'_, AppState>, range: Option<UsageRange>) -> AppResult<DashboardSnapshot> {
     let range = range.unwrap_or(UsageRange::Week);
     state
         .db
@@ -69,10 +66,7 @@ pub async fn usage_report(state: State<'_, AppState>, range: UsageRange) -> AppR
 }
 
 #[tauri::command]
-pub async fn update_provider(
-    state: State<'_, AppState>,
-    update: ProviderUpdate,
-) -> AppResult<ProviderUsage> {
+pub async fn update_provider(state: State<'_, AppState>, update: ProviderUpdate) -> AppResult<ProviderUsage> {
     state
         .db
         .call(move |conn| {
@@ -98,8 +92,5 @@ pub async fn list_threads(state: State<'_, AppState>, limit: Option<u32>) -> App
 
 #[tauri::command]
 pub async fn get_thread(state: State<'_, AppState>, id: String) -> AppResult<ThreadSummary> {
-    state
-        .db
-        .call(move |conn| threads::get(conn, &id)?.ok_or_else(|| AppError::NotFound(format!("thread {id}"))))
-        .await
+    state.db.call(move |conn| threads::get(conn, &id)?.ok_or_else(|| AppError::NotFound(format!("thread {id}")))).await
 }

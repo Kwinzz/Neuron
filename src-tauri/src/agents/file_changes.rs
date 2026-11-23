@@ -75,11 +75,7 @@ pub fn edited_paths(tool: &str, input: &Value, cwd: Option<&Path>) -> Vec<PathBu
     }
     // Codex: { changes: [{ path, kind }] }
     if let Some(changes) = input.get("changes").and_then(Value::as_array) {
-        return changes
-            .iter()
-            .filter_map(|c| c.get("path").and_then(Value::as_str))
-            .map(|p| resolve(p, cwd))
-            .collect();
+        return changes.iter().filter_map(|c| c.get("path").and_then(Value::as_str)).map(|p| resolve(p, cwd)).collect();
     }
     PATH_FIELDS
         .iter()
@@ -170,7 +166,9 @@ impl FileTracker {
         let mut out = Vec::new();
         for (path, before) in snapshots {
             let Ok(after) = read_text(&path).await else { continue };
-            if let Some(mut change) = compute(&display_path(&path, self.cwd.as_deref()), before.as_deref(), after.as_deref()) {
+            if let Some(mut change) =
+                compute(&display_path(&path, self.cwd.as_deref()), before.as_deref(), after.as_deref())
+            {
                 if is_markdown(&path) {
                     change.content = after.filter(|a| a.len() <= MAX_DIFF_BYTES);
                 }
@@ -189,11 +187,18 @@ mod tests {
     #[test]
     fn paths_of_each_provider() {
         let cwd = Path::new("C:/repo");
-        assert_eq!(edited_paths("Edit", &json!({"file_path": "C:/repo/a.rs"}), Some(cwd)), [PathBuf::from("C:/repo/a.rs")]);
+        assert_eq!(
+            edited_paths("Edit", &json!({"file_path": "C:/repo/a.rs"}), Some(cwd)),
+            [PathBuf::from("C:/repo/a.rs")]
+        );
         assert_eq!(edited_paths("write_file", &json!({"Path": "b.txt"}), Some(cwd)), [cwd.join("b.txt")]);
         assert_eq!(
-            edited_paths("FileChange", &json!({"changes": [{"path": "x.rs", "kind": "update"}, {"path": "y.rs", "kind": "add"}]}), Some(cwd))
-                .len(),
+            edited_paths(
+                "FileChange",
+                &json!({"changes": [{"path": "x.rs", "kind": "update"}, {"path": "y.rs", "kind": "add"}]}),
+                Some(cwd)
+            )
+            .len(),
             2
         );
         assert!(edited_paths("Read", &json!({"file_path": "a.rs"}), Some(cwd)).is_empty());

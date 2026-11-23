@@ -243,12 +243,10 @@ fn live_quota(conn: &Connection, provider: &Provider) -> AppResult<Option<LiveQu
         .get("windows")
         .and_then(serde_json::Value::as_array)
         .and_then(|ws| {
-            ws.iter()
-                .filter(|w| w.get("window").and_then(serde_json::Value::as_str) == Some(window))
-                .max_by(|a, b| {
-                    let u = |w: &serde_json::Value| w.get("utilization").and_then(serde_json::Value::as_f64).unwrap_or(0.0);
-                    u(a).total_cmp(&u(b))
-                })
+            ws.iter().filter(|w| w.get("window").and_then(serde_json::Value::as_str) == Some(window)).max_by(|a, b| {
+                let u = |w: &serde_json::Value| w.get("utilization").and_then(serde_json::Value::as_f64).unwrap_or(0.0);
+                u(a).total_cmp(&u(b))
+            })
         })
         .and_then(|w| {
             Some(LiveQuota {
@@ -318,34 +316,22 @@ pub fn usage(conn: &Connection, provider: Provider, now: i64) -> AppResult<Provi
          FROM token_usage
          WHERE agent = ?1 AND ts >= ?2",
     )?;
-    let (tokens, cost, turns, oldest): (i64, f64, i64, Option<i64>) = stmt
-        .query_row(params![provider.agent, window_start], |r| {
-            Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
-        })?;
+    let (tokens, cost, turns, oldest): (i64, f64, i64, Option<i64>) =
+        stmt.query_row(params![provider.agent, window_start], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?;
 
     let used = match provider.unit {
         QuotaUnit::Tokens => tokens as f64,
         QuotaUnit::Usd | QuotaUnit::Credits => cost,
         QuotaUnit::Messages | QuotaUnit::Requests => turns as f64,
     };
-    let ratio = provider
-        .limit_value
-        .filter(|limit| *limit > 0.0)
-        .map(|limit| used / limit);
+    let ratio = provider.limit_value.filter(|limit| *limit > 0.0).map(|limit| used / limit);
     let resets_at = match (provider.window_kind.duration_ms(), oldest) {
         (Some(len), Some(oldest)) => Some(oldest + len),
         _ => None,
     };
 
     let live = live_quota(conn, &provider)?;
-    Ok(ProviderUsage {
-        provider,
-        used,
-        ratio,
-        resets_at,
-        window_start,
-        live,
-    })
+    Ok(ProviderUsage { provider, used, ratio, resets_at, window_start, live })
 }
 
 /// Window kinds an agent's subscription reported (Claude 5 h / 7 j, Antigravity per tier, Codex free = 30 j).
@@ -490,7 +476,10 @@ mod tests {
             store_live_windows(
                 conn,
                 AgentKind::Antigravity,
-                &[window("seven_day", 0.1, Some("Gemini Models")), window("seven_day", 0.4, Some("Claude and GPT models"))],
+                &[
+                    window("seven_day", 0.1, Some("Gemini Models")),
+                    window("seven_day", 0.4, Some("Claude and GPT models")),
+                ],
                 now,
             )?;
             let cards = list_with_usage(conn, now)?;

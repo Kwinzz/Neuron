@@ -32,7 +32,9 @@ pub fn spawn_error(binary: &str, err: std::io::Error) -> AppError {
 }
 
 /// Keep the last bytes of a stream (stderr) for diagnostics.
-pub fn spawn_tail<R: tokio::io::AsyncRead + Unpin + Send + 'static>(mut reader: R) -> tokio::sync::oneshot::Receiver<String> {
+pub fn spawn_tail<R: tokio::io::AsyncRead + Unpin + Send + 'static>(
+    mut reader: R,
+) -> tokio::sync::oneshot::Receiver<String> {
     let (tx, rx) = tokio::sync::oneshot::channel::<String>();
     tauri::async_runtime::spawn(async move {
         let mut tail: VecDeque<u8> = VecDeque::with_capacity(STDERR_TAIL_BYTES);
@@ -86,7 +88,8 @@ where
         .spawn()
         .map_err(|err| spawn_error(binary, err))?;
     let pid = child.id();
-    let (Some(stdin), Some(stdout), Some(stderr)) = (child.stdin.take(), child.stdout.take(), child.stderr.take()) else {
+    let (Some(stdin), Some(stdout), Some(stderr)) = (child.stdin.take(), child.stdout.take(), child.stderr.take())
+    else {
         return Err(AppError::Other("pipes du processus indisponibles".into()));
     };
 

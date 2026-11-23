@@ -25,8 +25,11 @@ fn truncate(text: &str, max: usize) -> String {
 /// Returns the status and detail to show while `tool` runs with `input`.
 pub fn tool_activity(tool: &str, input: &Value) -> (ThreadStatus, Option<String>) {
     let lower = tool.to_ascii_lowercase();
-    let path = str_field(input, &["file_path", "path", "notebook_path", "Path", "TargetFile", "AbsolutePath", "DirectoryPath"])
-        .map(file_name);
+    let path = str_field(
+        input,
+        &["file_path", "path", "notebook_path", "Path", "TargetFile", "AbsolutePath", "DirectoryPath"],
+    )
+    .map(file_name);
     match lower.as_str() {
         "read" | "ls" | "notebookread" | "view_file" | "read_file" | "list_dir" | "view_code_item" => {
             (ThreadStatus::Reading, path)
@@ -35,12 +38,19 @@ pub fn tool_activity(tool: &str, input: &Value) -> (ThreadStatus, Option<String>
             ThreadStatus::Reading,
             str_field(input, &["pattern", "query", "Query", "Pattern", "SearchPath"]).map(|p| truncate(p, 48)),
         ),
-        "webfetch" | "websearch" => (
-            ThreadStatus::Reading,
-            str_field(input, &["url", "query"]).map(|p| truncate(p, 48)),
-        ),
-        "edit" | "multiedit" | "write" | "notebookedit" | "apply_patch" | "write_file" | "write_to_file"
-        | "replace_file_content" | "multi_replace_file_content" | "edit_file" => (ThreadStatus::Editing, path),
+        "webfetch" | "websearch" => {
+            (ThreadStatus::Reading, str_field(input, &["url", "query"]).map(|p| truncate(p, 48)))
+        }
+        "edit"
+        | "multiedit"
+        | "write"
+        | "notebookedit"
+        | "apply_patch"
+        | "write_file"
+        | "write_to_file"
+        | "replace_file_content"
+        | "multi_replace_file_content"
+        | "edit_file" => (ThreadStatus::Editing, path),
         "filechange" => (
             ThreadStatus::Editing,
             input

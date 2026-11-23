@@ -70,7 +70,11 @@ pub async fn delete_memory(state: State<'_, AppState>, id: String) -> AppResult<
 }
 
 #[tauri::command]
-pub async fn search_memories(state: State<'_, AppState>, query: String, limit: Option<u32>) -> AppResult<Vec<MemoryHit>> {
+pub async fn search_memories(
+    state: State<'_, AppState>,
+    query: String,
+    limit: Option<u32>,
+) -> AppResult<Vec<MemoryHit>> {
     let limit = limit.map_or(20, |l| l as usize);
     state.db.call(move |c| memories::search(c, &query, limit)).await
 }
@@ -78,10 +82,8 @@ pub async fn search_memories(state: State<'_, AppState>, query: String, limit: O
 #[tauri::command]
 pub async fn memory_info(state: State<'_, AppState>) -> AppResult<MemoryInfo> {
     let launch = std::env::current_exe().ok().map(|exe| {
-        let paths = memory::MemoryPaths {
-            db_path: state.paths.db_path.clone(),
-            file_path: state.paths.memory_file.clone(),
-        };
+        let paths =
+            memory::MemoryPaths { db_path: state.paths.db_path.clone(), file_path: state.paths.memory_file.clone() };
         memory::mcp::McpLaunch::new(exe, &paths, "<agent>", None).display()
     });
     Ok(MemoryInfo {
@@ -153,7 +155,8 @@ pub enum AgyMcpStatus {
 
 fn launch_for(state: &AppState, agent: &str) -> AppResult<memory::mcp::McpLaunch> {
     let exe = std::env::current_exe()?;
-    let paths = memory::MemoryPaths { db_path: state.paths.db_path.clone(), file_path: state.paths.memory_file.clone() };
+    let paths =
+        memory::MemoryPaths { db_path: state.paths.db_path.clone(), file_path: state.paths.memory_file.clone() };
     Ok(memory::mcp::McpLaunch::new(exe, &paths, agent, None))
 }
 

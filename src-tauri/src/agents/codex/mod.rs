@@ -52,7 +52,10 @@ pub fn turn_args(spec: &SessionSpec, thread: Option<&str>, turn: &crate::agents:
         // TOML literal strings ('…'): Windows paths keep their backslashes.
         let lit = |s: &str| format!("'{}'", s.replace('\'', ""));
         let list = mcp.args.iter().map(|a| lit(a)).collect::<Vec<_>>().join(",");
-        args.extend(["-c".into(), format!("mcp_servers.{SERVER_NAME}.command={}", lit(&mcp.command.display().to_string()))]);
+        args.extend([
+            "-c".into(),
+            format!("mcp_servers.{SERVER_NAME}.command={}", lit(&mcp.command.display().to_string())),
+        ]);
         args.extend(["-c".into(), format!("mcp_servers.{SERVER_NAME}.args=[{list}]")]);
     }
     // `--image=<path>`: the `=` form, because `-i` takes several values and would swallow the prompt.
@@ -121,7 +124,9 @@ async fn session_loop(
 
         // Slash commands: `/review` is its own Codex command; `/<skill>` becomes an explicit instruction.
         let (args, is_review) = match crate::agents::slash::codex_rewrite(&cwd, &prompt.text) {
-            Some(crate::agents::slash::CodexSlash::Review(instructions)) => (review_args(&spec, instructions.as_deref()), true),
+            Some(crate::agents::slash::CodexSlash::Review(instructions)) => {
+                (review_args(&spec, instructions.as_deref()), true)
+            }
             Some(crate::agents::slash::CodexSlash::Prompt(text)) => {
                 let turn = crate::agents::UserTurn { text, attachments: prompt.attachments.clone() };
                 (turn_args(&spec, thread.as_deref(), &turn), false)
@@ -264,7 +269,12 @@ mod tests {
             size: 3,
             is_image: true,
         };
-        let doc = crate::attachments::Attachment { name: "b.pdf".into(), path: "C:/n/b.pdf".into(), is_image: false, ..img.clone() };
+        let doc = crate::attachments::Attachment {
+            name: "b.pdf".into(),
+            path: "C:/n/b.pdf".into(),
+            is_image: false,
+            ..img.clone()
+        };
         let turn = crate::agents::UserTurn { text: "regarde".into(), attachments: vec![img, doc] };
         let with = turn_args(&spec("manual"), None, &turn);
         assert!(with.contains(&"--image=C:/n/a.png".to_string()));

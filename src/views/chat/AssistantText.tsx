@@ -1,6 +1,5 @@
 import { memo, useEffect, useMemo } from "react";
 import { cn } from "cn";
-import type { AgentKind } from "@/bindings/AgentKind";
 import type { ChatItem } from "@/bindings/ChatItem";
 import { Markdown } from "@/components/markdown/Markdown";
 import { useReveal } from "@/stores/reveal";
@@ -14,8 +13,6 @@ interface AssistantTextProps {
   item: TextItem;
   /** Arrived after the chat was opened: reveal it progressively. */
   fresh: boolean;
-  /** Kept for the item API (the agent cursor now lives at the timeline level). */
-  agent: AgentKind;
   threadId: string;
 }
 

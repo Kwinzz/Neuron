@@ -35,12 +35,15 @@ pub fn parse_rate_limits(limits: &Value) -> Vec<RateLimitWindow> {
             let w = limits.get(*key)?;
             let used = w.get("used_percent")?.as_f64()?;
             let minutes = w.get("window_minutes")?.as_u64()?;
-            let resets_at = w
-                .get("resets_at")
-                .and_then(Value::as_i64)
-                .map(|s| s * 1000)
-                .or_else(|| w.get("resets_in_seconds").and_then(Value::as_i64).map(|s| crate::util::now_ms() + s * 1000));
-            Some(RateLimitWindow { window: window_name(minutes), utilization: (used / 100.0).clamp(0.0, 1.0), resets_at, ..Default::default() })
+            let resets_at = w.get("resets_at").and_then(Value::as_i64).map(|s| s * 1000).or_else(|| {
+                w.get("resets_in_seconds").and_then(Value::as_i64).map(|s| crate::util::now_ms() + s * 1000)
+            });
+            Some(RateLimitWindow {
+                window: window_name(minutes),
+                utilization: (used / 100.0).clamp(0.0, 1.0),
+                resets_at,
+                ..Default::default()
+            })
         })
         .collect()
 }
@@ -96,7 +99,10 @@ mod tests {
         assert_eq!((w[0].window.as_str(), w[0].resets_at), ("five_hour", Some(1_800_000_000_000)));
         assert!((w[0].utilization - 0.42).abs() < 1e-9);
         assert_eq!(w[1].window, "seven_day");
-        let free: Value = serde_json::from_str(r#"{"primary":{"used_percent":1.0,"window_minutes":43200,"resets_at":1},"secondary":null}"#).unwrap();
+        let free: Value = serde_json::from_str(
+            r#"{"primary":{"used_percent":1.0,"window_minutes":43200,"resets_at":1},"secondary":null}"#,
+        )
+        .unwrap();
         assert_eq!(parse_rate_limits(&free)[0].window, "thirty_day");
     }
 

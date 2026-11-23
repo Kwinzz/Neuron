@@ -58,11 +58,7 @@ pub struct IpcError {
 
 impl Serialize for AppError {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        IpcError {
-            kind: self.kind(),
-            message: self.to_string(),
-        }
-        .serialize(serializer)
+        IpcError { kind: self.kind(), message: self.to_string() }.serialize(serializer)
     }
 }
 

@@ -71,7 +71,7 @@ const TimelineItem = memo(function TimelineItem({
     case "user":
       return <UserMessage item={item} />;
     case "text":
-      return <AssistantText item={item} fresh={fresh} agent={agent} threadId={threadId} />;
+      return <AssistantText item={item} fresh={fresh} threadId={threadId} />;
     case "thinking":
       return <ThinkingBlock item={item} />;
     case "tool":

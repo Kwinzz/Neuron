@@ -58,13 +58,6 @@ export function quotaLevel(ratio: number | null, alertPct: number): QuotaLevel {
   return "ok";
 }
 
-export const LEVEL_FILL: Record<QuotaLevel, string> = {
-  none: "*:data-[slot=progress-indicator]:bg-primary",
-  ok: "*:data-[slot=progress-indicator]:bg-ok",
-  warn: "*:data-[slot=progress-indicator]:bg-warn",
-  danger: "*:data-[slot=progress-indicator]:bg-destructive",
-};
-
 export const LEVEL_TEXT: Record<QuotaLevel, string> = {
   none: "text-muted-foreground",
   ok: "text-ok",

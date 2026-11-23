@@ -41,11 +41,9 @@ fn u(v: &Value, key: &str) -> u64 {
 fn tool_result_text(content: &Value) -> String {
     match content {
         Value::String(text) => text.clone(),
-        Value::Array(parts) => parts
-            .iter()
-            .filter_map(|p| p.get("text").and_then(Value::as_str))
-            .collect::<Vec<_>>()
-            .join("\n"),
+        Value::Array(parts) => {
+            parts.iter().filter_map(|p| p.get("text").and_then(Value::as_str)).collect::<Vec<_>>().join("\n")
+        }
         Value::Null => String::new(),
         other => other.to_string(),
     }
@@ -264,7 +262,11 @@ impl ClaudeParser {
             .drain(..)
             .flat_map(|(item_id, text)| {
                 [
-                    AdapterEvent::TextDelta { item_id: item_id.clone(), channel: DeltaChannel::Text, text: text.clone() },
+                    AdapterEvent::TextDelta {
+                        item_id: item_id.clone(),
+                        channel: DeltaChannel::Text,
+                        text: text.clone(),
+                    },
                     AdapterEvent::BlockCompleted { item_id, channel: DeltaChannel::Text, text },
                 ]
             })
@@ -278,10 +280,15 @@ impl ClaudeParser {
         let mut out = match s(v, "local_command").filter(|n| !n.is_empty()) {
             Some(name) => {
                 let held = std::mem::take(&mut self.synthetic);
-                let item_id = held.first().map(|(id, _)| id.clone()).unwrap_or_else(|| format!("cmd-{name}-{}", s(v, "uuid").unwrap_or_default()));
-                let text = held.into_iter().map(|(_, t)| t).collect::<Vec<_>>().join("
+                let item_id = held
+                    .first()
+                    .map(|(id, _)| id.clone())
+                    .unwrap_or_else(|| format!("cmd-{name}-{}", s(v, "uuid").unwrap_or_default()));
+                let text = held.into_iter().map(|(_, t)| t).collect::<Vec<_>>().join(
+                    "
 
-");
+",
+                );
                 vec![AdapterEvent::CommandOutput { item_id, name: name.trim_start_matches('/').to_string(), text }]
             }
             None => self.flush_synthetic(),
@@ -311,10 +318,7 @@ impl ClaudeParser {
     }
 
     fn on_rate_limit(&mut self, v: &Value) -> Vec<AdapterEvent> {
-        let Some(windows) = v
-            .get("rate_limit_info")
-            .and_then(|i| i.get("unifiedWindows"))
-            .and_then(Value::as_object)
+        let Some(windows) = v.get("rate_limit_info").and_then(|i| i.get("unifiedWindows")).and_then(Value::as_object)
         else {
             return Vec::new();
         };
@@ -369,7 +373,9 @@ mod tests {
         let events = run(LOCAL_COMMAND);
         assert!(events.iter().any(|e| matches!(e,
             AdapterEvent::CommandOutput { name, text, .. } if name == "usage" && text.contains("Current session"))));
-        assert!(!events.iter().any(|e| matches!(e, AdapterEvent::TextDelta { .. } | AdapterEvent::BlockCompleted { .. })));
+        assert!(
+            !events.iter().any(|e| matches!(e, AdapterEvent::TextDelta { .. } | AdapterEvent::BlockCompleted { .. }))
+        );
         assert!(matches!(events.last(), Some(AdapterEvent::TurnComplete { error: None, .. })));
     }
 
@@ -409,7 +415,9 @@ mod tests {
         assert!(events.iter().any(|e| matches!(e,
             AdapterEvent::Subagent { tool_uses: Some(1), last_tool: Some(t), .. } if t == "Read")));
         // The final answer is still the main agent's.
-        assert!(events.iter().any(|e| matches!(e, AdapterEvent::BlockCompleted { text, .. } if text.contains("hello"))));
+        assert!(
+            events.iter().any(|e| matches!(e, AdapterEvent::BlockCompleted { text, .. } if text.contains("hello")))
+        );
     }
 
     #[test]
@@ -448,7 +456,11 @@ mod tests {
         assert_eq!(turns.len(), 2);
         assert!(turns[0].cache_read > 0 && turns[0].output > 0 && turns[0].cost_usd > 0.0);
 
-        assert!(events.iter().any(|e| matches!(e, AdapterEvent::RateLimits(w) if w.iter().any(|w| w.window == "five_hour"))));
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, AdapterEvent::RateLimits(w) if w.iter().any(|w| w.window == "five_hour")))
+        );
     }
 
     #[test]
@@ -489,6 +501,8 @@ mod tests {
         assert!(matches!(p.feed("not json").as_slice(), [AdapterEvent::Warning(_)]));
         assert!(p.feed("").is_empty());
         let err = p.feed(r#"{"type":"result","subtype":"error_during_execution","is_error":true,"usage":{}}"#);
-        assert!(matches!(err.as_slice(), [AdapterEvent::TurnComplete { error: Some(e), .. }] if e == "error_during_execution"));
+        assert!(
+            matches!(err.as_slice(), [AdapterEvent::TurnComplete { error: Some(e), .. }] if e == "error_during_execution")
+        );
     }
 }

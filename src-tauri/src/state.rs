@@ -89,12 +89,7 @@ impl AppState {
         Ok(Self {
             db,
             agents: Arc::new(AgentRegistry::new(mcp)),
-            paths: AppPaths {
-                data_dir,
-                db_path,
-                neuron_home,
-                memory_file,
-            },
+            paths: AppPaths { data_dir, db_path, neuron_home, memory_file },
             setup_ms: as_u64(started.elapsed().as_millis()),
             db_open_us,
         })

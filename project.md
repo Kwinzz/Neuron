@@ -88,6 +88,15 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-24 — Tour du projet : mise en ordre
+- Rust : `rustfmt.toml` (`max_width = 120`, `use_small_heuristics = "Max"`, le style déjà utilisé) et `cargo fmt`
+  sur tout `src-tauri/` ; `cargo clippy --all-targets` sans avertissement.
+- Code mort retiré : `views/chat/CodeBlock.tsx` (ré-export inutilisé), composants shadcn jamais importés
+  (`radio-group`, `scroll-area`), `__reduceChat`, `LEVEL_FILL`, prop `agent` inutilisée d'`AssistantText`,
+  `app-icon.svg` (source de l'icône de la phase 0, remplacée par `neuronicon.png`).
+- Vérifié : aucune dépendance npm inutilisée, aucun `console.log`, `TODO` ni code commenté.
+- `CLAUDE.md` : arborescence à jour (desktop, notifications, quick, stores…), police Geist (et non Inter).
+
 ### 2026-11-24 — Raccourcis du navigateur désactivés
 - `lib/browserKeys.ts` (branché dans `main.tsx`) annule l'action par défaut de WebView2 pour Ctrl+F (barre de
   recherche), Ctrl+G, Ctrl+P (impression), Ctrl+R / F5 (rechargement), Ctrl+U, Ctrl+S, Ctrl+H, Ctrl+O, F3, F7,

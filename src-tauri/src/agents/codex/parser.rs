@@ -56,7 +56,10 @@ impl CodexParser {
             return Vec::new();
         }
         let Ok(v) = serde_json::from_str::<Value>(line) else {
-            return vec![AdapterEvent::Warning(format!("ligne non JSON : {}", line.chars().take(200).collect::<String>()))];
+            return vec![AdapterEvent::Warning(format!(
+                "ligne non JSON : {}",
+                line.chars().take(200).collect::<String>()
+            ))];
         };
         match v.get("type").and_then(Value::as_str) {
             Some("thread.started") => v
@@ -124,7 +127,11 @@ impl CodexParser {
                 out
             }
             Some("file_change") => {
-                let mut out = self.tool(id.clone(), "FileChange", json!({ "changes": item.get("changes").cloned().unwrap_or(Value::Null) }));
+                let mut out = self.tool(
+                    id.clone(),
+                    "FileChange",
+                    json!({ "changes": item.get("changes").cloned().unwrap_or(Value::Null) }),
+                );
                 if completed {
                     let summary = item
                         .get("changes")
@@ -176,9 +183,9 @@ impl CodexParser {
                     AdapterEvent::BlockCompleted { item_id: id, channel, text },
                 ]
             }
-            Some("error") if completed => vec![AdapterEvent::Warning(
-                item.get("message").and_then(Value::as_str).unwrap_or("").to_string(),
-            )],
+            Some("error") if completed => {
+                vec![AdapterEvent::Warning(item.get("message").and_then(Value::as_str).unwrap_or("").to_string())]
+            }
             _ => Vec::new(),
         }
     }

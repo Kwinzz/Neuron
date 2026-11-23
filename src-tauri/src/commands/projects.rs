@@ -81,11 +81,7 @@ pub async fn project_overview(state: State<'_, AppState>, project_id: String) ->
         let memory = crate::memory::context_section(&memory_items).filter(|_| opts.inject_memory);
         let preview = context::with_memory(Some(preview), memory)
             .unwrap_or_else(|| ContextBundle { markdown: String::new(), sources: Vec::new() });
-        Ok(ProjectOverview {
-            git: context::git_snapshot(&root),
-            recent_files: context::recent_files(&root),
-            preview,
-        })
+        Ok(ProjectOverview { git: context::git_snapshot(&root), recent_files: context::recent_files(&root), preview })
     })
     .await?
 }

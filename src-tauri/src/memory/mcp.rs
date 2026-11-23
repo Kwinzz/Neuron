@@ -95,9 +95,9 @@ pub fn entry_from_args() -> Option<i32> {
         .with_ansi(false)
         .with_env_filter(tracing_subscriber::EnvFilter::new("warn,neuron_lib=info"))
         .try_init();
-    let project = value("--project").map(PathBuf::from).or_else(|| {
-        std::env::current_dir().ok().filter(|d| d.join(crate::context::CONTEXT_REL).is_file())
-    });
+    let project = value("--project")
+        .map(PathBuf::from)
+        .or_else(|| std::env::current_dir().ok().filter(|d| d.join(crate::context::CONTEXT_REL).is_file()));
     let server = Server {
         paths: MemoryPaths { db_path: PathBuf::from(db), file_path: PathBuf::from(file) },
         agent: value("--agent").unwrap_or_else(|| "agent".into()),
@@ -364,9 +364,8 @@ fn call_tool(db: &Db, server: &Server, params: &Value) -> Value {
                     .map(MemoryCategory::from_db)
                     .unwrap_or(MemoryCategory::Other);
                 let content = args.get("content").and_then(Value::as_str).unwrap_or_default();
-                let duplicate = memories::list(c)?
-                    .into_iter()
-                    .any(|m| m.content.trim().eq_ignore_ascii_case(content.trim()));
+                let duplicate =
+                    memories::list(c)?.into_iter().any(|m| m.content.trim().eq_ignore_ascii_case(content.trim()));
                 if duplicate {
                     return Ok("Déjà en mémoire, rien à ajouter.".into());
                 }
@@ -377,8 +376,11 @@ fn call_tool(db: &Db, server: &Server, params: &Value) -> Value {
             "neuron_memory_update" => {
                 let id = resolve_id(c, args.get("id").and_then(Value::as_str).unwrap_or_default())?;
                 let current = memories::get(c, &id)?.ok_or_else(|| AppError::NotFound(id.clone()))?;
-                let category =
-                    args.get("category").and_then(Value::as_str).map(MemoryCategory::from_db).unwrap_or(current.category);
+                let category = args
+                    .get("category")
+                    .and_then(Value::as_str)
+                    .map(MemoryCategory::from_db)
+                    .unwrap_or(current.category);
                 let content = args.get("content").and_then(Value::as_str).unwrap_or(&current.content).to_string();
                 let saved = memories::update(c, &id, category, &content, now_ms())?;
                 export(c, &file)?;
@@ -459,7 +461,11 @@ mod tests {
                 json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}),
                 json!({"jsonrpc":"2.0","method":"notifications/initialized"}),
                 json!({"jsonrpc":"2.0","id":2,"method":"tools/list"}),
-                call(3, "neuron_memory_save", json!({"category":"strict_rules","content":"Ne jamais pousser sans demande"})),
+                call(
+                    3,
+                    "neuron_memory_save",
+                    json!({"category":"strict_rules","content":"Ne jamais pousser sans demande"}),
+                ),
                 call(4, "neuron_memory_search", json!({"query":"pousser"})),
                 call(5, "neuron_memory_read", json!({})),
                 json!({"jsonrpc":"2.0","id":6,"method":"nope"}),
@@ -480,7 +486,11 @@ mod tests {
         let replies = run(
             &s,
             &[
-                call(7, "neuron_memory_update", json!({"id": id, "content": "Ne jamais pousser sans accord explicite"})),
+                call(
+                    7,
+                    "neuron_memory_update",
+                    json!({"id": id, "content": "Ne jamais pousser sans accord explicite"}),
+                ),
                 call(8, "neuron_memory_read", json!({})),
                 call(9, "neuron_memory_delete", json!({"id": id})),
                 call(10, "neuron_memory_read", json!({})),

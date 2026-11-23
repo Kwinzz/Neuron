@@ -41,8 +41,8 @@ mod platform {
         if std::fs::read(&icon).ok().as_deref() != Some(ICON) {
             std::fs::write(&icon, ICON)?;
         }
-        let (key, _) = RegKey::predef(HKEY_CURRENT_USER)
-            .create_subkey(format!(r"Software\Classes\AppUserModelId\{app_id}"))?;
+        let (key, _) =
+            RegKey::predef(HKEY_CURRENT_USER).create_subkey(format!(r"Software\Classes\AppUserModelId\{app_id}"))?;
         key.set_value("DisplayName", &display_name)?;
         key.set_value("IconUri", &icon.to_string_lossy().into_owned())?;
         Ok(())

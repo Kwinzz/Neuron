@@ -49,9 +49,8 @@ pub fn list(conn: &Connection) -> AppResult<Vec<ProjectSummary>> {
 
 /// Register a project for a local directory (idempotent on the path). Returns its id.
 pub fn create(conn: &Connection, name: &str, path: &str, now: i64) -> AppResult<String> {
-    if let Some(id) = conn
-        .query_row("SELECT id FROM projects WHERE path = ?1", [path], |r| r.get::<_, String>(0))
-        .optional()?
+    if let Some(id) =
+        conn.query_row("SELECT id FROM projects WHERE path = ?1", [path], |r| r.get::<_, String>(0)).optional()?
     {
         conn.execute("UPDATE projects SET last_opened_at = ?2 WHERE id = ?1", params![id, now])?;
         return Ok(id);
@@ -69,9 +68,7 @@ pub fn get(conn: &Connection, id: &str) -> AppResult<Option<ProjectSummary>> {
 }
 
 pub fn path_of(conn: &Connection, id: &str) -> AppResult<Option<String>> {
-    Ok(conn
-        .query_row("SELECT path FROM projects WHERE id = ?1", [id], |r| r.get(0))
-        .optional()?)
+    Ok(conn.query_row("SELECT path FROM projects WHERE id = ?1", [id], |r| r.get(0)).optional()?)
 }
 
 pub fn touch(conn: &Connection, id: &str, now: i64) -> AppResult<()> {

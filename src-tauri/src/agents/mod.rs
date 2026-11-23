@@ -10,9 +10,9 @@ pub mod antigravity;
 pub mod catalog;
 pub mod claude;
 pub mod codex;
-pub mod generic;
 pub mod events;
 pub mod file_changes;
+pub mod generic;
 pub mod process;
 pub mod registry;
 pub mod slash;
@@ -115,18 +115,41 @@ pub struct RateLimitWindow {
 /// Normalized events produced by adapters, consumed by the registry pump.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AdapterEvent {
-    SessionInit { session_ref: String, model: Option<String> },
-    Status { status: ThreadStatus, detail: Option<String> },
-    TextDelta { item_id: String, channel: DeltaChannel, text: String },
+    SessionInit {
+        session_ref: String,
+        model: Option<String>,
+    },
+    Status {
+        status: ThreadStatus,
+        detail: Option<String>,
+    },
+    TextDelta {
+        item_id: String,
+        channel: DeltaChannel,
+        text: String,
+    },
     /// A text/thinking block is complete (full text, for persistence).
-    BlockCompleted { item_id: String, channel: DeltaChannel, text: String },
+    BlockCompleted {
+        item_id: String,
+        channel: DeltaChannel,
+        text: String,
+    },
     /// The agent's permission mode changed (plan approved, `EnterPlanMode`, live switch). Neuron's id.
     ModeChanged(String),
     /// Output of a command the CLI ran itself, without the model (Claude Code `/usage`, `/context`…).
     /// `name` is without the leading slash; `text` may be empty.
-    CommandOutput { item_id: String, name: String, text: String },
+    CommandOutput {
+        item_id: String,
+        name: String,
+        text: String,
+    },
     /// `parent_id`: set for calls made by a sub-agent (id of the call that launched it).
-    ToolCallStart { id: String, name: String, input: Value, parent_id: Option<String> },
+    ToolCallStart {
+        id: String,
+        name: String,
+        input: Value,
+        parent_id: Option<String>,
+    },
     Subagent {
         tool_call_id: String,
         description: Option<String>,
@@ -136,7 +159,11 @@ pub enum AdapterEvent {
         tokens: Option<u64>,
         last_tool: Option<String>,
     },
-    ToolCallResult { id: String, output: String, is_error: bool },
+    ToolCallResult {
+        id: String,
+        output: String,
+        is_error: bool,
+    },
     PermissionRequest {
         request_id: String,
         tool_name: String,
@@ -145,12 +172,19 @@ pub enum AdapterEvent {
         tool_use_id: Option<String>,
     },
     /// End of a turn with its usage.
-    TurnComplete { usage: TokenUsage, duration_ms: Option<i64>, error: Option<String> },
+    TurnComplete {
+        usage: TokenUsage,
+        duration_ms: Option<i64>,
+        error: Option<String>,
+    },
     RateLimits(Vec<RateLimitWindow>),
     /// Recoverable adapter problem (unparseable line, unexpected payload…).
     Warning(String),
     /// The process exited.
-    Exited { code: Option<i32>, stderr_tail: String },
+    Exited {
+        code: Option<i32>,
+        stderr_tail: String,
+    },
 }
 
 /// Handle to a running session.
@@ -188,9 +222,7 @@ pub fn kill_process_tree(pid: u32) {
     }
     #[cfg(not(windows))]
     {
-        let _ = std::process::Command::new("kill")
-            .args(["-TERM", &format!("-{pid}")])
-            .status();
+        let _ = std::process::Command::new("kill").args(["-TERM", &format!("-{pid}")]).status();
         let _ = std::process::Command::new("kill").args(["-TERM", &pid.to_string()]).status();
     }
 }

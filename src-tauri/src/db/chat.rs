@@ -143,7 +143,14 @@ pub fn insert_message(
     Ok(())
 }
 
-pub fn insert_tool_call(conn: &Connection, id: &str, thread_id: &str, name: &str, input: &Value, ts: i64) -> AppResult<()> {
+pub fn insert_tool_call(
+    conn: &Connection,
+    id: &str,
+    thread_id: &str,
+    name: &str,
+    input: &Value,
+    ts: i64,
+) -> AppResult<()> {
     let seq = next_seq(conn, thread_id)?;
     conn.execute(
         "INSERT OR IGNORE INTO tool_calls (id, thread_id, name, input_json, status, started_at, seq)
@@ -193,10 +200,8 @@ pub fn history(conn: &Connection, thread_id: &str) -> AppResult<Vec<ChatItem>> {
         let id: String = r.get(2)?;
         if src == "t" {
             let name: String = r.get(3)?;
-            let input: Value = r
-                .get::<_, Option<String>>(4)?
-                .and_then(|s| serde_json::from_str(&s).ok())
-                .unwrap_or(Value::Null);
+            let input: Value =
+                r.get::<_, Option<String>>(4)?.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or(Value::Null);
             let (_, activity) = crate::agents::activity::tool_activity(&name, &input);
             return Ok(ChatItem::Tool {
                 id,
@@ -239,7 +244,8 @@ pub fn history(conn: &Connection, thread_id: &str) -> AppResult<Vec<ChatItem>> {
                 let meta = meta.unwrap_or(Value::Null);
                 ChatItem::Turn {
                     id,
-                    usage: serde_json::from_value(meta.get("usage").cloned().unwrap_or(Value::Null)).unwrap_or_default(),
+                    usage: serde_json::from_value(meta.get("usage").cloned().unwrap_or(Value::Null))
+                        .unwrap_or_default(),
                     duration_ms: meta.get("durationMs").and_then(Value::as_i64),
                     ts,
                 }
@@ -289,10 +295,7 @@ pub fn record_prompt(conn: &Connection, project_id: Option<&str>, text: &str, ts
 }
 
 pub fn message_exists(conn: &Connection, id: &str) -> AppResult<bool> {
-    Ok(conn
-        .query_row("SELECT 1 FROM messages WHERE id = ?1", [id], |_| Ok(()))
-        .optional()?
-        .is_some())
+    Ok(conn.query_row("SELECT 1 FROM messages WHERE id = ?1", [id], |_| Ok(())).optional()?.is_some())
 }
 
 #[cfg(test)]

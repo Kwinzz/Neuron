@@ -6,9 +6,8 @@ use serde_json::Value;
 use crate::error::AppResult;
 
 pub fn get(conn: &Connection, key: &str) -> AppResult<Option<Value>> {
-    let raw: Option<String> = conn
-        .query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| r.get(0))
-        .optional()?;
+    let raw: Option<String> =
+        conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| r.get(0)).optional()?;
     Ok(raw.and_then(|s| serde_json::from_str(&s).ok()))
 }
 

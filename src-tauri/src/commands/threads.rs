@@ -7,8 +7,8 @@ use ts_rs::TS;
 
 use crate::agents::events::AgentKind;
 use crate::db::chat::{self, ChatItem};
-use crate::db::{projects, settings};
 use crate::db::threads::{self, NewThread, ThreadSummary};
+use crate::db::{projects, settings};
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use crate::util::now_ms;
@@ -350,7 +350,10 @@ pub async fn create_project(
 
 /// Forget a project (its chats are kept).
 #[tauri::command]
-pub async fn delete_project(state: State<'_, AppState>, project_id: String) -> AppResult<Vec<projects::ProjectSummary>> {
+pub async fn delete_project(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> AppResult<Vec<projects::ProjectSummary>> {
     state
         .db
         .call(move |c| {

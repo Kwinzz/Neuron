@@ -7,10 +7,7 @@ use crate::error::{AppError, AppResult};
 /// Ordered list of migrations. Index + 1 == schema version. Never reorder or edit released entries.
 const MIGRATIONS: &[(&str, &str)] = &[
     ("0001_init", include_str!("../../migrations/0001_init.sql")),
-    (
-        "0002_default_providers",
-        include_str!("../../migrations/0002_default_providers.sql"),
-    ),
+    ("0002_default_providers", include_str!("../../migrations/0002_default_providers.sql")),
     ("0003_thread_runtime", include_str!("../../migrations/0003_thread_runtime.sql")),
     ("0004_thread_effort", include_str!("../../migrations/0004_thread_effort.sql")),
     ("0005_thread_context", include_str!("../../migrations/0005_thread_context.sql")),
@@ -84,13 +81,8 @@ mod tests {
     fn creates_every_table() {
         let conn = fresh();
         for table in EXPECTED_TABLES {
-            let found: i64 = conn
-                .query_row(
-                    "SELECT COUNT(*) FROM sqlite_master WHERE name = ?1",
-                    [table],
-                    |r| r.get(0),
-                )
-                .unwrap();
+            let found: i64 =
+                conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE name = ?1", [table], |r| r.get(0)).unwrap();
             assert_eq!(found, 1, "missing table {table}");
         }
     }
@@ -99,12 +91,7 @@ mod tests {
     fn memories_fts_stays_in_sync() {
         let conn = fresh();
         let search = |q: &str| -> i64 {
-            conn.query_row(
-                "SELECT COUNT(*) FROM memories_fts WHERE memories_fts MATCH ?1",
-                [q],
-                |r| r.get(0),
-            )
-            .unwrap()
+            conn.query_row("SELECT COUNT(*) FROM memories_fts WHERE memories_fts MATCH ?1", [q], |r| r.get(0)).unwrap()
         };
 
         conn.execute(
@@ -116,8 +103,7 @@ mod tests {
         assert_eq!(search("rust"), 1);
         assert_eq!(search("preferer"), 1, "diacritics should be folded");
 
-        conn.execute("UPDATE memories SET content = 'TypeScript strict' WHERE id = 'm1'", [])
-            .unwrap();
+        conn.execute("UPDATE memories SET content = 'TypeScript strict' WHERE id = 'm1'", []).unwrap();
         assert_eq!(search("rust"), 0);
         assert_eq!(search("typescript"), 1);
 
@@ -128,8 +114,7 @@ mod tests {
     #[test]
     fn rejects_newer_schema() {
         let mut conn = Connection::open_in_memory().unwrap();
-        conn.pragma_update(None, "user_version", LATEST_VERSION + 1)
-            .unwrap();
+        conn.pragma_update(None, "user_version", LATEST_VERSION + 1).unwrap();
         assert!(apply(&mut conn).is_err());
     }
 }
