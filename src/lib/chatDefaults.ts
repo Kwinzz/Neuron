@@ -42,3 +42,23 @@ export function saveQuickModel(next: QuickModel): void {
     /* not persisted */
   }
 }
+
+/** Project last picked in the quick prompt window (null = no project). */
+const QUICK_PROJECT_KEY = "neuron.quickProject";
+
+export function readQuickProject(): string | null {
+  try {
+    return localStorage.getItem(QUICK_PROJECT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function saveQuickProject(id: string | null): void {
+  try {
+    if (id) localStorage.setItem(QUICK_PROJECT_KEY, id);
+    else localStorage.removeItem(QUICK_PROJECT_KEY);
+  } catch {
+    /* not persisted */
+  }
+}

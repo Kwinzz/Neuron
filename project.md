@@ -88,6 +88,14 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-24 — Projets dans la demande rapide, Claude Fable 5.2
+- Catalogue Claude : Fable 5.2 n'est plus étiqueté « Génération précédente » (il fait partie de la famille Claude 5).
+- Fenêtre rapide : sélecteur de projet (`QuickProjectPicker`, `Ctrl+P`, mémorisé dans `neuron.quickProject`) à côté
+  du modèle. Avec un projet : le nouveau chat est créé dans le projet (`projectId`) et la liste montre ses chats.
+  Champ vide + Entrée = **ouvrir** dans Neuron le chat choisi (`show_thread`) ou l'écran « Nouveau chat » du projet
+  (nouvelle commande `show_new_chat` → événement `quick://new-chat` → `startChat(projectId)` dans la fenêtre
+  principale). Le pied affiche « Envoyer » ou « Ouvrir » selon le champ.
+
 ### 2026-11-24 — Point d'activité de la liste des chats
 - Barre latérale : le point « l'agent travaille » (badge en position absolue) chevauchait le titre. Le bouton
   réserve sa place (`pr-7`) tant que le point est affiché ; dans les chats d'un projet, le titre prend la place

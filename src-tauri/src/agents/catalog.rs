@@ -102,7 +102,7 @@ async fn claude() -> ProviderCatalog {
             model("claude-opus-5-5", "Claude Opus 5.5", Some("Le plus capable"), CLAUDE_EFFORTS, None),
             model("claude-sonnet-5-5", "Claude Sonnet 5.5", Some("Équilibré"), CLAUDE_EFFORTS, None),
             model("claude-haiku-5-5", "Claude Haiku 5.5", Some("Rapide et économique"), CLAUDE_EFFORTS, None),
-            model("claude-fable-5-2", "Claude Fable 5.2", Some("Génération précédente"), CLAUDE_EFFORTS, None),
+            model("claude-fable-5-2", "Claude Fable 5.2", None, CLAUDE_EFFORTS, None),
         ],
         note: None,
     }

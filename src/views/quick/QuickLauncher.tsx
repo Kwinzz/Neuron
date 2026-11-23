@@ -1,19 +1,30 @@
 import { cn } from "cn";
 import { Check, CornerDownLeft, Loader2, Plus } from "lucide-react";
+import type { ProjectSummary } from "@/bindings/ProjectSummary";
 import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { AgentKind } from "@/bindings/AgentKind";
 import type { ThreadSummary } from "@/bindings/ThreadSummary";
 import neuronMark from "@/assets/neuron-mark.png";
 import { ModelPicker } from "@/components/chat/ModelPicker";
 import { AgentLogo } from "@/components/ui/AgentLogo";
-import { type QuickModel, readChatDefaults, readQuickModel, saveQuickModel } from "@/lib/chatDefaults";
+import {
+  type QuickModel,
+  readChatDefaults,
+  readQuickModel,
+  readQuickProject,
+  saveQuickModel,
+  saveQuickProject,
+} from "@/lib/chatDefaults";
 import { formatRelative } from "@/lib/format";
 import { ipc, ipcErrorMessage, quickWindow } from "@/lib/ipc";
 import { resolveModelId } from "@/stores/models";
+import { QuickProjectPicker } from "./QuickProjectPicker";
 
 /** Agents a quick request can start (generic CLIs need a profile picked in the app). */
 const QUICK_AGENTS: readonly AgentKind[] = ["claude_code", "antigravity", "codex"];
 const RECENT = 7;
+/** Threads fetched once per opening, filtered by project on the client. */
+const FETCHED = 200;
 
 /** Last agent + model used here, else the « Nouveau chat » defaults. */
 function initialChoice(): QuickModel {
@@ -29,7 +40,18 @@ function initialChoice(): QuickModel {
  */
 export function QuickLauncher() {
   const [text, setText] = useState("");
-  const [chats, setChats] = useState<ThreadSummary[]>([]);
+  const [allChats, setAllChats] = useState<ThreadSummary[]>([]);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [projectId, setProjectIdState] = useState<string | null>(readQuickProject);
+  const [projectOpen, setProjectOpen] = useState(false);
+  const project = projects.find((p) => p.id === projectId) ?? null;
+  const setProjectId = (id: string | null) => {
+    setProjectIdState(id);
+    saveQuickProject(id);
+    setSelected(0);
+  };
+  // In a project: its chats only.
+  const chats = (project ? allChats.filter((c) => c.projectId === project.id) : allChats).slice(0, RECENT);
   /** 0 = new chat, n = chats[n - 1]. */
   const [selected, setSelected] = useState(0);
   const [choice, setChoiceState] = useState<QuickModel>(initialChoice);
@@ -49,12 +71,18 @@ export function QuickLauncher() {
     setSelected(0);
     setChoiceState(initialChoice());
     setPickerOpen(false);
+    setProjectOpen(false);
+    setProjectIdState(readQuickProject());
     setState("idle");
     setError(null);
     ipc
-      .listThreads(RECENT)
-      .then(setChats)
-      .catch(() => setChats([]));
+      .listThreads(FETCHED)
+      .then(setAllChats)
+      .catch(() => setAllChats([]));
+    ipc
+      .listProjects()
+      .then(setProjects)
+      .catch(() => setProjects([]));
     window.setTimeout(() => inputRef.current?.focus(), 0);
   }, []);
 
@@ -92,9 +120,24 @@ export function QuickLauncher() {
   const count = chats.length + 1;
   const target = selected === 0 ? null : chats[selected - 1] ?? null;
 
+  /** No text: just open the chosen chat (or the new-chat screen, in the project) in Neuron. */
+  const openOnly = async () => {
+    try {
+      if (target) await quickWindow.showThread(target.id);
+      else await quickWindow.showNewChat(project?.id ?? null);
+      await quickWindow.hide();
+    } catch (err) {
+      setError(ipcErrorMessage(err));
+    }
+  };
+
   const send = async (open: boolean) => {
     const prompt = text.trim();
-    if (!prompt || state !== "idle") return;
+    if (state !== "idle") return;
+    if (!prompt) {
+      void openOnly();
+      return;
+    }
     setState("sending");
     setError(null);
     try {
@@ -111,7 +154,7 @@ export function QuickLauncher() {
           effort: choice.effort,
           permissionMode: defaults.permissionMode,
           title: null,
-          projectId: null,
+          projectId: project?.id ?? null,
           prompt,
           attachments: [],
         });
@@ -152,6 +195,9 @@ export function QuickLauncher() {
       e.preventDefault();
       setSelected(0);
       setPickerOpen(true);
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
+      e.preventDefault();
+      setProjectOpen(true);
     } else if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       void send(e.ctrlKey || e.metaKey);
@@ -180,7 +226,13 @@ export function QuickLauncher() {
             onKeyDown={onKeyDown}
             rows={1}
             disabled={state !== "idle"}
-            placeholder={target ? `Message pour « ${target.title || "Chat sans titre"} »…` : "Demande quelque chose…"}
+            placeholder={
+              target
+                ? `Message pour « ${target.title || "Chat sans titre"} »…`
+                : project
+                  ? `Demande quelque chose dans ${project.name}…`
+                  : "Demande quelque chose…"
+            }
             aria-label="Ta demande"
             className="min-h-7 flex-1 resize-none bg-transparent text-base leading-7 outline-none placeholder:text-muted-foreground disabled:opacity-60"
           />
@@ -206,11 +258,21 @@ export function QuickLauncher() {
               </span>
               <span className="font-medium">Nouveau chat</span>
               <span
-                className="ml-auto"
-                // The picker is a popover: keep the row selection, not the caret logic, for its clicks.
+                className="ml-auto flex items-center gap-1"
+                // The pickers are popovers: keep the row selection, not the caret logic, for their clicks.
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
               >
+                <QuickProjectPicker
+                  projects={projects}
+                  value={project}
+                  open={projectOpen}
+                  onOpenChange={(open) => {
+                    setProjectOpen(open);
+                    if (!open) window.setTimeout(() => inputRef.current?.focus(), 0);
+                  }}
+                  onChange={setProjectId}
+                />
                 <ModelPicker
                   agent={agent}
                   model={choice.model}
@@ -239,10 +301,16 @@ export function QuickLauncher() {
               </span>
             </Row>
           </li>
-          {chats.length > 0 && (
+          {chats.length > 0 ? (
             <li className="px-2.5 pt-2 pb-1 text-xs font-medium text-muted-foreground" aria-hidden>
-              Chats récents
+              {project ? `Chats de ${project.name}` : "Chats récents"}
             </li>
+          ) : (
+            project && (
+              <li className="px-2.5 pt-2 pb-1 text-xs text-muted-foreground" aria-hidden>
+                Aucun chat dans {project.name} pour l&apos;instant.
+              </li>
+            )
           )}
           {chats.map((chat, i) => (
             <li key={chat.id} data-index={i + 1}>
@@ -250,7 +318,7 @@ export function QuickLauncher() {
                 <AgentLogo agent={chat.agent} size={16} className="shrink-0" />
                 <span className="min-w-0 flex-1 truncate">{chat.title || "Chat sans titre"}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">
-                  {[chat.projectName, formatRelative(chat.updatedAt)].filter(Boolean).join(" · ")}
+                  {[project ? null : chat.projectName, formatRelative(chat.updatedAt)].filter(Boolean).join(" · ")}
                 </span>
               </Row>
             </li>
@@ -261,10 +329,10 @@ export function QuickLauncher() {
           <Hint keys="↑ ↓">chat</Hint>
           <Hint keys="Tab">agent</Hint>
           <Hint keys="Ctrl M">modèle</Hint>
+          <Hint keys="Ctrl P">projet</Hint>
           <Hint keys="Ctrl ↵">envoyer + ouvrir</Hint>
-          <Hint keys="Échap">fermer</Hint>
           <span className="ml-auto flex items-center gap-1.5 text-foreground">
-            <CornerDownLeft className="size-3.5" /> Envoyer
+            <CornerDownLeft className="size-3.5" /> {text.trim() ? "Envoyer" : "Ouvrir"}
           </span>
         </footer>
       </div>

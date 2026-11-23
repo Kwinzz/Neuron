@@ -170,6 +170,9 @@ export const events = {
   onQuotasChanged: (handler: () => void): Promise<UnlistenFn> => listen(QUOTAS_CHANGED_CHANNEL, () => handler()),
   onNotificationClicked: (handler: (threadId: string | null) => void): Promise<UnlistenFn> =>
     listen<string | null>(NOTIFICATION_CLICKED_CHANNEL, (e) => handler(e.payload)),
+  /** The quick prompt asks for the « Nouveau chat » screen (payload = project id or null). */
+  onNewChatRequested: (handler: (projectId: string | null) => void): Promise<UnlistenFn> =>
+    listen<string | null>("quick://new-chat", (e) => handler(e.payload)),
 } as const;
 
 /** Label of the webview this code runs in: "main" (the app) or "quick" (global quick prompt). */
@@ -182,6 +185,8 @@ export const quickWindow = {
   onOpened: (handler: () => void): Promise<UnlistenFn> => listen("quick://opened", () => handler()),
   /** Show Neuron's main window on a chat. */
   showThread: (threadId: string): Promise<void> => invoke<void>("show_thread", { threadId }),
+  /** Show Neuron's main window on the « Nouveau chat » screen (in a project or not). */
+  showNewChat: (projectId: string | null): Promise<void> => invoke<void>("show_new_chat", { projectId }),
 };
 
 /** Custom title bar: the native one is hidden (`decorations: false`). */

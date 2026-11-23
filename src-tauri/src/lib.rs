@@ -73,6 +73,7 @@ pub fn run() {
             commands::system::frontend_log,
             commands::system::send_notification,
             commands::system::show_thread,
+            commands::system::show_new_chat,
             commands::dashboard::dashboard_snapshot,
             commands::dashboard::usage_report,
             commands::dashboard::update_provider,

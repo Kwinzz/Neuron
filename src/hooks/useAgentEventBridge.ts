@@ -87,6 +87,16 @@ export function useAgentEventBridge(): void {
     let unlisten: (() => void) | null = null;
     let unlistenQuotas: (() => void) | null = null;
     let unlistenClicks: (() => void) | null = null;
+    let unlistenNewChat: (() => void) | null = null;
+
+    // Quick prompt « ouvrir » on « Nouveau chat »: the new-chat screen, in the chosen project.
+    events
+      .onNewChatRequested((projectId) => useUi.getState().startChat(projectId))
+      .then((fn) => {
+        if (disposed) fn();
+        else unlistenNewChat = fn;
+      })
+      .catch(() => undefined);
 
     // Clicking a notification brings the window back (backend) and opens the chat it was about.
     events
@@ -155,6 +165,7 @@ export function useAgentEventBridge(): void {
       unlisten?.();
       unlistenQuotas?.();
       unlistenClicks?.();
+      unlistenNewChat?.();
     };
   }, []);
 }

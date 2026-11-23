@@ -86,3 +86,15 @@ pub async fn show_thread(app: tauri::AppHandle, thread_id: String) -> AppResult<
     app.emit_to("main", crate::notifications::CLICKED_EVENT, Some(thread_id))?;
     Ok(())
 }
+
+/// Emitted to the main window: open the « Nouveau chat » screen; payload = project id (or null).
+pub const NEW_CHAT_EVENT: &str = "quick://new-chat";
+
+/// Brings Neuron's main window up on the « Nouveau chat » screen, in a project or not (quick prompt).
+#[tauri::command]
+pub async fn show_new_chat(app: tauri::AppHandle, project_id: Option<String>) -> AppResult<()> {
+    use tauri::Emitter;
+    crate::desktop::show_main(&app);
+    app.emit_to("main", NEW_CHAT_EVENT, project_id)?;
+    Ok(())
+}
