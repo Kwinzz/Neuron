@@ -8,7 +8,7 @@ export const EFFORT_LABEL: Record<string, string> = {
   medium: "Moyen",
   high: "Élevé",
   xhigh: "Très élevé",
-  max: "Maximum",
+  max: "Max",
   ultra: "Ultra",
 };
 

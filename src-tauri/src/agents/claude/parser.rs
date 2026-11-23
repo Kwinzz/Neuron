@@ -24,6 +24,9 @@ pub struct ClaudeParser {
     streamed_messages: HashSet<String>,
     /// Tool calls already announced (assistant events can repeat content).
     started_tools: HashSet<String>,
+    /// Text of `<synthetic>` messages (written by the CLI, not the model), held until the `result` says whether
+    /// it was a local command's output (`local_command`) or an ordinary notice. `(item id, text)`.
+    synthetic: Vec<(String, String)>,
 }
 
 fn s(v: &Value, key: &str) -> Option<String> {
@@ -171,7 +174,8 @@ impl ClaudeParser {
         let streamed = self.streamed_messages.contains(&msg_id);
         // Messages written by a sub-agent carry the id of the call that launched it.
         let parent = s(v, "parent_tool_use_id");
-        let mut out = Vec::new();
+        let synthetic = s(message, "model").as_deref() == Some("<synthetic>") && parent.is_none() && !streamed;
+        let mut out = if synthetic { Vec::new() } else { self.flush_synthetic() };
         let Some(content) = message.get("content").and_then(Value::as_array) else { return out };
         for (n, block) in content.iter().enumerate() {
             match block.get("type").and_then(Value::as_str) {
@@ -196,6 +200,10 @@ impl ClaudeParser {
                         continue;
                     }
                     let item_id = format!("{msg_id}:a{n}");
+                    if synthetic && kind == "text" {
+                        self.synthetic.push((item_id, text));
+                        continue;
+                    }
                     out.push(AdapterEvent::TextDelta { item_id: item_id.clone(), channel, text: text.clone() });
                     out.push(AdapterEvent::BlockCompleted { item_id, channel, text });
                 }
@@ -242,9 +250,34 @@ impl ClaudeParser {
         }]
     }
 
+    /// Held `<synthetic>` text, emitted as ordinary assistant text.
+    fn flush_synthetic(&mut self) -> Vec<AdapterEvent> {
+        self.synthetic
+            .drain(..)
+            .flat_map(|(item_id, text)| {
+                [
+                    AdapterEvent::TextDelta { item_id: item_id.clone(), channel: DeltaChannel::Text, text: text.clone() },
+                    AdapterEvent::BlockCompleted { item_id, channel: DeltaChannel::Text, text },
+                ]
+            })
+            .collect()
+    }
+
     fn on_result(&mut self, v: &Value) -> Vec<AdapterEvent> {
         self.current_message = None;
         self.blocks.clear();
+        // Local slash command (`/usage`, `/context`…): its synthetic message is the command's output.
+        let mut out = match s(v, "local_command").filter(|n| !n.is_empty()) {
+            Some(name) => {
+                let held = std::mem::take(&mut self.synthetic);
+                let item_id = held.first().map(|(id, _)| id.clone()).unwrap_or_else(|| format!("cmd-{name}-{}", s(v, "uuid").unwrap_or_default()));
+                let text = held.into_iter().map(|(_, t)| t).collect::<Vec<_>>().join("
+
+");
+                vec![AdapterEvent::CommandOutput { item_id, name: name.trim_start_matches('/').to_string(), text }]
+            }
+            None => self.flush_synthetic(),
+        };
         let usage = v.get("usage").cloned().unwrap_or(Value::Null);
         let tokens = TokenUsage {
             input: u(&usage, "input_tokens"),
@@ -261,11 +294,12 @@ impl ClaudeParser {
                 .or_else(|| s(v, "subtype"))
                 .unwrap_or_else(|| "Erreur inconnue".into())
         });
-        vec![AdapterEvent::TurnComplete {
+        out.push(AdapterEvent::TurnComplete {
             usage: tokens,
             duration_ms: v.get("duration_ms").and_then(Value::as_i64),
             error,
-        }]
+        });
+        out
     }
 
     fn on_rate_limit(&mut self, v: &Value) -> Vec<AdapterEvent> {
@@ -310,6 +344,26 @@ mod tests {
     const BASH: &str = include_str!("fixtures/bash_two_turns.jsonl");
     const PERMISSION: &str = include_str!("fixtures/permission_write.jsonl");
     const SUBAGENT: &str = include_str!("fixtures/subagent.jsonl");
+    const LOCAL_COMMAND: &str = include_str!("fixtures/local_command.jsonl");
+
+    #[test]
+    fn local_command_output_is_not_assistant_text() {
+        let events = run(LOCAL_COMMAND);
+        assert!(events.iter().any(|e| matches!(e,
+            AdapterEvent::CommandOutput { name, text, .. } if name == "usage" && text.contains("Current session"))));
+        assert!(!events.iter().any(|e| matches!(e, AdapterEvent::TextDelta { .. } | AdapterEvent::BlockCompleted { .. })));
+        assert!(matches!(events.last(), Some(AdapterEvent::TurnComplete { error: None, .. })));
+    }
+
+    #[test]
+    fn synthetic_notice_without_local_command_stays_text() {
+        let mut p = ClaudeParser::new();
+        let mut events = p.feed(r#"{"type":"assistant","message":{"id":"s1","model":"<synthetic>","content":[{"type":"text","text":"No response requested."}]}}"#);
+        assert!(events.is_empty());
+        events.extend(p.feed(r#"{"type":"result","subtype":"success","is_error":false,"result":"","usage":{}}"#));
+        assert!(matches!(&events[1], AdapterEvent::BlockCompleted { text, .. } if text == "No response requested."));
+        assert!(matches!(events.last(), Some(AdapterEvent::TurnComplete { .. })));
+    }
 
     #[test]
     fn subagent_calls_are_attached_to_their_launcher() {

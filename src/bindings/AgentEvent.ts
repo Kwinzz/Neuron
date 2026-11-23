@@ -8,7 +8,7 @@ import type { JsonValue } from "./serde_json/JsonValue";
 /**
  * Normalized event produced by any agent adapter.
  */
-export type AgentEvent = { "kind": "MessageDelta", messageId: string, channel: DeltaChannel, text: string, } | { "kind": "MessageCompleted", messageId: string, } | { "kind": "ToolCallStart", toolCallId: string, name: string, input: JsonValue, activity: string | null, 
+export type AgentEvent = { "kind": "MessageDelta", messageId: string, channel: DeltaChannel, text: string, } | { "kind": "MessageCompleted", messageId: string, } | { "kind": "CommandOutput", messageId: string, name: string, text: string, } | { "kind": "ToolCallStart", toolCallId: string, name: string, input: JsonValue, activity: string | null, 
 /**
  * Set when a sub-agent made this call: the id of the tool call that launched the sub-agent.
  */

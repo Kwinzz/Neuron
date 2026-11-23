@@ -110,6 +110,9 @@ pub enum AdapterEvent {
     TextDelta { item_id: String, channel: DeltaChannel, text: String },
     /// A text/thinking block is complete (full text, for persistence).
     BlockCompleted { item_id: String, channel: DeltaChannel, text: String },
+    /// Output of a command the CLI ran itself, without the model (Claude Code `/usage`, `/context`…).
+    /// `name` is without the leading slash; `text` may be empty.
+    CommandOutput { item_id: String, name: String, text: String },
     /// `parent_id`: set for calls made by a sub-agent (id of the call that launched it).
     ToolCallStart { id: String, name: String, input: Value, parent_id: Option<String> },
     Subagent {

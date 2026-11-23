@@ -172,6 +172,8 @@ pub enum AgentEvent {
     },
     /// A text/thinking item finished streaming (its full text is persisted).
     MessageCompleted { message_id: String },
+    /// Output of a slash command run by the CLI itself, without the model (`/usage`, `/context`…).
+    CommandOutput { message_id: String, name: String, text: String },
     /// A tool invocation started. `activity` is a short human label ("Édition de app.tsx").
     ToolCallStart {
         tool_call_id: String,

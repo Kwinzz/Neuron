@@ -203,7 +203,7 @@ const HeaderMeta = memo(function HeaderMeta({
   const level =
     (modelInfo?.effortModels ? Object.entries(modelInfo.effortModels).find(([, id]) => id === model)?.[0] : undefined) ??
     effort;
-  const parts = [agentLabel, modelInfo?.label ?? model ?? "modèle par défaut", level ? `raisonnement ${effortLabel(level).toLowerCase()}` : null].filter(
+  const parts = [agentLabel, modelInfo?.label ?? model ?? "modèle par défaut", level ? effortLabel(level) : null].filter(
     (p): p is string => Boolean(p),
   );
   return (

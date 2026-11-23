@@ -102,8 +102,16 @@ function reduce(items: ChatItem[], { ts, event }: AgentEventEnvelope): ChatItem[
           state: "pending",
         },
       ];
-    case "TokenUsageUpdate":
+    case "CommandOutput":
+      if (indexOf(event.messageId) >= 0) return items;
+      return [...endStreaming(items), { kind: "command", id: event.messageId, name: event.name, output: event.text }];
+    case "TokenUsageUpdate": {
+      // A local slash command (/usage, /context…) used no model: no end-of-turn marker (same rule as the backend).
+      const d = event.delta;
+      const free = d.input + d.output + d.cacheRead + d.cacheWrite === 0 && d.costUsd === 0;
+      if (free && items[items.length - 1]?.kind === "command") return items;
       return [...endStreaming(items), { kind: "turn", id: localId("turn"), usage: event.delta, durationMs: null, ts }];
+    }
     case "ThreadError":
       return [...endStreaming(items), { kind: "error", id: localId("err"), message: event.message }];
     case "ThreadStatusChanged": {

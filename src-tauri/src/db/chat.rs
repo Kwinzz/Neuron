@@ -84,6 +84,12 @@ pub enum ChatItem {
         id: String,
         message: String,
     },
+    /// Output of a slash command run by the CLI itself (`/usage`, `/context`…). `name` without the slash.
+    Command {
+        id: String,
+        name: String,
+        output: String,
+    },
     /// End-of-turn marker with the turn's usage.
     Turn {
         id: String,
@@ -115,7 +121,7 @@ pub fn next_seq(conn: &Connection, thread_id: &str) -> AppResult<i64> {
     )?)
 }
 
-/// role: user | assistant | thinking | error | turn
+/// role: user | assistant | thinking | error | turn | command
 pub fn insert_message(
     conn: &Connection,
     id: &str,
@@ -210,6 +216,11 @@ pub fn history(conn: &Connection, thread_id: &str) -> AppResult<Vec<ChatItem>> {
             },
             "thinking" => ChatItem::Thinking { id, text: content, streaming: false },
             "error" => ChatItem::Error { id, message: content },
+            "command" => ChatItem::Command {
+                id,
+                name: meta.as_ref().and_then(|m| m.get("name")).and_then(Value::as_str).unwrap_or_default().to_string(),
+                output: content,
+            },
             "turn" => {
                 let meta = meta.unwrap_or(Value::Null);
                 ChatItem::Turn {

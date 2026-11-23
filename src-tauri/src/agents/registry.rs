@@ -394,6 +394,8 @@ impl AgentRegistry {
             db.call(move |c| chat::thread_usage(c, &tid)).await.unwrap_or_default()
         };
         let mut last_status: Option<(ThreadStatus, Option<String>)> = None;
+        // The current turn only ran a local slash command (no model call): no end-of-turn marker.
+        let mut command_turn = false;
 
         macro_rules! persist {
             ($body:expr) => {{
@@ -440,6 +442,16 @@ impl AgentRegistry {
                     let (tid, mid) = (id.clone(), item_id.clone());
                     persist!(move |c| chat::insert_message(c, &mid, &tid, role, &text, None, now_ms()));
                     emit(&app, &id, AgentEvent::MessageCompleted { message_id: item_id });
+                }
+                AdapterEvent::CommandOutput { item_id, name, text } => {
+                    command_turn = true;
+                    {
+                        let (tid, mid, n, out) = (id.clone(), item_id.clone(), name.clone(), text.clone());
+                        persist!(move |c| {
+                            chat::insert_message(c, &mid, &tid, "command", &out, Some(&json!({ "name": n })), now_ms())
+                        });
+                    }
+                    emit(&app, &id, AgentEvent::CommandOutput { message_id: item_id, name, text });
                 }
                 AdapterEvent::ToolCallStart { id: tool_id, name, input, parent_id } => {
                     let (status, detail) = tool_activity(&name, &input);
@@ -505,15 +517,19 @@ impl AgentRegistry {
                         s.idle_since = Instant::now();
                     }
                     cumulative.add(&usage);
+                    let silent = std::mem::take(&mut command_turn) && usage.total() == 0 && usage.cost_usd == 0.0;
                     {
                         let (tid, project, m, agent) = (id.clone(), rt.project_id.clone(), model.clone(), rt.agent);
                         let err = error.clone().filter(|_| !stopped);
                         persist!(move |c| {
                             let now = now_ms();
-                            record_usage(c, &tid, project.as_deref(), agent, m.as_deref(), &usage, now)?;
                             if let Some(message) = &err {
                                 chat::insert_message(c, &uuid::Uuid::new_v4().to_string(), &tid, "error", message, None, now)?;
                             }
+                            if silent {
+                                return chat::close_dangling_tools(c, &tid, now);
+                            }
+                            record_usage(c, &tid, project.as_deref(), agent, m.as_deref(), &usage, now)?;
                             chat::insert_message(
                                 c,
                                 &uuid::Uuid::new_v4().to_string(),

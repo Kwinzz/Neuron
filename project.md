@@ -88,6 +88,17 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Commandes locales affichées à part, niveau de raisonnement plus court
+- **Commandes locales Claude** (`/usage`, `/context`, `/cost`…) : le message `<synthetic>` est retenu par le parseur
+  jusqu'au `result` ; si celui-ci porte `local_command`, il devient `AdapterEvent::CommandOutput` → rôle `command`
+  en base, `ChatItem::Command` / `AgentEvent::CommandOutput`, sinon il redevient du texte normal. Pas de marqueur
+  de fin de tour ni d'usage enregistré pour ces tours à 0 token. Fixture `fixtures/local_command.jsonl`.
+- UI : un message « /commande » s'affiche comme une note discrète « Commande /usage utilisée » (au lieu d'une
+  bulle) ; la sortie dans une carte repliable `CommandOutput` (Markdown pour /context, jauges pour les lignes
+  « N% used », texte mono sinon).
+- En-tête de chat : le niveau s'affiche seul (« Moyen », « Élevé », « Max ») au lieu de « raisonnement moyen » ;
+  libellé `max` → « Max ».
+
 ### 2026-11-23 — Slash commands de chaque fournisseur (menu « / »)
 - **Liste par fournisseur et dossier** (`agents/slash.rs`, commande `list_slash_commands`, cache 15 min) :
   Claude Code via la requête de contrôle `initialize` (≈ 96 commandes : intégrées, skills, plugins, avec

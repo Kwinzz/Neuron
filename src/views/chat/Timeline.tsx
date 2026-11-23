@@ -3,6 +3,7 @@ import { cn } from "cn";
 import type { AgentKind } from "@/bindings/AgentKind";
 import type { ChatItem } from "@/bindings/ChatItem";
 import { AssistantText } from "./AssistantText";
+import { CommandOutput } from "./CommandOutput";
 import { ErrorItem } from "./ErrorItem";
 import { PermissionCard } from "./PermissionCard";
 import { ThinkingBlock } from "./ThinkingBlock";
@@ -34,6 +35,8 @@ const TimelineItem = memo(function TimelineItem({
       return <PermissionCard item={item} threadId={threadId} />;
     case "error":
       return <ErrorItem item={item} />;
+    case "command":
+      return <CommandOutput item={item} />;
     case "turn":
       return <TurnMarker item={item} agent={agent} />;
   }
@@ -47,6 +50,7 @@ const ENTER: Record<ChatItem["kind"], string> = {
   tool: "",
   permission: "animate-in fade-in-0 slide-in-from-bottom-2 zoom-in-[0.98] duration-300",
   error: "animate-in fade-in-0 slide-in-from-bottom-1 duration-300",
+  command: "animate-in fade-in-0 slide-in-from-bottom-1 duration-300",
   turn: "animate-in fade-in-0 duration-500",
 };
 
