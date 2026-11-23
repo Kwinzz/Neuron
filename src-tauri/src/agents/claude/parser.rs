@@ -83,8 +83,16 @@ impl ClaudeParser {
                 Some(session_ref) => vec![AdapterEvent::SessionInit { session_ref, model: s(v, "model") }],
                 None => Vec::new(),
             },
-            Some("status") if v.get("status").and_then(Value::as_str) == Some("requesting") => {
-                vec![AdapterEvent::Status { status: ThreadStatus::Thinking, detail: None }]
+            Some("status") => {
+                let mut out = Vec::new();
+                // Plan approved with a mode, EnterPlanMode, live switch: `{"subtype":"status","permissionMode":"..."}`.
+                if let Some(mode) = v.get("permissionMode").and_then(Value::as_str) {
+                    out.push(AdapterEvent::ModeChanged(super::neuron_mode(mode).to_string()));
+                }
+                if v.get("status").and_then(Value::as_str) == Some("requesting") {
+                    out.push(AdapterEvent::Status { status: ThreadStatus::Thinking, detail: None });
+                }
+                out
             }
             Some(sub @ ("task_started" | "task_progress" | "task_notification")) => self.on_task(sub, v),
             _ => Vec::new(),
@@ -346,6 +354,15 @@ mod tests {
     const PERMISSION: &str = include_str!("fixtures/permission_write.jsonl");
     const SUBAGENT: &str = include_str!("fixtures/subagent.jsonl");
     const LOCAL_COMMAND: &str = include_str!("fixtures/local_command.jsonl");
+
+    #[test]
+    fn permission_mode_changes_are_reported() {
+        let mut p = ClaudeParser::new();
+        let ev = p.feed(r#"{"type":"system","subtype":"status","status":null,"permissionMode":"acceptEdits"}"#);
+        assert!(matches!(ev.as_slice(), [AdapterEvent::ModeChanged(m)] if m == "acceptEdits"));
+        let ev = p.feed(r#"{"type":"system","subtype":"status","status":null,"permissionMode":"default"}"#);
+        assert!(matches!(ev.as_slice(), [AdapterEvent::ModeChanged(m)] if m == "manual"));
+    }
 
     #[test]
     fn local_command_output_is_not_assistant_text() {

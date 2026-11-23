@@ -7,7 +7,8 @@ import { ChatSettingsBar } from "./ChatSettingsBar";
 
 /**
  * Settings of an existing chat. Changes apply to the next message: a running agent restarts and
- * resumes the conversation. The provider (CLI) is locked — another provider means a new chat.
+ * resumes the conversation — except Claude Code's permission mode, switched live. The mode also follows the
+ * agent (plan approved, EnterPlanMode) through `PermissionModeChanged`. The provider (CLI) is locked.
  */
 export const ThreadSettingsBar = memo(function ThreadSettingsBar({ threadId }: { threadId: string }) {
   const agent = useLive((s) => s.threads[threadId]?.agent ?? "claude_code");

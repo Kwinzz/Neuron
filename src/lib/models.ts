@@ -18,6 +18,7 @@ export const DEFAULT_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as cons
 export const PERMISSION_MODES = [
   { id: "manual", label: "Demander", hint: "Chaque action sensible attend ton approbation." },
   { id: "acceptEdits", label: "Éditions auto", hint: "Modifs de fichiers acceptées, commandes à approuver." },
+  { id: "auto", label: "Auto", hint: "Actions sûres enchaînées seules, confirmation avant les actions irréversibles." },
   { id: "plan", label: "Plan", hint: "Lecture seule : l'agent propose un plan." },
   { id: "bypassPermissions", label: "Tout autoriser", hint: "Aucune confirmation — dossiers jetables uniquement." },
 ] as const;

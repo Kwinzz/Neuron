@@ -208,6 +208,8 @@ pub enum AgentEvent {
         status: ThreadStatus,
         detail: Option<String>,
     },
+    /// The chat's permission mode changed on the agent side (plan approved, `EnterPlanMode`...).
+    PermissionModeChanged { mode: String },
     /// Error reported by the adapter or the process. `fatal` ends the thread.
     ThreadError { message: String, fatal: bool },
     /// A sub-agent (Claude Code `Agent`/`Task` tool) started, progressed or ended. `toolCallId` is the call

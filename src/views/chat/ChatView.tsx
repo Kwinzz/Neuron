@@ -10,6 +10,7 @@ import { useChat } from "@/stores/chat";
 import { useLive } from "@/stores/live";
 import { Composer } from "./Composer";
 import { ThreadHeader } from "./ThreadHeader";
+import { PlanFollowUp } from "./PlanFollowUp";
 import { Timeline } from "./Timeline";
 import { TimelineSkeleton } from "./TimelineSkeleton";
 import { useStickToBottom } from "./useStickToBottom";
@@ -28,6 +29,7 @@ export function ChatView({ threadId }: { threadId: string }) {
   });
   const projectId = useLive((s) => s.threads[threadId]?.projectId ?? null);
   const agent = useLive((s) => s.threads[threadId]?.agent ?? "claude_code");
+  const planMode = useLive((s) => s.threads[threadId]?.permissionMode === "plan");
   const revealing = useReveal(selectAnyRevealing);
 
   const scrollRoot = useScrollRoot();
@@ -118,6 +120,10 @@ export function ChatView({ threadId }: { threadId: string }) {
           <Timeline items={items} threadId={threadId} agent={agent} />
         )}
         {loaded && working && <WorkingIndicator threadId={threadId} />}
+        {/* Codex / Antigravity: no plan approval of their own, offer to run the plan once they answered. */}
+        {loaded && planMode && !active && agent !== "claude_code" && agent !== "generic" && items[items.length - 1]?.kind === "turn" && (
+          <PlanFollowUp threadId={threadId} />
+        )}
         {/* Absolutely positioned in the column gutter; it skips itself when measuring the last element. */}
         {loaded && <AgentCursor containerRef={contentRef} agent={agent} visible={active || revealing} />}
       </div>

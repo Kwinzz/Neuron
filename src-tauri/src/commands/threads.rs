@@ -184,8 +184,12 @@ pub async fn respond_permission(
     thread_id: String,
     request_id: String,
     allow: bool,
+    mode: Option<String>,
 ) -> AppResult<()> {
-    state.agents.respond_permission(&thread_id, &request_id, allow)
+    if let Some(m) = mode.as_deref() {
+        validate_settings(m, None)?;
+    }
+    state.agents.respond_permission(&thread_id, &request_id, allow, mode)
 }
 
 #[tauri::command]
@@ -291,6 +295,10 @@ pub async fn update_thread_settings(
 ) -> AppResult<ThreadSummary> {
     validate_settings(&settings.permission_mode, settings.effort.as_deref())?;
     let id = thread_id.clone();
+    let before = {
+        let id = thread_id.clone();
+        state.db.call(move |c| threads::runtime(c, &id)).await?
+    };
     let summary = state
         .db
         .call(move |c| {
@@ -300,7 +308,13 @@ pub async fn update_thread_settings(
             threads::get(c, &id)?.ok_or_else(|| AppError::NotFound(id.clone()))
         })
         .await?;
-    state.agents.mark_stale(&thread_id);
+    // Only the permission mode changed: Claude Code switches it live, without restarting the session.
+    let mode_only = before.as_ref().is_some_and(|b| {
+        b.model == summary.model && b.effort == summary.effort && b.permission_mode != summary.permission_mode
+    });
+    if !(mode_only && state.agents.set_mode_live(&thread_id, summary.agent, &summary.permission_mode)) {
+        state.agents.mark_stale(&thread_id);
+    }
     Ok(summary)
 }
 

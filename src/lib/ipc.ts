@@ -99,8 +99,9 @@ export const ipc = {
     if (Array.isArray(picked)) return picked;
     return typeof picked === "string" ? [picked] : [];
   },
-  respondPermission: (threadId: string, requestId: string, allow: boolean) =>
-    invoke<void>("respond_permission", { threadId, requestId, allow }),
+  /** `mode`: approving a plan also picks the mode to run it in (refusing with a mode = keep planning). */
+  respondPermission: (threadId: string, requestId: string, allow: boolean, mode: string | null = null) =>
+    invoke<void>("respond_permission", { threadId, requestId, allow, mode }),
   stopThread: (threadId: string) => invoke<void>("stop_thread", { threadId }),
   threadHistory: (threadId: string) => invoke<ChatItem[]>("get_thread_history", { threadId }),
   renameThread: (threadId: string, title: string) => invoke<void>("rename_thread", { threadId, title }),

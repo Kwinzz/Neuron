@@ -159,6 +159,12 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
   session stream-json**) → groupes de modèles × fenêtres 5 h / hebdo (`antigravity/quota.rs`), rafraîchi après chaque
   tour agy et toutes les 15 min, événement `quotas://changed`. Dans un chat agy, `/quota`, `/usage`, `/credits` sont
   interceptés par `send_prompt` et exécutés de la même façon (carte de commande).
+- **Modes** (`manual`, `acceptEdits`, `auto`, `plan`, `bypassPermissions`) : Claude change de mode **à chaud**
+  (`control_request set_permission_mode`, `manual` ⇄ `default` côté Claude) au lieu de redémarrer ; `system/status`
+  `permissionMode` → `AgentEvent::PermissionModeChanged` (persisté). Plan mode Claude : `ExitPlanMode` = demande
+  d'autorisation → `PlanBlock` (plan en Markdown) + `PlanApproval` ; approuver renvoie `updatedPermissions setMode`
+  (Claude exécute aussitôt), refuser = continuer à planifier. Codex / agy en Plan : `PlanFollowUp` (« Exécuter le
+  plan » = repasse en éditions auto + message). Codex : `auto` = `workspace-write` ; agy : `--mode auto`.
 - **Diffs des fichiers modifiés** (`agents/file_changes.rs`) : agy et Codex ne transmettent que les chemins → le
   pump lit chaque fichier au début de l'outil d'édition (les CLI annoncent avant d'écrire) et à la fin, diff unifié
   (`similar`) stocké dans `tool_calls.changes_json` et envoyé dans `ToolCallResult.changes`. UI : `FileEditBlock`

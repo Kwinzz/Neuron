@@ -80,6 +80,8 @@ pub enum SessionCommand {
     Permission(PermissionDecision),
     /// Ask the agent to stop the current turn (keeps the session alive when supported).
     Interrupt,
+    /// Switch the permission mode of the running session (Claude Code only; others restart instead).
+    SetMode(String),
     /// Close stdin and terminate the process.
     Shutdown,
 }
@@ -91,6 +93,8 @@ pub struct PermissionDecision {
     /// Original tool input, echoed back on allow.
     pub input: Value,
     pub message: Option<String>,
+    /// On allow: permission mode to switch to (approving a plan: `acceptEdits`, `auto`, `manual`).
+    pub mode: Option<String>,
 }
 
 /// One usage window reported by the agent's provider (e.g. Claude 5-hour / 7-day limits).
@@ -115,6 +119,8 @@ pub enum AdapterEvent {
     TextDelta { item_id: String, channel: DeltaChannel, text: String },
     /// A text/thinking block is complete (full text, for persistence).
     BlockCompleted { item_id: String, channel: DeltaChannel, text: String },
+    /// The agent's permission mode changed (plan approved, `EnterPlanMode`, live switch). Neuron's id.
+    ModeChanged(String),
     /// Output of a command the CLI ran itself, without the model (Claude Code `/usage`, `/context`…).
     /// `name` is without the leading slash; `text` may be empty.
     CommandOutput { item_id: String, name: String, text: String },

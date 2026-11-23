@@ -24,7 +24,7 @@ interface ChatState {
   /** Load history once (no-op when already loaded or loading). */
   load: (threadId: string, force?: boolean) => Promise<void>;
   send: (threadId: string, text: string, attachments?: Attachment[]) => Promise<boolean>;
-  respondPermission: (threadId: string, requestId: string, allow: boolean) => Promise<void>;
+  respondPermission: (threadId: string, requestId: string, allow: boolean, mode?: string | null) => Promise<void>;
   stop: (threadId: string) => Promise<void>;
   /** Called by the agent-event bridge for every event. */
   enqueue: (envelope: AgentEventEnvelope) => void;
@@ -131,6 +131,9 @@ function reduce(items: ChatItem[], { ts, event }: AgentEventEnvelope): ChatItem[
       }
       return items;
     }
+    case "PermissionModeChanged":
+      // Shown by the settings bar (live store).
+      return items;
     case "SubagentUpdate":
       // Sub-agent progress is shown in the live dock; the chat timeline shows its tool calls.
       return items;
@@ -198,7 +201,7 @@ export const useChat = create<ChatState>((set, get) => {
       }
     },
 
-    respondPermission: async (threadId, requestId, allow) => {
+    respondPermission: async (threadId, requestId, allow, mode = null) => {
       const setState = (state: "pending" | "allowed" | "denied") =>
         patch(threadId, (t) => ({
           ...t,
@@ -206,7 +209,7 @@ export const useChat = create<ChatState>((set, get) => {
         }));
       setState(allow ? "allowed" : "denied");
       try {
-        await ipc.respondPermission(threadId, requestId, allow);
+        await ipc.respondPermission(threadId, requestId, allow, mode);
       } catch (err) {
         setState("denied");
         toast({ tone: "danger", title: "Réponse impossible", description: ipcErrorMessage(err) });

@@ -320,7 +320,7 @@ impl AgentRegistry {
         Ok(commands)
     }
 
-    pub fn respond_permission(&self, thread_id: &str, request_id: &str, allow: bool) -> AppResult<()> {
+    pub fn respond_permission(&self, thread_id: &str, request_id: &str, allow: bool, mode: Option<String>) -> AppResult<()> {
         let mut sessions = self.lock();
         let session = sessions
             .get_mut(thread_id)
@@ -335,9 +335,26 @@ impl AgentRegistry {
                 request_id: request_id.to_string(),
                 allow,
                 input,
-                message: None,
+                // Plan refused from the plan card (a mode was offered): keep planning.
+                message: (!allow && mode.is_some()).then(|| {
+                    "L'utilisateur veut continuer à planifier : reste en mode Plan et attends ses précisions.".into()
+                }),
+                mode: mode.filter(|_| allow),
             }))
             .map_err(|_| AppError::Other("la session de l'agent est arrêtée".into()))
+    }
+
+    /// Switch a running Claude Code session's permission mode without restarting it. False when there is no
+    /// live session that can do it (the caller then restarts it with the new mode).
+    pub fn set_mode_live(&self, thread_id: &str, agent: AgentKind, mode: &str) -> bool {
+        if agent != AgentKind::ClaudeCode {
+            return false;
+        }
+        let sessions = self.lock();
+        match sessions.get(thread_id) {
+            Some(s) if !s.stale => s.commands.send(SessionCommand::SetMode(mode.to_string())).is_ok(),
+            _ => false,
+        }
     }
 
     /// Stop the current turn: interrupt, then kill the process tree if it doesn't comply in time.
@@ -353,6 +370,7 @@ impl AgentRegistry {
                     allow: false,
                     input,
                     message: Some("Arrêt demandé par l'utilisateur.".into()),
+                    mode: None,
                 }));
             }
             let _ = session.commands.send(SessionCommand::Interrupt);
@@ -493,6 +511,11 @@ impl AgentRegistry {
                     if changed {
                         emit(&app, &id, AgentEvent::ThreadStatusChanged { status, detail });
                     }
+                }
+                AdapterEvent::ModeChanged(mode) => {
+                    let (tid, m) = (id.clone(), mode.clone());
+                    persist!(move |c| threads::set_permission_mode(c, &tid, &m));
+                    emit(&app, &id, AgentEvent::PermissionModeChanged { mode });
                 }
                 AdapterEvent::TextDelta { item_id, channel, text } => {
                     emit(&app, &id, AgentEvent::MessageDelta { message_id: item_id, channel, text });

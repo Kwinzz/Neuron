@@ -192,7 +192,7 @@ async fn session_loop(
                         shutdown = true;
                         if let Some(pid) = pid { kill_process_tree(pid); }
                     }
-                    Some(SessionCommand::Permission(_)) => {}
+                    Some(SessionCommand::Permission(_) | SessionCommand::SetMode(_)) => {}
                 },
             }
         }

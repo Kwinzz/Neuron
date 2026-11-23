@@ -7,6 +7,8 @@ import { CommandOutput } from "./CommandOutput";
 import { ErrorItem } from "./ErrorItem";
 import { FileEditBlock } from "./FileEditBlock";
 import { PermissionCard } from "./PermissionCard";
+import { PlanApproval } from "./PlanApproval";
+import { PlanBlock } from "./PlanBlock";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolBlock } from "./ToolBlock";
 import { baseToolName } from "./toolMeta";
@@ -20,7 +22,10 @@ const INPUT_DIFF_TOOLS = new Set(["Edit", "MultiEdit", "Write"]);
 
 /** File modifications are shown as code blocks in the conversation; other tools as collapsed rows. */
 function ToolItemView({ item }: { item: ToolItem }) {
-  if (item.status === "ok" && item.changes.length > 0) {
+  if (baseToolName(item.name) === "ExitPlanMode") return <PlanBlock item={item} />;
+  // Claude's own plan file (Plan mode) duplicates the plan block: keep it as a collapsed row.
+  const planFile = item.changes.some((c) => c.path.includes("/.claude/plans/"));
+  if (item.status === "ok" && item.changes.length > 0 && !planFile) {
     return (
       <div className="flex flex-col gap-2">
         {item.changes.map((change) => (
@@ -54,7 +59,11 @@ const TimelineItem = memo(function TimelineItem({
     case "tool":
       return <ToolItemView item={item} />;
     case "permission":
-      return <PermissionCard item={item} threadId={threadId} />;
+      return item.toolName === "ExitPlanMode" ? (
+        <PlanApproval item={item} threadId={threadId} />
+      ) : (
+        <PermissionCard item={item} threadId={threadId} />
+      );
     case "error":
       return <ErrorItem item={item} />;
     case "command":

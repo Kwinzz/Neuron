@@ -106,7 +106,13 @@ pub fn encode_command(command: &SessionCommand) -> Option<Value> {
         }
         SessionCommand::Permission(d) => {
             let response = if d.allow {
-                json!({ "behavior": "allow", "updatedInput": d.input })
+                let mut allow = json!({ "behavior": "allow", "updatedInput": d.input });
+                // Approving a plan (ExitPlanMode) also chooses how to run it, like Claude Code's own prompt.
+                if let Some(mode) = d.mode.as_deref() {
+                    allow["updatedPermissions"] =
+                        json!([{ "type": "setMode", "mode": claude_mode(mode), "destination": "session" }]);
+                }
+                allow
             } else {
                 json!({
                     "behavior": "deny",
@@ -118,6 +124,11 @@ pub fn encode_command(command: &SessionCommand) -> Option<Value> {
                 "response": { "subtype": "success", "request_id": d.request_id, "response": response },
             }))
         }
+        SessionCommand::SetMode(mode) => Some(json!({
+            "type": "control_request",
+            "request_id": uuid::Uuid::new_v4().to_string(),
+            "request": { "subtype": "set_permission_mode", "mode": claude_mode(mode) },
+        })),
         SessionCommand::Interrupt => Some(json!({
             "type": "control_request",
             "request_id": uuid::Uuid::new_v4().to_string(),
@@ -146,6 +157,23 @@ impl AgentAdapter for ClaudeCodeAdapter {
             |command| encode_command(command).map_or(Delivery::Ignore, Delivery::Line),
             move |line| parser.feed(line),
         )
+    }
+}
+
+/// Neuron mode id -> Claude Code's (`manual` is reported back as `default`).
+fn claude_mode(mode: &str) -> &str {
+    match mode {
+        "manual" => "default",
+        m @ ("acceptEdits" | "auto" | "plan" | "bypassPermissions" | "dontAsk") => m,
+        _ => "default",
+    }
+}
+
+/// Claude Code mode -> Neuron's.
+pub fn neuron_mode(mode: &str) -> &str {
+    match mode {
+        "default" | "manual" => "manual",
+        other => other,
     }
 }
 
@@ -202,6 +230,7 @@ mod tests {
             allow: true,
             input: json!({"file_path": "a"}),
             message: None,
+            mode: None,
         }))
         .unwrap();
         assert_eq!(allow["response"]["request_id"], "r1");
@@ -213,9 +242,22 @@ mod tests {
             allow: false,
             input: Value::Null,
             message: None,
+            mode: None,
         }))
         .unwrap();
         assert_eq!(deny["response"]["response"]["behavior"], "deny");
+        let plan = encode_command(&SessionCommand::Permission(PermissionDecision {
+            request_id: "r3".into(),
+            allow: true,
+            input: json!({"plan": "1. x"}),
+            message: None,
+            mode: Some("acceptEdits".into()),
+        }))
+        .unwrap();
+        assert_eq!(plan["response"]["response"]["updatedPermissions"][0]["mode"], "acceptEdits");
+        let switch = encode_command(&SessionCommand::SetMode("manual".into())).unwrap();
+        assert_eq!(switch["request"]["subtype"], "set_permission_mode");
+        assert_eq!(switch["request"]["mode"], "default");
 
         assert_eq!(encode_command(&SessionCommand::Interrupt).unwrap()["request"]["subtype"], "interrupt");
         assert!(encode_command(&SessionCommand::Shutdown).is_none());

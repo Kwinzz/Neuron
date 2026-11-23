@@ -283,7 +283,7 @@ async fn session_loop(
                         shutdown = true;
                         (turn.kill)();
                     }
-                    Some(SessionCommand::Permission(_)) => {}
+                    Some(SessionCommand::Permission(_) | SessionCommand::SetMode(_)) => {}
                 },
             }
             if stopped || shutdown {

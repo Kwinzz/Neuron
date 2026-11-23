@@ -180,6 +180,12 @@ pub fn set_title_if_empty(conn: &Connection, id: &str, title: &str) -> AppResult
 }
 
 /// Change model / effort / permission mode (applied when the session (re)starts).
+/// Mode switched by the agent itself (no restart).
+pub fn set_permission_mode(conn: &Connection, id: &str, mode: &str) -> AppResult<()> {
+    conn.execute("UPDATE threads SET permission_mode = ?2 WHERE id = ?1", rusqlite::params![id, mode])?;
+    Ok(())
+}
+
 pub fn update_settings(
     conn: &Connection,
     id: &str,

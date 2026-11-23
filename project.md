@@ -88,6 +88,19 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Modes Plan / Auto pris en charge
+- **Mode Auto** proposé dans le sélecteur (Claude `--permission-mode auto`, agy `--mode auto`, Codex `workspace-write`).
+- **Changement de mode à chaud pour Claude** : `update_thread_settings` envoie `set_permission_mode` à la session
+  vivante quand seul le mode change (plus de redémarrage) ; les autres agents redémarrent comme avant.
+- **Mode suivi en direct** : `system/status.permissionMode` (plan approuvé, `EnterPlanMode`…) → `ModeChanged` →
+  persisté + `AgentEvent::PermissionModeChanged` → le sélecteur du chat se met à jour.
+- **Plan mode Claude** (cycle vérifié en réel) : l'appel `ExitPlanMode` s'affiche comme un document « Plan proposé »
+  (Markdown) et sa demande d'autorisation comme une barre « Exécuter ce plan ? » : éditions auto / auto / en demandant
+  (`updatedPermissions: setMode`, Claude enchaîne l'exécution) ou « Continuer à planifier » (refus avec consigne).
+  Le fichier `~/.claude/plans/…` reste une ligne d'outil repliée.
+- **Codex / Antigravity en Plan** : après leur réponse, barre « Exécuter le plan » (passe le chat en éditions auto et
+  envoie « Exécute le plan ci-dessus. »).
+
 ### 2026-11-23 — Blocs de code des fichiers modifiés dans la conversation
 - **Diff calculé par Neuron pour tous les agents** (`agents/file_changes.rs`, crate `similar`) : agy (`write_file`,
   `edit_file`…) et Codex (`file_change`) ne donnent que les chemins, Claude `Write` que le nouveau contenu. Le pump

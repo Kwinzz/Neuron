@@ -72,7 +72,7 @@ fn encode(command: &SessionCommand) -> Delivery {
             "message": { "role": "user", "content": turn.text_with_note(|_| false) },
         })),
         SessionCommand::Interrupt => Delivery::Kill,
-        SessionCommand::Permission(_) | SessionCommand::Shutdown => Delivery::Ignore,
+        SessionCommand::Permission(_) | SessionCommand::SetMode(_) | SessionCommand::Shutdown => Delivery::Ignore,
     }
 }
 
