@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
-import { MessageSquare, XCircle } from "lucide-react";
+import { XCircle } from "lucide-react";
+import { AgentLogo } from "@/components/ui/AgentLogo";
 import type { ChatItem } from "@/bindings/ChatItem";
 import { useScrollRoot } from "@/components/shell/ScrollRoot";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -110,7 +111,7 @@ export function ChatView({ threadId }: { threadId: string }) {
           </Alert>
         ) : loaded && items.length === 0 ? (
           <div className="my-auto flex flex-col items-center justify-center py-12 text-center">
-            <MessageSquare className="size-8 text-muted-foreground" />
+            <AgentLogo agent={agent} size={32} className="text-muted-foreground" />
             <h2 className="mt-3 text-base font-semibold text-foreground">Nouvelle conversation</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Envoyez un premier message pour démarrer l'agent.

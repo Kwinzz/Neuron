@@ -88,6 +88,10 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Logo de l'agent à la place de la bulle
+- Liste des chats (barre latérale), palette Ctrl+K et chat vide : l'icône bulle est remplacée par le logo de l'IA
+  du chat (`AgentLogo` : Claude, Gemini pour Antigravity, OpenAI pour Codex, terminal pour les CLI génériques).
+
 ### 2026-11-23 — Icône arrondie, quotas qui suivent l'abonnement
 - Icône : coins arrondis transparents (rayon 22 %, masque suréchantillonné), toutes tailles régénérées.
 - **Accueil** : dès qu'un agent a rapporté les fenêtres de son abonnement, ses cartes de quota sont exactement

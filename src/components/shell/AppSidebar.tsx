@@ -47,6 +47,7 @@ import {
   SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { AgentLogo } from "@/components/ui/AgentLogo";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { STATUS } from "@/lib/status";
@@ -375,7 +376,7 @@ const ChatLink = memo(function ChatLink({ chat, sub = false }: { chat: ThreadSum
   return (
     <>
       <SidebarMenuButton isActive={active} onClick={open} tooltip={label}>
-        <MessageSquare />
+        <AgentLogo agent={chat.agent} />
         <span>{label}</span>
       </SidebarMenuButton>
       {STATUS[status].active && (

@@ -7,13 +7,13 @@ import {
   FlaskConical,
   FolderGit2,
   LayoutDashboard,
-  MessageSquare,
   PanelRight,
   Plus,
   Trash2,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { AgentBadge } from "@/components/ui/AgentBadge";
+import { AgentLogo } from "@/components/ui/AgentLogo";
 import {
   Command as CommandRoot,
   CommandDialog,
@@ -150,7 +150,7 @@ function useCommands(): Command[] {
           .filter(Boolean)
           .join(" · "),
         keywords: `${t.agent} ${t.model ?? ""}`,
-        icon: active ? <StatusDot status={t.status} /> : <MessageSquare size={15} />,
+        icon: active ? <StatusDot status={t.status} /> : <AgentLogo agent={t.agent} size={15} />,
         hint: <AgentBadge agent={t.agent} variant="short" className="text-xs" />,
         run: () => openThread(t.id),
       });
