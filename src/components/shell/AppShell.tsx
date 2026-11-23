@@ -1,4 +1,4 @@
-import { type CSSProperties, Suspense, lazy, useEffect, useState } from "react";
+import { type CSSProperties, Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { cn } from "cn";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { ShortcutsDialog } from "@/components/shortcuts/ShortcutsDialog";
@@ -9,6 +9,7 @@ import { useAgentEventBridge } from "@/hooks/useAgentEventBridge";
 import { useHotkey } from "@/hooks/useHotkey";
 import { ipc } from "@/lib/ipc";
 import { useDashboard } from "@/stores/dashboard";
+import { useLayout } from "@/stores/layout";
 import { useLive } from "@/stores/live";
 import { useNav } from "@/stores/nav";
 import { useUi } from "@/stores/ui";
@@ -68,14 +69,19 @@ function useHydrateOpenThread(): void {
   }, [threadId]);
 }
 
-const PROVIDER_STYLE = {
-  "--sidebar-width": "calc(var(--spacing) * 64)",
-  "--header-height": "calc(var(--spacing) * 12)",
-} as CSSProperties;
 
 /** shadcn "dashboard-01" frame: inset sidebar · header + scrolling view · live dock, plus overlays. */
 export function AppShell() {
   const view = useUi((s) => s.view);
+  const sidebarWidth = useLayout((s) => s.sidebarWidth);
+  const providerStyle = useMemo(
+    () =>
+      ({
+        "--sidebar-width": `${sidebarWidth}px`,
+        "--header-height": "calc(var(--spacing) * 12)",
+      }) as CSSProperties,
+    [sidebarWidth],
+  );
   const [scrollRoot, setScrollRoot] = useState<HTMLElement | null>(null);
   useAgentEventBridge();
   useHydrateOpenThread();
@@ -106,7 +112,7 @@ export function AppShell() {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <SidebarProvider style={PROVIDER_STYLE} className="h-svh min-h-0 overflow-hidden">
+      <SidebarProvider style={providerStyle} className="h-svh min-h-0 overflow-hidden">
         <AppSidebar variant="inset" collapsible="icon" />
         <SidebarInset className="min-w-0 overflow-hidden md:peer-data-[variant=inset]:mr-0">
           <SiteHeader />

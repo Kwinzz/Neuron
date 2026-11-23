@@ -88,6 +88,14 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Logo dans la barre latérale, barre latérale redimensionnable
+- En-tête de la barre latérale : glyphe de l'app (sans la tuile noire) à côté de « Neuron ». `src/assets/neuron-mark.png`
+  = glyphe blanc extrait de l'icône (alpha), peint en `bg-foreground` via `mask` (suit la couleur du texte).
+- Bord droit de la barre latérale (`SidebarResizer`, remplace `SidebarRail`) : glisser = redimensionner (200–440 px),
+  clic = replier / déplier comme avant. Largeur dans `stores/layout.ts`, mémorisée en `localStorage` (repli 256 px),
+  injectée dans `--sidebar-width` par `AppShell`. Pendant le glisser : pas de transition de largeur, curseur
+  `col-resize` partout, pas de sélection (`:root[data-sidebar-resizing]`).
+
 ### 2026-11-23 — Boutons de fenêtre dans le coin, pied « SQLite » retiré
 - `WindowControls` toujours dans le coin haut droit : dans l'en-tête du dock « Threads live » quand il est ouvert
   (en-tête lui aussi déplaçable), sinon dans `SiteHeader` (avant, ils restaient au milieu, collés au dock).

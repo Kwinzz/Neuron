@@ -246,3 +246,14 @@
 @utility view-fade {
   animation: neuron-fade-in 180ms var(--ease-snappy) backwards;
 }
+
+/* Sidebar being resized (SidebarResizer): follow the pointer without the width transition, no selection. */
+:root[data-sidebar-resizing] [data-slot="sidebar-gap"],
+:root[data-sidebar-resizing] [data-slot="sidebar-container"] {
+  transition: none;
+}
+:root[data-sidebar-resizing],
+:root[data-sidebar-resizing] * {
+  cursor: col-resize !important;
+  user-select: none;
+}

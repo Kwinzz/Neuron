@@ -42,7 +42,6 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-  SidebarRail,
 } from "@/components/ui/sidebar";
 import { AgentLogo } from "@/components/ui/AgentLogo";
 import { StatusDot } from "@/components/ui/StatusDot";
@@ -53,6 +52,8 @@ import { useLive } from "@/stores/live";
 import { useNav } from "@/stores/nav";
 import { toast } from "@/stores/toast";
 import { useUi } from "@/stores/ui";
+import neuronMark from "@/assets/neuron-mark.png";
+import { SidebarResizer } from "./SidebarResizer";
 
 /** Chats shown per project folder / in the loose "Chats" list before "Afficher plus". */
 const PAGE = 8;
@@ -71,13 +72,17 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
               size="lg"
               onClick={() => useUi.getState().navigate({ kind: "home" })}
               tooltip="Neuron"
-              className="justify-center"
+              className="justify-center gap-2"
             >
+              {/* App mark without its black tile: the glyph is a mask painted in the text color. */}
+              <span
+                aria-hidden
+                className="size-5 shrink-0 bg-foreground"
+                style={{ mask: `url(${neuronMark}) center / contain no-repeat` }}
+              />
               <span className="truncate text-base font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
                 Neuron
               </span>
-              {/* Collapsed sidebar: no room for the word. */}
-              <span className="hidden text-sm font-semibold group-data-[collapsible=icon]:inline">N</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -89,7 +94,7 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
         <LooseChatsNav />
       </SidebarContent>
 
-      <SidebarRail />
+      <SidebarResizer />
     </Sidebar>
   );
 }
