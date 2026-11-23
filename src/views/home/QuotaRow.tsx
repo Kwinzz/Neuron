@@ -5,7 +5,7 @@ import type { ProviderUsage } from "@/bindings/ProviderUsage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { AGENT_ORDER } from "@/lib/agents";
+import { AGENT_ORDER, AGENTS } from "@/lib/agents";
 import { QuotaEditor } from "./QuotaEditor";
 import {
   effectiveRatio,
@@ -91,11 +91,14 @@ export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
           </span>
         ) : live ? (
           <span
-            className="inline-flex items-center gap-1.5 text-muted-foreground"
-            title="Utilisation rapportée par Claude Code"
+            className="inline-flex min-w-0 items-center gap-1.5 text-muted-foreground"
+            title={`Utilisation rapportée par ${AGENTS[provider.agent].label}${live.group ? ` (groupe le plus utilisé : ${live.group})` : ""}`}
           >
-            <span className="size-1.5 rounded-full bg-live" aria-hidden />
-            Abonnement · source Claude
+            <span className="size-1.5 shrink-0 rounded-full bg-live" aria-hidden />
+            <span className="truncate">
+              Abonnement · source {AGENTS[provider.agent].label}
+              {live.group ? ` · ${live.group}` : ""}
+            </span>
           </span>
         ) : provider.limitValue == null ? (
           <span className="inline-flex items-center gap-1.5 text-muted-foreground">

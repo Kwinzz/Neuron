@@ -1,5 +1,7 @@
 //! Quota / subscription cards and their usage within the configured window.
 
+use std::collections::HashMap;
+
 use rusqlite::{Connection, OptionalExtension, Row, params};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -140,6 +142,8 @@ pub struct LiveQuota {
     /// When the agent last reported it (Unix ms).
     #[ts(type = "number")]
     pub reported_at: i64,
+    /// Quota group shown (Antigravity: the most used one, « Gemini Models »…).
+    pub group: Option<String>,
 }
 
 /// Claude Code reports `five_hour` / `seven_day` windows in `rate_limit_event`.
@@ -251,6 +255,7 @@ fn live_quota(conn: &Connection, provider: &Provider) -> AppResult<Option<LiveQu
                 utilization: w.get("utilization")?.as_f64()?,
                 resets_at: w.get("resetsAt").and_then(serde_json::Value::as_i64),
                 reported_at,
+                group: w.get("group").and_then(serde_json::Value::as_str).map(str::to_string),
             })
         }))
 }
@@ -343,11 +348,74 @@ pub fn usage(conn: &Connection, provider: Provider, now: i64) -> AppResult<Provi
     })
 }
 
+/// Window kinds an agent's subscription reported (Claude 5 h / 7 j, Antigravity per tier, Codex free = 30 j).
+/// Empty when it reported nothing yet.
+fn reported_kinds(conn: &Connection, agent: AgentKind) -> AppResult<Vec<WindowKind>> {
+    let Some(stored) = crate::db::settings::get(conn, &crate::db::settings::rate_limits_key(agent))? else {
+        return Ok(Vec::new());
+    };
+    let mut kinds = Vec::new();
+    for w in stored.get("windows").and_then(serde_json::Value::as_array).into_iter().flatten() {
+        let kind = match w.get("window").and_then(serde_json::Value::as_str) {
+            Some("five_hour") => WindowKind::Rolling5h,
+            Some("seven_day") => WindowKind::Weekly,
+            Some("thirty_day") => WindowKind::Monthly,
+            _ => continue,
+        };
+        if !kinds.contains(&kind) {
+            kinds.push(kind);
+        }
+    }
+    Ok(kinds)
+}
+
+fn agent_rank(agent: AgentKind) -> usize {
+    AgentKind::ALL.iter().position(|a| *a == agent).unwrap_or(usize::MAX)
+}
+
+fn window_rank(kind: WindowKind) -> usize {
+    [WindowKind::Rolling5h, WindowKind::Weekly, WindowKind::Monthly, WindowKind::Credits, WindowKind::None]
+        .iter()
+        .position(|k| *k == kind)
+        .unwrap_or(usize::MAX)
+}
+
+/// Quota cards that follow each subscription: once an agent reported its windows, its cards are exactly those
+/// windows (missing ones are created, configurable like the others; the others are hidden, not deleted).
+/// Agents that reported nothing keep their configured cards.
 pub fn list_with_usage(conn: &Connection, now: i64) -> AppResult<Vec<ProviderUsage>> {
-    list(conn)?
-        .into_iter()
-        .map(|p| usage(conn, p, now))
-        .collect()
+    let mut providers = list(conn)?;
+    let mut reported: HashMap<AgentKind, Vec<WindowKind>> = HashMap::new();
+    for agent in [AgentKind::ClaudeCode, AgentKind::Antigravity, AgentKind::Codex] {
+        let kinds = reported_kinds(conn, agent)?;
+        if kinds.is_empty() {
+            continue;
+        }
+        for kind in &kinds {
+            if !providers.iter().any(|p| p.agent == agent && p.window_kind == *kind) {
+                let id = format!("{}-{}", agent.as_str(), kind.as_str());
+                let label = match agent {
+                    AgentKind::ClaudeCode => "Claude Code",
+                    AgentKind::Antigravity => "Antigravity",
+                    AgentKind::Codex => "Codex",
+                    AgentKind::Generic => "CLI",
+                };
+                conn.execute(
+                    "INSERT OR IGNORE INTO providers
+                         (id, agent, label, plan, window_kind, limit_value, unit, alert_pct, sort_order, created_at, updated_at)
+                     VALUES (?1, ?2, ?3, NULL, ?4, NULL, 'tokens', 0.8, ?5, ?6, ?6)",
+                    params![id, agent.as_str(), label, kind.as_str(), (agent_rank(agent) * 10 + window_rank(*kind)) as i64, now],
+                )?;
+                if let Some(p) = get(conn, &id)? {
+                    providers.push(p);
+                }
+            }
+        }
+        reported.insert(agent, kinds);
+    }
+    providers.retain(|p| reported.get(&p.agent).is_none_or(|kinds| kinds.contains(&p.window_kind)));
+    providers.sort_by_key(|p| (agent_rank(p.agent), window_rank(p.window_kind), p.sort_order));
+    providers.into_iter().map(|p| usage(conn, p, now)).collect()
 }
 
 pub fn update(conn: &Connection, input: &ProviderUpdate, now: i64) -> AppResult<()> {
@@ -391,6 +459,62 @@ mod tests {
             "INSERT INTO token_usage (agent, input_tokens, output_tokens, cost_usd, ts) VALUES (?1, ?2, ?3, 0.5, ?4)",
             params![agent, input, output, ts],
         )
+        .unwrap();
+    }
+
+    fn window(name: &str, utilization: f64, group: Option<&str>) -> crate::agents::RateLimitWindow {
+        crate::agents::RateLimitWindow {
+            window: name.into(),
+            utilization,
+            resets_at: Some(1),
+            group: group.map(str::to_string),
+            models: Vec::new(),
+        }
+    }
+
+    #[tokio::test]
+    async fn cards_follow_the_reported_subscription() {
+        let db = Db::open_in_memory().unwrap();
+        db.call(|conn| {
+            let now = 100 * DAY_MS;
+            let kinds = |cards: &[ProviderUsage], agent: AgentKind| -> Vec<WindowKind> {
+                cards.iter().filter(|c| c.provider.agent == agent).map(|c| c.provider.window_kind).collect()
+            };
+            // Nothing reported: the configured cards.
+            let cards = list_with_usage(conn, now)?;
+            assert_eq!(kinds(&cards, AgentKind::Codex), [WindowKind::Weekly]);
+
+            // Codex without a subscription: a 30-day window only.
+            store_live_windows(conn, AgentKind::Codex, &[window("thirty_day", 0.25, None)], now)?;
+            // Antigravity Plus: weekly buckets only (two groups: the most used one is shown).
+            store_live_windows(
+                conn,
+                AgentKind::Antigravity,
+                &[window("seven_day", 0.1, Some("Gemini Models")), window("seven_day", 0.4, Some("Claude and GPT models"))],
+                now,
+            )?;
+            let cards = list_with_usage(conn, now)?;
+            assert_eq!(kinds(&cards, AgentKind::Codex), [WindowKind::Monthly]);
+            let codex = cards.iter().find(|c| c.provider.agent == AgentKind::Codex).unwrap();
+            assert_eq!(codex.live.as_ref().map(|l| l.utilization), Some(0.25));
+            assert_eq!(kinds(&cards, AgentKind::Antigravity), [WindowKind::Weekly]);
+            let agy = cards.iter().find(|c| c.provider.agent == AgentKind::Antigravity).unwrap();
+            assert_eq!(agy.live.as_ref().and_then(|l| l.group.as_deref()), Some("Claude and GPT models"));
+
+            // Antigravity Pro: 5 h + weekly, in that order.
+            store_live_windows(
+                conn,
+                AgentKind::Antigravity,
+                &[window("seven_day", 0.1, Some("Gemini Models")), window("five_hour", 0.02, Some("Gemini Models"))],
+                now,
+            )?;
+            let cards = list_with_usage(conn, now)?;
+            assert_eq!(kinds(&cards, AgentKind::Antigravity), [WindowKind::Rolling5h, WindowKind::Weekly]);
+            // Claude reported nothing: its two configured cards stay.
+            assert_eq!(kinds(&cards, AgentKind::ClaudeCode), [WindowKind::Rolling5h, WindowKind::Weekly]);
+            Ok(())
+        })
+        .await
         .unwrap();
     }
 

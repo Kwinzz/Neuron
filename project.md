@@ -88,6 +88,16 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Icône arrondie, quotas qui suivent l'abonnement
+- Icône : coins arrondis transparents (rayon 22 %, masque suréchantillonné), toutes tailles régénérées.
+- **Accueil** : dès qu'un agent a rapporté les fenêtres de son abonnement, ses cartes de quota sont exactement
+  ces fenêtres (`providers::list_with_usage`) : cartes manquantes créées (`<agent>-<fenêtre>`, configurables),
+  les autres masquées (pas supprimées). Ex. Antigravity Plus → hebdo seul ; Pro → 5 h + hebdo ; Codex sans
+  abonnement → 30 jours. Agents sans rapport : cartes configurées inchangées. Ordre agent puis 5 h / hebdo / 30 j.
+- `LiveQuota.group` : groupe Antigravity le plus utilisé, affiché sous la carte (« source Antigravity · Gemini
+  Models ») ; la source affichée suit l'agent (n'était « source Claude » en dur).
+- En-tête de chat : déjà limité aux fenêtres rapportées (groupe du modèle du chat pour Antigravity).
+
 ### 2026-11-23 — Les agents connaissent Neuron, modifient la mémoire et le contexte du projet
 - **Icône** : l'exe n'avait pas été recompilé (cargo ne voit pas les icônes) → `build.rs` déclare
   `rerun-if-changed=icons` ; exe recompilé, icône vérifiée dans la ressource de l'exe.

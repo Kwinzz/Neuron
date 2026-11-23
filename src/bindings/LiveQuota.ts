@@ -11,4 +11,8 @@ utilization: number, resetsAt: number | null,
 /**
  * When the agent last reported it (Unix ms).
  */
-reportedAt: number, };
+reportedAt: number, 
+/**
+ * Quota group shown (Antigravity: the most used one, « Gemini Models »…).
+ */
+group: string | null, };
