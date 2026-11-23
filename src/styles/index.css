@@ -257,3 +257,9 @@
   cursor: col-resize !important;
   user-select: none;
 }
+
+/* Quick prompt window (transparent, frameless): only its card is painted. */
+html.quick-window,
+html.quick-window body {
+  background: transparent;
+}

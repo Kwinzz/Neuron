@@ -172,6 +172,18 @@ export const events = {
     listen<string | null>(NOTIFICATION_CLICKED_CHANNEL, (e) => handler(e.payload)),
 } as const;
 
+/** Label of the webview this code runs in: "main" (the app) or "quick" (global quick prompt). */
+export const windowLabel = (): string => (isTauri() ? getCurrentWindow().label : "main");
+
+/** Quick prompt window (global shortcut, see `desktop.rs`). */
+export const quickWindow = {
+  hide: (): Promise<void> => getCurrentWindow().hide(),
+  /** Each time the global shortcut shows the window. */
+  onOpened: (handler: () => void): Promise<UnlistenFn> => listen("quick://opened", () => handler()),
+  /** Show Neuron's main window on a chat. */
+  showThread: (threadId: string): Promise<void> => invoke<void>("show_thread", { threadId }),
+};
+
 /** Custom title bar: the native one is hidden (`decorations: false`). */
 export const appWindow = {
   minimize: (): Promise<void> => getCurrentWindow().minimize(),

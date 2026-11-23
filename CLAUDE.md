@@ -154,6 +154,12 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
   erreur) quand la fenêtre n'a pas le focus, envoyées par la commande `send_notification` (`notifications.rs`).
   Windows : AppUserModelID `dev.neuron.app` enregistré dans HKCU (nom + icône Neuron, sinon icône PowerShell) ; clic →
   `notification://clicked` (ouvre le chat). Autres OS : `tauri-plugin-notification` (mineure alignée crate/npm).
+- **Arrière-plan & demande rapide** (`desktop.rs`) : zone de notification, croix = cacher (`background.closeToTray`),
+  démarrage avec Windows (`--background`), instance unique ; raccourci global (`quickLauncher.shortcut`) → fenêtre
+  `quick` (`views/quick/QuickLauncher`, choisie dans `App.tsx` via `windowLabel()`), qui crée un chat ou écrit dans
+  un chat récent par l'IPC habituel. Une seule source d'événements agents : la fenêtre principale (`AppShell`).
+- **Résumé de fin de tour** : ligne cachée `<!-- neuron: ok|partiel|échec | résumé -->` demandée par `neuron_intro`,
+  lue par `agents/summary.rs` → `AgentEvent::TurnSummary` (notification), masquée à l'affichage (`lib/turnSummary.ts`).
 - Vues chargées à la demande (`React.lazy` dans `AppShell`, préchargées au repos) : garder les imports lourds
   (markdown, highlight.js, recharts) hors du bundle principal.
 - **Coûts** : Claude Code communique son coût ; Codex/Antigravity sont estimés par `pricing.rs` (liste LiteLLM

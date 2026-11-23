@@ -7,6 +7,7 @@ import { useSettings } from "@/stores/settings";
 import { toast } from "@/stores/toast";
 import { useUi, type SettingsSection } from "@/stores/ui";
 import { AgentsSection } from "./AgentsSection";
+import { BackgroundSection } from "./BackgroundSection";
 import { ContextSection } from "./ContextSection";
 import { GeneralSection } from "./GeneralSection";
 import { PricingCard } from "./PricingCard";
@@ -91,6 +92,8 @@ export function SettingsView({ section }: SettingsViewProps) {
               <GeneralSection settings={settings} />
               <PricingCard />
             </div>
+          ) : active === "background" ? (
+            <BackgroundSection settings={settings} />
           ) : active === "notifications" ? (
             <NotificationsSection settings={settings} />
           ) : active === "context" ? (

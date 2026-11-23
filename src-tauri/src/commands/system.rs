@@ -77,3 +77,12 @@ pub async fn send_notification(
 ) -> AppResult<()> {
     tokio::task::spawn_blocking(move || crate::notifications::show(&app, &title, &body, thread_id)).await?
 }
+
+/// Brings Neuron's main window up on a chat (quick prompt « envoyer et ouvrir »).
+#[tauri::command]
+pub async fn show_thread(app: tauri::AppHandle, thread_id: String) -> AppResult<()> {
+    use tauri::Emitter;
+    crate::desktop::show_main(&app);
+    app.emit_to("main", crate::notifications::CLICKED_EVENT, Some(thread_id))?;
+    Ok(())
+}

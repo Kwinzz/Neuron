@@ -1,5 +1,6 @@
 import { cn } from "cn";
 import {
+  AppWindow,
   Bell,
   Keyboard,
   Layers,
@@ -18,6 +19,7 @@ interface SettingsNavItem {
 
 const NAV_ITEMS: readonly SettingsNavItem[] = [
   { id: "general", label: "Général", icon: SlidersHorizontal },
+  { id: "background", label: "Arrière-plan & raccourci", icon: AppWindow },
   { id: "agents", label: "Agents & MCP", icon: Plug },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "context", label: "Contexte injecté", icon: Layers },

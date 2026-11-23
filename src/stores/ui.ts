@@ -16,7 +16,14 @@ export type View =
   | { kind: "memory" }
   | { kind: "settings"; section?: SettingsSection };
 
-export type SettingsSection = "general" | "agents" | "notifications" | "context" | "generic" | "shortcuts";
+export type SettingsSection =
+  | "general"
+  | "background"
+  | "agents"
+  | "notifications"
+  | "context"
+  | "generic"
+  | "shortcuts";
 
 const DOCK_KEY = "neuron.dockOpen";
 

@@ -88,6 +88,30 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-24 — Résumé de l'agent dans les notifications, arrière-plan, demande rapide globale
+- **Résumé de fin de tâche** : `neuron_intro` demande à chaque agent de finir sa réponse par une ligne cachée
+  `<!-- neuron: ok|partiel|échec | résumé -->` (rappel court ajouté aux messages suivants des agents sans
+  system prompt : `context::SUMMARY_REMINDER`). Le pump garde le dernier texte du tour ; `agents/summary.rs`
+  (`turn_summary`, testé) en tire `TurnOutcome` + résumé (repli : première phrase) → nouvel
+  `AgentEvent::TurnSummary`, émis juste avant le statut final. Notification : « ✅ Tâche réussie / ⚠️ Faite en
+  partie / ❌ Non effectuée · <chat> » + le résumé. La ligne est masquée dans le chat, même en streaming
+  (`lib/turnSummary.ts`), et dans le dock.
+- **Arrière-plan** (`desktop.rs`) : icône dans la zone de notification (clic = ouvrir ; menu Ouvrir / Demande
+  rapide / Quitter), la croix cache la fenêtre (réglage `background.closeToTray`, notification explicative la
+  1re fois), `tauri-plugin-autostart` (`background.launchAtLogin`, lancé avec `--background` → reste caché),
+  `tauri-plugin-single-instance` (relancer Neuron ramène la fenêtre). Fenêtre principale `visible: false` dans la
+  config, affichée par `desktop::setup`. Feature `tray-icon`.
+- **Demande rapide globale** : `tauri-plugin-global-shortcut` (réglage `quickLauncher`, défaut `Ctrl+Shift+Space`,
+  ré-enregistré à chaque sauvegarde ; raccourci invalide ou déjà pris → réglages précédents restaurés + erreur).
+  Deuxième fenêtre `quick` (sans bordure, transparente, toujours au premier plan, hors barre des tâches), affichée
+  sur l'écran du curseur, cachée quand elle perd le focus. Vue `views/quick/QuickLauncher.tsx` (routée par
+  `windowLabel()` dans `App.tsx`) : champ de demande, « Nouveau chat » (agent Claude / Antigravity / Codex, Tab) +
+  7 chats récents (↑↓), Entrée = envoyer, Ctrl+Entrée = envoyer et ouvrir (`show_thread`), Échap = fermer.
+  Réglages par défaut d'un nouveau chat partagés avec l'écran « Nouveau chat » (`lib/chatDefaults.ts`).
+- Paramètres → **Arrière-plan & raccourci** (`BackgroundSection`, enregistreur de raccourci).
+- Vérifié en vrai : raccourci global → fenêtre rapide affichée, fermeture → fenêtre cachée (processus vivant),
+  2e lancement → fenêtre ramenée.
+
 ### 2026-11-23 — Images des agents affichées dans le chat
 - Génération d'images testée en direct : `agy` CLI n'a pas d'outil d'image ; Claude Code non plus ; Codex a
   `image_gen` (feature `image_generation` active) mais répond « indisponible dans cette session » en `codex exec`

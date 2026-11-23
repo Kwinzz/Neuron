@@ -6,6 +6,7 @@ import { ChatSettingsBar } from "@/components/chat/ChatSettingsBar";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
+import { readChatDefaults, saveChatDefaults } from "@/lib/chatDefaults";
 import type { ChatSettings } from "@/lib/models";
 import { useDashboard } from "@/stores/dashboard";
 import { useLive } from "@/stores/live";
@@ -14,17 +15,6 @@ import { toast } from "@/stores/toast";
 import { useUi } from "@/stores/ui";
 import { Composer } from "./Composer";
 
-const DEFAULTS_KEY = "neuron.chatDefaults";
-const FALLBACK: ChatSettings = { agent: "claude_code", model: null, effort: null, permissionMode: "manual" };
-
-function readDefaults(): ChatSettings {
-  try {
-    const raw = localStorage.getItem(DEFAULTS_KEY);
-    return raw ? { ...FALLBACK, ...(JSON.parse(raw) as Partial<ChatSettings>) } : FALLBACK;
-  } catch {
-    return FALLBACK;
-  }
-}
 
 function folderName(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
@@ -33,7 +23,7 @@ function folderName(path: string): string {
 /** Empty chat: pick model / reasoning / permissions, type, and the chat is created on send. */
 export function DraftChat({ projectId }: { projectId: string | null }) {
   const project = useNav((s) => (projectId ? s.projects.find((p) => p.id === projectId) : undefined));
-  const [settings, setSettings] = useState<ChatSettings>(readDefaults);
+  const [settings, setSettings] = useState<ChatSettings>(readChatDefaults);
   const [cwd, setCwd] = useState<string>("");
 
   useEffect(() => {
@@ -46,11 +36,7 @@ export function DraftChat({ projectId }: { projectId: string | null }) {
 
   const onSettings = useCallback((next: ChatSettings) => {
     setSettings(next);
-    try {
-      localStorage.setItem(DEFAULTS_KEY, JSON.stringify(next));
-    } catch {
-      /* not persisted */
-    }
+    saveChatDefaults(next);
   }, []);
 
   const browse = useCallback(async () => {

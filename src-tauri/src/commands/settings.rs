@@ -7,7 +7,7 @@ use tauri::{AppHandle, Manager, State};
 use ts_rs::TS;
 
 use crate::app_settings::{self, AppSettings, GenericCliProfile};
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 
 #[tauri::command]
@@ -15,9 +15,24 @@ pub async fn get_app_settings(state: State<'_, AppState>) -> AppResult<AppSettin
     state.db.call(|c| app_settings::load(c)).await
 }
 
+/// Saves the settings and applies their desktop part (tray behaviour, global shortcut, start with Windows).
+/// A shortcut that can't be registered (invalid, or taken by another app) leaves the previous settings in place.
 #[tauri::command]
-pub async fn update_app_settings(state: State<'_, AppState>, settings: AppSettings) -> AppResult<AppSettings> {
-    state.db.call(move |c| app_settings::save(c, settings)).await
+pub async fn update_app_settings(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    settings: AppSettings,
+) -> AppResult<AppSettings> {
+    let previous = state.db.call(|c| app_settings::load(c)).await?;
+    let stored = state.db.call(move |c| app_settings::save(c, settings)).await?;
+    let problems = crate::desktop::apply(&app, &stored);
+    if problems.is_empty() {
+        return Ok(stored);
+    }
+    let restore = previous.clone();
+    state.db.call(move |c| app_settings::save(c, restore)).await?;
+    crate::desktop::apply(&app, &previous);
+    Err(AppError::Invalid(problems.join(" · ")))
 }
 
 #[derive(Debug, Clone, Serialize, TS)]

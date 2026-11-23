@@ -6,6 +6,7 @@ pub mod attachments;
 pub mod commands;
 pub mod context;
 pub mod db;
+pub mod desktop;
 pub mod error;
 pub mod memory;
 pub mod notifications;
@@ -26,6 +27,13 @@ pub fn run() {
     init_tracing();
 
     let app = tauri::Builder::default()
+        // First: a second launch (shortcut, autostart while running) just brings the window back.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| desktop::show_main(app)))
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![desktop::BACKGROUND_ARG]),
+        ))
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .setup(move |app| {
@@ -49,17 +57,22 @@ pub fn run() {
                 let data_dir = state.paths.data_dir.clone();
                 std::thread::spawn(move || notifications::register(&handle, &data_dir));
             }
+            let settings = tauri::async_runtime::block_on(state.db.call(|c| app_settings::load(c))).unwrap_or_default();
             app.manage(state);
+            // Tray, global shortcut, start with Windows; shows the main window unless started in the background.
+            desktop::setup(app.handle(), &settings);
             commands::memory::spawn_memory_watcher(app.handle());
             commands::settings::spawn_idle_reaper(app.handle());
             commands::pricing::spawn_price_refresh(app.handle());
             commands::pricing::spawn_agy_quota_refresh(app.handle());
             Ok(())
         })
+        .on_window_event(desktop::on_window_event)
         .invoke_handler(tauri::generate_handler![
             commands::system::app_info,
             commands::system::frontend_log,
             commands::system::send_notification,
+            commands::system::show_thread,
             commands::dashboard::dashboard_snapshot,
             commands::dashboard::usage_report,
             commands::dashboard::update_provider,

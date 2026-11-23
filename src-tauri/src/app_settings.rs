@@ -20,6 +20,8 @@ pub struct AppSettings {
     pub context: ContextSettings,
     /// User-defined CLIs usable as the "Generic" agent (each one appears as a model).
     pub generic_clis: Vec<GenericCliProfile>,
+    pub background: BackgroundSettings,
+    pub quick_launcher: QuickLauncherSettings,
 }
 
 impl Default for AppSettings {
@@ -29,7 +31,44 @@ impl Default for AppSettings {
             notifications: NotificationSettings::default(),
             context: ContextSettings::default(),
             generic_clis: Vec::new(),
+            background: BackgroundSettings::default(),
+            quick_launcher: QuickLauncherSettings::default(),
         }
+    }
+}
+
+/// Neuron keeps running without its window (system tray).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", default)]
+#[ts(export)]
+pub struct BackgroundSettings {
+    /// Closing the window hides it in the system tray; « Quitter » from the tray menu really quits.
+    pub close_to_tray: bool,
+    /// Start with Windows, straight into the tray.
+    pub launch_at_login: bool,
+}
+
+impl Default for BackgroundSettings {
+    fn default() -> Self {
+        Self { close_to_tray: true, launch_at_login: false }
+    }
+}
+
+/// System-wide shortcut opening the quick prompt window (works from any app, Neuron hidden or not).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", default)]
+#[ts(export)]
+pub struct QuickLauncherSettings {
+    pub enabled: bool,
+    /// e.g. `Ctrl+Shift+Space` (modifiers + a key code: `KeyK`, `Space`, `F1`…).
+    pub shortcut: String,
+}
+
+pub const DEFAULT_QUICK_SHORTCUT: &str = "Ctrl+Shift+Space";
+
+impl Default for QuickLauncherSettings {
+    fn default() -> Self {
+        Self { enabled: true, shortcut: DEFAULT_QUICK_SHORTCUT.into() }
     }
 }
 
@@ -134,6 +173,10 @@ pub fn save(conn: &Connection, mut next: AppSettings) -> AppResult<AppSettings> 
             p.id = format!("{base}-{n}");
             n += 1;
         }
+    }
+    next.quick_launcher.shortcut = next.quick_launcher.shortcut.trim().to_string();
+    if next.quick_launcher.shortcut.is_empty() {
+        next.quick_launcher.shortcut = DEFAULT_QUICK_SHORTCUT.into();
     }
     settings::set(conn, KEY, &serde_json::to_value(&next)?)?;
     Ok(next)

@@ -1,0 +1,22 @@
+import type { ChatSettings } from "@/lib/models";
+
+/** Settings of the last new chat (shared by the « Nouveau chat » screen and the quick prompt window). */
+const DEFAULTS_KEY = "neuron.chatDefaults";
+const FALLBACK: ChatSettings = { agent: "claude_code", model: null, effort: null, permissionMode: "manual" };
+
+export function readChatDefaults(): ChatSettings {
+  try {
+    const raw = localStorage.getItem(DEFAULTS_KEY);
+    return raw ? { ...FALLBACK, ...(JSON.parse(raw) as Partial<ChatSettings>) } : FALLBACK;
+  } catch {
+    return FALLBACK;
+  }
+}
+
+export function saveChatDefaults(next: ChatSettings): void {
+  try {
+    localStorage.setItem(DEFAULTS_KEY, JSON.stringify(next));
+  } catch {
+    /* not persisted */
+  }
+}
