@@ -88,6 +88,11 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Boutons de fenêtre dans le coin, pied « SQLite » retiré
+- `WindowControls` toujours dans le coin haut droit : dans l'en-tête du dock « Threads live » quand il est ouvert
+  (en-tête lui aussi déplaçable), sinon dans `SiteHeader` (avant, ils restaient au milieu, collés au dock).
+- Pied de la barre latérale (« SQLite vN · v0.1.0 ») supprimé.
+
 ### 2026-11-23 — Barre de titre maison, info-bulle du graphe sans glissement
 - Barre de titre native retirée (`decorations: false`, ombre conservée). `SiteHeader` sert de barre de titre :
   zones vides en `data-tauri-drag-region` (glisser = déplacer, double-clic = agrandir), boutons Réduire /

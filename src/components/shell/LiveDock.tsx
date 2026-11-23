@@ -11,6 +11,7 @@ import { STATUS } from "@/lib/status";
 import { selectDockIds, useLive } from "@/stores/live";
 import { useUi } from "@/stores/ui";
 import { DockCard } from "./dock/DockCard";
+import { WindowControls } from "./WindowControls";
 
 const DOCK_WIDTH = 380;
 
@@ -63,9 +64,10 @@ function DockPanel({ open }: { open: boolean }) {
       style={{ width: DOCK_WIDTH - 16 }}
       aria-label="Threads live"
     >
-      <header className="flex h-12 shrink-0 items-center gap-2 px-4">
+      {/* Rightmost header while open: part of the title bar, holds the window controls. */}
+      <header data-tauri-drag-region className="flex h-12 shrink-0 select-none items-center gap-2 pl-4 pr-2">
         <Activity className="size-4 text-muted-foreground" />
-        <h2 className="text-sm font-medium">Threads live</h2>
+        <h2 data-tauri-drag-region className="text-sm font-medium">Threads live</h2>
         {activeCount > 0 && (
           <Badge variant="secondary" className="font-mono tabular-nums animate-in zoom-in-75 fade-in-0 duration-200">
             {activeCount}
@@ -81,6 +83,8 @@ function DockPanel({ open }: { open: boolean }) {
         >
           <PanelRightClose />
         </Button>
+        <Separator orientation="vertical" className="mx-0.5 data-[orientation=vertical]:h-4" />
+        <WindowControls />
       </header>
       <Separator />
 

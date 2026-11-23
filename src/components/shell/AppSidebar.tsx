@@ -4,7 +4,6 @@ import {
   Settings,
   ChevronRight,
   CirclePlus,
-  Database,
   FileText,
   Folder,
   FolderOpen,
@@ -16,7 +15,6 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import type { AppInfo } from "@/bindings/AppInfo";
 import type { ProjectSummary } from "@/bindings/ProjectSummary";
 import type { ThreadSummary } from "@/bindings/ThreadSummary";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -31,7 +29,6 @@ import { MOD_LABEL } from "@/components/ui/Kbd";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupAction,
   SidebarGroupContent,
@@ -92,9 +89,6 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
         <LooseChatsNav />
       </SidebarContent>
 
-      <SidebarFooter>
-        <StatusFooter />
-      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );
@@ -388,23 +382,3 @@ const ChatLink = memo(function ChatLink({ chat, sub = false }: { chat: ThreadSum
   );
 });
 
-function StatusFooter() {
-  const [info, setInfo] = useState<AppInfo | null>(null);
-  useEffect(() => {
-    ipc
-      .appInfo()
-      .then(setInfo)
-      .catch(() => undefined);
-  }, []);
-  return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <SidebarMenuButton size="sm" tooltip={info?.dbPath ?? "SQLite"} className="text-muted-foreground">
-          <Database />
-          <span>SQLite v{info?.schemaVersion ?? "–"}</span>
-          <span className="ml-auto tabular-nums">v{info?.version ?? "–"}</span>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-    </SidebarMenu>
-  );
-}

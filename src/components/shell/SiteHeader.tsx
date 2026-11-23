@@ -34,6 +34,7 @@ function useViewTitle(view: View): { section: string; title: string } {
 export function SiteHeader() {
   const view = useUi((s) => s.view);
   const { section, title } = useViewTitle(view);
+  const dockOpen = useUi((s) => s.dockOpen);
   return (
     <header
       data-tauri-drag-region
@@ -65,8 +66,13 @@ export function SiteHeader() {
             Nouveau chat
           </Button>
           <DockToggle />
-          <Separator orientation="vertical" className="mx-1 data-[orientation=vertical]:h-4" />
-          <WindowControls />
+          {/* The window controls sit in the top-right corner: here, or in the live dock's header when it is open. */}
+          {!dockOpen && (
+            <>
+              <Separator orientation="vertical" className="mx-1 data-[orientation=vertical]:h-4" />
+              <WindowControls />
+            </>
+          )}
         </div>
       </div>
     </header>
