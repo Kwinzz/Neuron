@@ -4,19 +4,23 @@ import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useRef, use
 import type { AgentKind } from "@/bindings/AgentKind";
 import type { ThreadSummary } from "@/bindings/ThreadSummary";
 import neuronMark from "@/assets/neuron-mark.png";
+import { ModelPicker } from "@/components/chat/ModelPicker";
 import { AgentLogo } from "@/components/ui/AgentLogo";
-import { AGENTS } from "@/lib/agents";
-import { readChatDefaults } from "@/lib/chatDefaults";
+import { type QuickModel, readChatDefaults, readQuickModel, saveQuickModel } from "@/lib/chatDefaults";
 import { formatRelative } from "@/lib/format";
 import { ipc, ipcErrorMessage, quickWindow } from "@/lib/ipc";
+import { resolveModelId } from "@/stores/models";
 
 /** Agents a quick request can start (generic CLIs need a profile picked in the app). */
 const QUICK_AGENTS: readonly AgentKind[] = ["claude_code", "antigravity", "codex"];
 const RECENT = 7;
 
-function defaultAgent(): AgentKind {
-  const agent = readChatDefaults().agent;
-  return QUICK_AGENTS.includes(agent) ? agent : "claude_code";
+/** Last agent + model used here, else the « Nouveau chat » defaults. */
+function initialChoice(): QuickModel {
+  const saved = readQuickModel();
+  if (saved && QUICK_AGENTS.includes(saved.agent)) return saved;
+  const { agent, model, effort } = readChatDefaults();
+  return QUICK_AGENTS.includes(agent) ? { agent, model, effort } : { agent: "claude_code", model: null, effort: null };
 }
 
 /**
@@ -28,7 +32,13 @@ export function QuickLauncher() {
   const [chats, setChats] = useState<ThreadSummary[]>([]);
   /** 0 = new chat, n = chats[n - 1]. */
   const [selected, setSelected] = useState(0);
-  const [agent, setAgent] = useState<AgentKind>(defaultAgent);
+  const [choice, setChoiceState] = useState<QuickModel>(initialChoice);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const agent = choice.agent;
+  const setChoice = (next: QuickModel) => {
+    setChoiceState(next);
+    saveQuickModel(next);
+  };
   const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -37,7 +47,8 @@ export function QuickLauncher() {
   const reset = useCallback(() => {
     setText("");
     setSelected(0);
-    setAgent(defaultAgent());
+    setChoiceState(initialChoice());
+    setPickerOpen(false);
     setState("idle");
     setError(null);
     ipc
@@ -93,12 +104,11 @@ export function QuickLauncher() {
         threadId = target.id;
       } else {
         const defaults = readChatDefaults();
-        const same = defaults.agent === agent;
         const chat = await ipc.createThread({
           agent,
           cwd: null,
-          model: same ? defaults.model : null,
-          effort: same ? defaults.effort : null,
+          model: choice.model,
+          effort: choice.effort,
           permissionMode: defaults.permissionMode,
           title: null,
           projectId: null,
@@ -131,13 +141,17 @@ export function QuickLauncher() {
       e.preventDefault();
       setSelected((i) => (i - 1 + count) % count);
     } else if (e.key === "Tab") {
+      // Next agent, with its default model.
       e.preventDefault();
       setSelected(0);
-      setAgent((a) => {
-        const i = QUICK_AGENTS.indexOf(a);
-        const step = e.shiftKey ? -1 : 1;
-        return QUICK_AGENTS[(i + step + QUICK_AGENTS.length) % QUICK_AGENTS.length] ?? a;
-      });
+      const i = QUICK_AGENTS.indexOf(agent);
+      const step = e.shiftKey ? -1 : 1;
+      const next = QUICK_AGENTS[(i + step + QUICK_AGENTS.length) % QUICK_AGENTS.length] ?? agent;
+      setChoice({ agent: next, model: null, effort: null });
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "m") {
+      e.preventDefault();
+      setSelected(0);
+      setPickerOpen(true);
     } else if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       void send(e.ctrlKey || e.metaKey);
@@ -191,29 +205,37 @@ export function QuickLauncher() {
                 <Plus className="size-4" />
               </span>
               <span className="font-medium">Nouveau chat</span>
-              <span className="ml-auto flex items-center gap-1" role="radiogroup" aria-label="Agent du nouveau chat">
-                {QUICK_AGENTS.map((a) => (
-                  <button
-                    key={a}
-                    type="button"
-                    role="radio"
-                    aria-checked={agent === a}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setAgent(a);
-                      setSelected(0);
-                    }}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs transition-colors duration-150",
-                      agent === a
-                        ? "border-foreground/30 bg-background text-foreground"
-                        : "border-transparent text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    <AgentLogo agent={a} size={12} />
-                    {AGENTS[a].label}
-                  </button>
-                ))}
+              <span
+                className="ml-auto"
+                // The picker is a popover: keep the row selection, not the caret logic, for its clicks.
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <ModelPicker
+                  agent={agent}
+                  model={choice.model}
+                  open={pickerOpen}
+                  onOpenChange={(open) => {
+                    setPickerOpen(open);
+                    if (open) setSelected(0);
+                    else window.setTimeout(() => inputRef.current?.focus(), 0);
+                  }}
+                  listClassName="max-h-52"
+                  onChange={(nextAgent, next) => {
+                    if (!QUICK_AGENTS.includes(nextAgent)) return;
+                    if (!next) {
+                      setChoice({ agent: nextAgent, model: null, effort: null });
+                      return;
+                    }
+                    // Same rule as the chat settings bar: keep the level only if the model accepts it.
+                    const keep =
+                      nextAgent === agent &&
+                      choice.effort !== null &&
+                      (next.efforts.length === 0 || next.efforts.includes(choice.effort));
+                    const effort = keep ? choice.effort : null;
+                    setChoice({ agent: nextAgent, model: resolveModelId(next, effort), effort });
+                  }}
+                />
               </span>
             </Row>
           </li>
@@ -235,10 +257,11 @@ export function QuickLauncher() {
           ))}
         </ul>
 
-        <footer className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t px-4 py-2 text-xs text-muted-foreground">
-          <Hint keys="↑ ↓">destination</Hint>
+        <footer className="flex items-center gap-3 border-t px-4 py-2 text-xs whitespace-nowrap text-muted-foreground">
+          <Hint keys="↑ ↓">chat</Hint>
           <Hint keys="Tab">agent</Hint>
-          <Hint keys="Ctrl ↵">envoyer et ouvrir</Hint>
+          <Hint keys="Ctrl M">modèle</Hint>
+          <Hint keys="Ctrl ↵">envoyer + ouvrir</Hint>
           <Hint keys="Échap">fermer</Hint>
           <span className="ml-auto flex items-center gap-1.5 text-foreground">
             <CornerDownLeft className="size-3.5" /> Envoyer

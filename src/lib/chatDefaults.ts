@@ -20,3 +20,25 @@ export function saveChatDefaults(next: ChatSettings): void {
     /* not persisted */
   }
 }
+
+/** Agent + model last used from the quick prompt window (its own memory, independent of « Nouveau chat »). */
+const QUICK_KEY = "neuron.quickDefaults";
+
+export type QuickModel = Pick<ChatSettings, "agent" | "model" | "effort">;
+
+export function readQuickModel(): QuickModel | null {
+  try {
+    const raw = localStorage.getItem(QUICK_KEY);
+    return raw ? (JSON.parse(raw) as QuickModel) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveQuickModel(next: QuickModel): void {
+  try {
+    localStorage.setItem(QUICK_KEY, JSON.stringify(next));
+  } catch {
+    /* not persisted */
+  }
+}

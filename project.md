@@ -88,6 +88,14 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-24 — Choix du modèle dans la demande rapide
+- Ligne « Nouveau chat » de la fenêtre rapide : le `ModelPicker` des chats (recherche, tous fournisseurs) remplace
+  les pastilles d'agent ; `Ctrl+M` l'ouvre au clavier, Tab passe à l'agent suivant (modèle par défaut). Le choix
+  agent + modèle (+ niveau gardé s'il est compatible) est mémorisé à part (`neuron.quickDefaults`,
+  `lib/chatDefaults.ts`), repli sur les réglages du dernier « Nouveau chat ».
+- `ModelPicker` : ouverture contrôlable (`open` / `onOpenChange`) et hauteur de liste réglable (`listClassName`).
+- Vérifié en vrai : modèle affiché dans la fenêtre rapide, `Ctrl+M` ouvre la liste.
+
 ### 2026-11-24 — Résumé de l'agent dans les notifications, arrière-plan, demande rapide globale
 - **Résumé de fin de tâche** : `neuron_intro` demande à chaque agent de finir sa réponse par une ligne cachée
   `<!-- neuron: ok|partiel|échec | résumé -->` (rappel court ajouté aux messages suivants des agents sans

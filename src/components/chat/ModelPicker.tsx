@@ -26,11 +26,30 @@ interface ModelPickerProps {
   /** Existing chat: the provider can't change (a different CLI = a new chat). */
   lockAgent?: boolean;
   disabled?: boolean;
+  /** Controlled open state (e.g. opened by a keyboard shortcut). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Classes of the scrolling list (small windows need a shorter one). */
+  listClassName?: string;
 }
 
 /** Searchable model picker, all providers, grouped with their logos. */
-export const ModelPicker = memo(function ModelPicker({ agent, model, onChange, lockAgent, disabled }: ModelPickerProps) {
-  const [open, setOpen] = useState(false);
+export const ModelPicker = memo(function ModelPicker({
+  agent,
+  model,
+  onChange,
+  lockAgent,
+  disabled,
+  open: openProp,
+  onOpenChange,
+  listClassName,
+}: ModelPickerProps) {
+  const [openState, setOpenState] = useState(false);
+  const open = openProp ?? openState;
+  const setOpen = (next: boolean) => {
+    if (openProp === undefined) setOpenState(next);
+    onOpenChange?.(next);
+  };
   const providers = useModels((s) => s.providers);
   const loading = useModels((s) => s.loading);
 
@@ -64,7 +83,7 @@ export const ModelPicker = memo(function ModelPicker({ agent, model, onChange, l
       <PopoverContent align="start" className="w-80 p-0">
         <Command loop>
           <CommandInput placeholder="Rechercher un modèle…" />
-          <CommandList className="max-h-80">
+          <CommandList className={cn("max-h-80", listClassName)}>
             <CommandEmpty>{loading ? "Chargement des modèles…" : "Aucun modèle"}</CommandEmpty>
             {providers.map((p, i) => {
               const locked = Boolean(lockAgent) && p.agent !== agent;
