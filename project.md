@@ -88,6 +88,12 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-24 — Raccourcis du navigateur désactivés
+- `lib/browserKeys.ts` (branché dans `main.tsx`) annule l'action par défaut de WebView2 pour Ctrl+F (barre de
+  recherche), Ctrl+G, Ctrl+P (impression), Ctrl+R / F5 (rechargement), Ctrl+U, Ctrl+S, Ctrl+H, Ctrl+O, F3, F7,
+  Ctrl+Shift+I/C/R. Les raccourcis de Neuron reçoivent toujours l'événement ; le zoom reste disponible.
+  Vérifié en vrai : Ctrl+F n'ouvre plus rien.
+
 ### 2026-11-24 — Projets dans la demande rapide, Claude Fable 5.2
 - Catalogue Claude : Fable 5.2 n'est plus étiqueté « Génération précédente » (il fait partie de la famille Claude 5).
 - Fenêtre rapide : sélecteur de projet (`QuickProjectPicker`, `Ctrl+P`, mémorisé dans `neuron.quickProject`) à côté
