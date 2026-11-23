@@ -40,7 +40,7 @@ src/
   lib/                      agents.ts (méta + ordre), status.ts, format.ts, fuzzy.ts
   stores/                   zustand : ui, live (threads temps réel), dashboard, toast
   hooks/                    useAgentEventBridge, useHotkey, useNow
-  components/shell/         AppShell, Sidebar, LiveDock, DockThreadRow, Toaster
+  components/shell/         AppShell, Sidebar, SiteHeader (= barre de titre, `decorations: false`), WindowControls, LiveDock, Toaster
   components/palette/       CommandPalette (Ctrl+K)
   components/ui/            primitives partagées (AgentBadge, StatusDot, Kbd, LiveTimer)
   views/home/               Accueil (dashboard)

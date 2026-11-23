@@ -67,7 +67,7 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 
   return (
     <Sidebar {...props}>
-      <SidebarHeader>
+      <SidebarHeader data-tauri-drag-region>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton

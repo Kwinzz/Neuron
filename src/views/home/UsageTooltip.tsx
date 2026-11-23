@@ -24,7 +24,7 @@ export function UsageTooltip({ byKey, visibleAgents, config, range, metric, acti
   const agents = visibleAgents.filter((agent) => row[agent] > 0);
 
   return (
-    <div className="grid min-w-44 gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl">
+    <div className="grid min-w-44 gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl animate-in fade-in-0 zoom-in-95 duration-150">
       <div className="font-medium text-foreground">{bucketTitle(row.key, range)}</div>
       {agents.length === 0 ? (
         <div className="text-muted-foreground">Aucune activité</div>

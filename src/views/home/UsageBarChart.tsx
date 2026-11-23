@@ -69,6 +69,8 @@ export function UsageBarChart({ rows, visibleAgents, config, range, metric }: Us
           tickFormatter={(v: number) => spec.axis(v)}
         />
         <ChartTooltip
+          // No position tween: the details appear where the pointer is instead of sliding across the page.
+          isAnimationActive={false}
           cursor={{ fill: "var(--muted)", opacity: 0.5, radius: 6 }}
           content={<UsageTooltip byKey={byKey} visibleAgents={visibleAgents} config={config} range={range} metric={metric} />}
         />

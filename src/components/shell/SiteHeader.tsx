@@ -7,6 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useLive } from "@/stores/live";
 import { useNav } from "@/stores/nav";
 import { useUi, type View } from "@/stores/ui";
+import { WindowControls } from "./WindowControls";
 
 function useViewTitle(view: View): { section: string; title: string } {
   const chatTitle = useLive((s) => (view.kind === "thread" ? s.threads[view.id]?.title : undefined));
@@ -25,21 +26,28 @@ function useViewTitle(view: View): { section: string; title: string } {
   return { section: "Neuron", title: "Accueil" };
 }
 
-/** dashboard-01 site header: sidebar trigger · breadcrumb · actions. */
+/**
+ * dashboard-01 site header: sidebar trigger · breadcrumb · actions · window controls.
+ * Doubles as the title bar (native one hidden): every bare area carries `data-tauri-drag-region`
+ * (drag to move, double-click to maximize); buttons stay clickable.
+ */
 export function SiteHeader() {
   const view = useUi((s) => s.view);
   const { section, title } = useViewTitle(view);
   return (
-    <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear">
-      <div className="flex w-full min-w-0 items-center gap-1 px-4 lg:gap-2 lg:px-6">
+    <header
+      data-tauri-drag-region
+      className="flex h-(--header-height) shrink-0 select-none items-center gap-2 border-b transition-[width,height] ease-linear"
+    >
+      <div data-tauri-drag-region className="flex w-full min-w-0 items-center gap-1 pl-4 pr-2 lg:gap-2 lg:pl-6">
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
-        <nav aria-label="Fil d'Ariane" className="flex min-w-0 items-center gap-1.5 text-sm">
-          <span key={section} className="shrink-0 text-muted-foreground animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ease-snappy">{section}</span>
-          <span className="text-muted-foreground">/</span>
-          <h1 key={title} className="truncate font-medium animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ease-snappy">{title}</h1>
+        <nav data-tauri-drag-region aria-label="Fil d'Ariane" className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
+          <span data-tauri-drag-region key={section} className="shrink-0 text-muted-foreground animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ease-snappy">{section}</span>
+          <span data-tauri-drag-region className="text-muted-foreground">/</span>
+          <h1 data-tauri-drag-region key={title} className="truncate font-medium animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ease-snappy">{title}</h1>
         </nav>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
+        <div data-tauri-drag-region className="ml-auto flex shrink-0 items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -57,6 +65,8 @@ export function SiteHeader() {
             Nouveau chat
           </Button>
           <DockToggle />
+          <Separator orientation="vertical" className="mx-1 data-[orientation=vertical]:h-4" />
+          <WindowControls />
         </div>
       </div>
     </header>

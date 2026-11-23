@@ -4,6 +4,7 @@
  */
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 import type { AgentEventEnvelope } from "@/bindings/AgentEventEnvelope";
@@ -167,6 +168,16 @@ export const events = {
   onNotificationClicked: (handler: (threadId: string | null) => void): Promise<UnlistenFn> =>
     listen<string | null>(NOTIFICATION_CLICKED_CHANNEL, (e) => handler(e.payload)),
 } as const;
+
+/** Custom title bar: the native one is hidden (`decorations: false`). */
+export const appWindow = {
+  minimize: (): Promise<void> => getCurrentWindow().minimize(),
+  toggleMaximize: (): Promise<void> => getCurrentWindow().toggleMaximize(),
+  close: (): Promise<void> => getCurrentWindow().close(),
+  isMaximized: (): Promise<boolean> => getCurrentWindow().isMaximized(),
+  /** Fires on every resize (maximize / restore included). */
+  onResized: (handler: () => void): Promise<UnlistenFn> => getCurrentWindow().onResized(() => handler()),
+};
 
 /** Native desktop notifications (asks the OS permission once). */
 export const notify = {

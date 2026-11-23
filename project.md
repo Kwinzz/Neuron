@@ -88,6 +88,15 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Barre de titre maison, info-bulle du graphe sans glissement
+- Barre de titre native retirée (`decorations: false`, ombre conservée). `SiteHeader` sert de barre de titre :
+  zones vides en `data-tauri-drag-region` (glisser = déplacer, double-clic = agrandir), boutons Réduire /
+  Agrandir-Restaurer / Fermer (`components/shell/WindowControls.tsx`, survol rouge pour Fermer). Haut de la barre
+  latérale aussi déplaçable. IPC : `appWindow` dans `lib/ipc.ts` ; permissions `core:window:allow-minimize`,
+  `allow-toggle-maximize`, `allow-close`, `allow-start-dragging`.
+- Graphe de consommation : l'info-bulle ne glisse plus d'un point à l'autre (`isAnimationActive={false}`), elle
+  apparaît sur place en fondu.
+
 ### 2026-11-23 — Notifications au nom et au logo de Neuron
 - Windows : le plugin de notification prenait l'identité de PowerShell (nom + icône) dès que l'exe tourne depuis
   `target/debug|release`. Neuron enregistre désormais son propre AppUserModelID (`dev.neuron.app`) sous
