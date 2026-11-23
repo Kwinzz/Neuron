@@ -88,6 +88,11 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-24 — Point d'activité de la liste des chats
+- Barre latérale : le point « l'agent travaille » (badge en position absolue) chevauchait le titre. Le bouton
+  réserve sa place (`pr-7`) tant que le point est affiché ; dans les chats d'un projet, le titre prend la place
+  restante (`min-w-0 flex-1`) et le point ne rétrécit plus.
+
 ### 2026-11-24 — Choix du modèle dans la demande rapide
 - Ligne « Nouveau chat » de la fenêtre rapide : le `ModelPicker` des chats (recherche, tous fournisseurs) remplace
   les pastilles d'agent ; `Ctrl+M` l'ouvre au clavier, Tab passe à l'agent suivant (modèle par défaut). Le choix

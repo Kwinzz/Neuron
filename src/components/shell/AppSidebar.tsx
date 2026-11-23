@@ -363,22 +363,24 @@ const ChatLink = memo(function ChatLink({ chat, sub = false }: { chat: ThreadSum
   const active = useUi((s) => s.view.kind === "thread" && s.view.id === chat.id);
   const label = title || "Chat sans titre";
   const open = () => useUi.getState().focusThread(chat.id);
+  const working = STATUS[status].active;
 
   if (sub) {
     return (
       <SidebarMenuSubButton isActive={active} onClick={open} title={label}>
-        <span className="truncate">{label}</span>
-        {STATUS[status].active && <StatusDot status={status} className="ml-auto animate-in fade-in-0 zoom-in-50 duration-200" />}
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        {working && <StatusDot status={status} className="shrink-0 animate-in fade-in-0 zoom-in-50 duration-200" />}
       </SidebarMenuSubButton>
     );
   }
   return (
     <>
-      <SidebarMenuButton isActive={active} onClick={open} tooltip={label}>
+      {/* The status dot sits over the row's right edge: keep the title clear of it. */}
+      <SidebarMenuButton isActive={active} onClick={open} tooltip={label} className={working ? "pr-7" : undefined}>
         <AgentLogo agent={chat.agent} />
         <span>{label}</span>
       </SidebarMenuButton>
-      {STATUS[status].active && (
+      {working && (
         <SidebarMenuBadge>
           <StatusDot status={status} className="animate-in fade-in-0 zoom-in-50 duration-200" />
         </SidebarMenuBadge>
