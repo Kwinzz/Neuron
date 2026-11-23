@@ -21,11 +21,18 @@ const NOTIFY_TITLE: Record<Attention, string> = {
   error: "Erreur",
 };
 
+/** Approvals that are really a question or a plan to review get their own wording. */
+function approvalTitle(toolName: string | null | undefined, fallback: string): string {
+  if (toolName === "AskUserQuestion") return "L'agent pose une question";
+  if (toolName === "ExitPlanMode") return "Plan prêt à valider";
+  return fallback;
+}
+
 /** Last status notified per chat: one notification per transition. */
 const notified = new Map<string, Attention>();
 
 /** Native notification while the Neuron window is in the background (per Paramètres › Notifications). */
-function maybeNotify(threadId: string, why: Attention | null): void {
+function maybeNotify(threadId: string, why: Attention | null, detail: string | null = null): void {
   if (!why) {
     notified.delete(threadId);
     return;
@@ -38,7 +45,8 @@ function maybeNotify(threadId: string, why: Attention | null): void {
   notified.set(threadId, why);
   const thread = useLive.getState().threads[threadId];
   void notify.ensurePermission().then((ok) => {
-    if (ok) notify.send(NOTIFY_TITLE[why], thread?.title || "Chat sans titre");
+    const title = why === "approval" ? approvalTitle(detail, NOTIFY_TITLE[why]) : NOTIFY_TITLE[why];
+    if (ok) notify.send(title, thread?.title || "Chat sans titre");
   });
 }
 
@@ -76,7 +84,8 @@ export function useAgentEventBridge(): void {
           const meta = ATTENTION_TOAST[after];
           toast({
             tone: meta.tone,
-            title: meta.title,
+            title:
+              envelope.event.kind === "PermissionRequest" ? approvalTitle(envelope.event.toolName, meta.title) : meta.title,
             description: thread?.title || "Chat sans titre",
             onClick: () => {
               useUi.getState().focusThread(envelope.threadId);
@@ -87,7 +96,7 @@ export function useAgentEventBridge(): void {
         }
 
         if (envelope.event.kind === "ThreadStatusChanged") {
-          maybeNotify(envelope.threadId, attentionFor(envelope.event.status));
+          maybeNotify(envelope.threadId, attentionFor(envelope.event.status), envelope.event.detail);
         }
 
         const kind = envelope.event.kind;

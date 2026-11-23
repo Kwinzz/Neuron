@@ -24,7 +24,13 @@ interface ChatState {
   /** Load history once (no-op when already loaded or loading). */
   load: (threadId: string, force?: boolean) => Promise<void>;
   send: (threadId: string, text: string, attachments?: Attachment[]) => Promise<boolean>;
-  respondPermission: (threadId: string, requestId: string, allow: boolean, mode?: string | null) => Promise<void>;
+  respondPermission: (
+    threadId: string,
+    requestId: string,
+    allow: boolean,
+    mode?: string | null,
+    answers?: Record<string, string> | null,
+  ) => Promise<void>;
   stop: (threadId: string) => Promise<void>;
   /** Called by the agent-event bridge for every event. */
   enqueue: (envelope: AgentEventEnvelope) => void;
@@ -117,7 +123,10 @@ function reduce(items: ChatItem[], { ts, event }: AgentEventEnvelope): ChatItem[
       const d = event.delta;
       const free = d.input + d.output + d.cacheRead + d.cacheWrite === 0 && d.costUsd === 0;
       if (free && items[items.length - 1]?.kind === "command") return items;
-      return [...endStreaming(items), { kind: "turn", id: localId("turn"), usage: event.delta, durationMs: null, ts }];
+      return [
+        ...endStreaming(items),
+        { kind: "turn", id: localId("turn"), usage: event.delta, durationMs: event.durationMs, ts },
+      ];
     }
     case "ThreadError":
       return [...endStreaming(items), { kind: "error", id: localId("err"), message: event.message }];
@@ -201,7 +210,7 @@ export const useChat = create<ChatState>((set, get) => {
       }
     },
 
-    respondPermission: async (threadId, requestId, allow, mode = null) => {
+    respondPermission: async (threadId, requestId, allow, mode = null, answers = null) => {
       const setState = (state: "pending" | "allowed" | "denied") =>
         patch(threadId, (t) => ({
           ...t,
@@ -209,7 +218,7 @@ export const useChat = create<ChatState>((set, get) => {
         }));
       setState(allow ? "allowed" : "denied");
       try {
-        await ipc.respondPermission(threadId, requestId, allow, mode);
+        await ipc.respondPermission(threadId, requestId, allow, mode, answers);
       } catch (err) {
         setState("denied");
         toast({ tone: "danger", title: "Réponse impossible", description: ipcErrorMessage(err) });

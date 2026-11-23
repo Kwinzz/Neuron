@@ -165,6 +165,8 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
   d'autorisation → `PlanBlock` (plan en Markdown) + `PlanApproval` ; approuver renvoie `updatedPermissions setMode`
   (Claude exécute aussitôt), refuser = continuer à planifier. Codex / agy en Plan : `PlanFollowUp` (« Exécuter le
   plan » = repasse en éditions auto + message). Codex : `auto` = `workspace-write` ; agy : `--mode auto`.
+- **Questions** : Claude `AskUserQuestion` = demande d'autorisation → `QuestionCard` ; réponses renvoyées dans
+  `updatedInput.answers` (`{ question: réponse }`, choix multiples joints par « , »). agy saute `ask_question` en print.
 - **Diffs des fichiers modifiés** (`agents/file_changes.rs`) : agy et Codex ne transmettent que les chemins → le
   pump lit chaque fichier au début de l'outil d'édition (les CLI annoncent avant d'écrire) et à la fin, diff unifié
   (`similar`) stocké dans `tool_calls.changes_json` et envoyé dans `ToolCallResult.changes`. UI : `FileEditBlock`

@@ -308,7 +308,7 @@ pub async fn dev_simulate_activity(app: AppHandle, state: State<'_, AppState>) -
                     };
                     let total = cumulative.entry(thread_id.clone()).or_default();
                     total.add(&delta);
-                    emit(thread_id, AgentEvent::TokenUsageUpdate { delta, cumulative: *total });
+                    emit(thread_id, AgentEvent::TokenUsageUpdate { delta, cumulative: *total, duration_ms: Some(42_000) });
                     let _ = record_usage(&db, thread_id, project.clone(), *agent, delta).await;
                 }
             }

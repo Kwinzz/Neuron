@@ -185,11 +185,12 @@ pub async fn respond_permission(
     request_id: String,
     allow: bool,
     mode: Option<String>,
+    answers: Option<std::collections::HashMap<String, String>>,
 ) -> AppResult<()> {
     if let Some(m) = mode.as_deref() {
         validate_settings(m, None)?;
     }
-    state.agents.respond_permission(&thread_id, &request_id, allow, mode)
+    state.agents.respond_permission(&thread_id, &request_id, allow, mode, answers)
 }
 
 #[tauri::command]

@@ -45,6 +45,8 @@ struct ActiveSession {
     stale: bool,
     /// A turn is in progress (from the prompt until TurnComplete).
     busy: bool,
+    /// When the current turn's first prompt was sent (total time shown under the turn).
+    turn_started: Option<Instant>,
     /// Last time the session became idle (idle-shutdown reaper).
     idle_since: Instant,
 }
@@ -225,6 +227,9 @@ impl AgentRegistry {
             let turn = crate::agents::UserTurn { text: text.clone(), attachments: attachments.clone() };
             if sender.send(SessionCommand::Prompt(turn)).is_ok() {
                 if let Some(s) = self.lock().get_mut(thread_id) {
+                    if !s.busy {
+                        s.turn_started = Some(Instant::now());
+                    }
                     s.busy = true;
                 }
                 return Ok(());
@@ -307,6 +312,7 @@ impl AgentRegistry {
                 shutdown_requested: false,
                 stale: false,
                 busy: false,
+                turn_started: None,
                 idle_since: Instant::now(),
             },
         );
@@ -320,15 +326,27 @@ impl AgentRegistry {
         Ok(commands)
     }
 
-    pub fn respond_permission(&self, thread_id: &str, request_id: &str, allow: bool, mode: Option<String>) -> AppResult<()> {
+    /// `answers`: replies to Claude's `AskUserQuestion` (question text → chosen label(s) or custom text), added to
+    /// the tool input on allow — that is how Claude Code receives them.
+    pub fn respond_permission(
+        &self,
+        thread_id: &str,
+        request_id: &str,
+        allow: bool,
+        mode: Option<String>,
+        answers: Option<HashMap<String, String>>,
+    ) -> AppResult<()> {
         let mut sessions = self.lock();
         let session = sessions
             .get_mut(thread_id)
             .ok_or_else(|| AppError::NotFound("aucune session active pour ce thread".into()))?;
-        let input = session
+        let mut input = session
             .pending
             .remove(request_id)
             .ok_or_else(|| AppError::NotFound("demande de permission expirée".into()))?;
+        if let (true, Some(answers), Some(obj)) = (allow, answers, input.as_object_mut()) {
+            obj.insert("answers".into(), json!(answers));
+        }
         session
             .commands
             .send(SessionCommand::Permission(PermissionDecision {
@@ -605,10 +623,15 @@ impl AgentRegistry {
                             usage.cost_usd = cost;
                         }
                     }
+                    let mut wall_ms = None;
                     if let Some(s) = self.lock().get_mut(&id).filter(|s| s.generation == generation) {
                         s.busy = false;
                         s.idle_since = Instant::now();
+                        wall_ms = s.turn_started.take().map(|t| i64::try_from(t.elapsed().as_millis()).unwrap_or(i64::MAX));
                     }
+                    // Total time of the request as the user lived it (send → answer, approvals included);
+                    // the CLI's own figure when Neuron didn't see the start (resumed process).
+                    let duration_ms = wall_ms.or(duration_ms);
                     cumulative.add(&usage);
                     let silent = std::mem::take(&mut command_turn) && usage.total() == 0 && usage.cost_usd == 0.0;
                     {
@@ -635,7 +658,7 @@ impl AgentRegistry {
                             chat::close_dangling_tools(c, &tid, now)
                         });
                     }
-                    emit(&app, &id, AgentEvent::TokenUsageUpdate { delta: usage, cumulative });
+                    emit(&app, &id, AgentEvent::TokenUsageUpdate { delta: usage, cumulative, duration_ms });
                     let status = if stopped {
                         ThreadStatus::Cancelled
                     } else if let Some(message) = error {

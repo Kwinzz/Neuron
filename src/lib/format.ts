@@ -33,6 +33,17 @@ export function formatElapsed(ms: number): string {
   return h > 0 ? `${h}:${m.toString().padStart(2, "0")}:${ss}` : `${m}:${ss}`;
 }
 
+/** Duration of a request: "0,8 s", "12,4 s", "1 min 05 s", "1 h 02 min". */
+export function formatDuration(ms: number): string {
+  const safe = Math.max(0, ms);
+  if (safe < 60_000) return `${(safe / 1000).toFixed(1).replace(".", ",")} s`;
+  const total = Math.round(safe / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return h > 0 ? `${h} h ${m.toString().padStart(2, "0")} min` : `${m} min ${s.toString().padStart(2, "0")} s`;
+}
+
 /** Remaining time: "2 h 13 min", "45 min", "3 j". */
 export function formatCountdown(ms: number): string {
   const min = Math.max(0, Math.round(ms / 60_000));

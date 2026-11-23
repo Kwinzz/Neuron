@@ -88,6 +88,18 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Durée de chaque requête, questions de l'agent
+- **Temps total** sous chaque requête (tokens · coût · ⏱ durée) : mesuré par le registre de l'envoi du premier
+  message à la fin du tour (approbations comprises), repli sur la durée du CLI ; `TokenUsageUpdate.durationMs`
+  (donc visible en direct, plus seulement dans l'historique). Format « 12,4 s », « 1 min 05 s », « 1 h 02 min ».
+- **Questions de Claude** (`AskUserQuestion`, cycle vérifié en réel) : la demande d'autorisation devient une carte
+  `QuestionCard` (une ou plusieurs questions, choix unique ou multiple, « Autre… » = réponse libre, Répondre /
+  Ignorer) ; les réponses partent dans `updatedInput.answers` (`respond_permission(..., answers)`). Une fois répondu,
+  `QuestionSummary` affiche questions → réponses (relues dans le résultat de l'outil, donc aussi dans l'historique).
+- Toasts / notifications : « L'agent pose une question », « Plan prêt à valider » au lieu de « Approbation requise ».
+- Antigravity : son outil `ask_question` est sauté automatiquement en mode print (« You skipped answering ») et
+  n'apparaît pas dans le flux — pas de réponse possible depuis Neuron. Codex n'a pas d'outil de question.
+
 ### 2026-11-23 — Plans affichés comme des fichiers Markdown
 - `MarkdownFileCard` : document .md dans le chat (nom du fichier, badge « Plan », Aperçu rendu / Source, copier,
   replier, « Afficher tout » au-delà de 40 lignes).

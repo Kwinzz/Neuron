@@ -17,4 +17,8 @@ parentToolCallId: string | null, } | { "kind": "ToolCallResult", toolCallId: str
 /**
  * Files the call modified, with their diff (edit tools only).
  */
-changes: Array<FileChange>, } | { "kind": "PermissionRequest", requestId: string, toolName: string, description: string, input: JsonValue, } | { "kind": "TokenUsageUpdate", delta: TokenUsage, cumulative: TokenUsage, } | { "kind": "ThreadStatusChanged", status: ThreadStatus, detail: string | null, } | { "kind": "PermissionModeChanged", mode: string, } | { "kind": "ThreadError", message: string, fatal: boolean, } | { "kind": "SubagentUpdate", toolCallId: string, description: string | null, subagentType: string | null, status: SubagentStatus, toolUses: number | null, tokens: number | null, lastTool: string | null, };
+changes: Array<FileChange>, } | { "kind": "PermissionRequest", requestId: string, toolName: string, description: string, input: JsonValue, } | { "kind": "TokenUsageUpdate", delta: TokenUsage, cumulative: TokenUsage, 
+/**
+ * Total time of the turn (send → answer), in milliseconds.
+ */
+durationMs: number | null, } | { "kind": "ThreadStatusChanged", status: ThreadStatus, detail: string | null, } | { "kind": "PermissionModeChanged", mode: string, } | { "kind": "ThreadError", message: string, fatal: boolean, } | { "kind": "SubagentUpdate", toolCallId: string, description: string | null, subagentType: string | null, status: SubagentStatus, toolUses: number | null, tokens: number | null, lastTool: string | null, };

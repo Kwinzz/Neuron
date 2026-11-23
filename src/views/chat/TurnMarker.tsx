@@ -1,24 +1,30 @@
 import { memo } from "react";
+import { Clock } from "lucide-react";
 import type { AgentKind } from "@/bindings/AgentKind";
 import type { ChatItem } from "@/bindings/ChatItem";
 import { Separator } from "@/components/ui/separator";
 import { CostLabel } from "@/components/ui/CostLabel";
-import { formatTokens } from "@/lib/format";
+import { formatDuration, formatTokens } from "@/lib/format";
 
 type TurnItem = Extract<ChatItem, { kind: "turn" }>;
 
+/** End of a request: tokens · cost · total time (send → answer). */
 export const TurnMarker = memo(function TurnMarker({ item, agent }: { item: TurnItem; agent: AgentKind }) {
   const totalTokens = item.usage.input + item.usage.output;
-  const duration =
-    item.durationMs != null ? ` · ${(item.durationMs / 1000).toFixed(1).replace(".", ",")} s` : "";
 
   return (
     <div className="flex items-center gap-3 py-1">
       <Separator className="flex-1 data-horizontal:w-auto" />
-      <span className="shrink-0 font-mono text-[11px] text-muted-foreground tabular-nums">
+      <span className="inline-flex shrink-0 items-center gap-1 font-mono text-[11px] text-muted-foreground tabular-nums">
         {formatTokens(totalTokens)} tokens ·{" "}
         <CostLabel agent={agent} costUsd={item.usage.costUsd} tokens={totalTokens} />
-        {duration}
+        {item.durationMs != null && (
+          <>
+            <span aria-hidden>·</span>
+            <Clock className="size-3" aria-hidden />
+            <span title="Temps total de la requête">{formatDuration(item.durationMs)}</span>
+          </>
+        )}
       </span>
       <Separator className="flex-1 data-horizontal:w-auto" />
     </div>

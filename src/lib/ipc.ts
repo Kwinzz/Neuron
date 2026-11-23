@@ -100,8 +100,14 @@ export const ipc = {
     return typeof picked === "string" ? [picked] : [];
   },
   /** `mode`: approving a plan also picks the mode to run it in (refusing with a mode = keep planning). */
-  respondPermission: (threadId: string, requestId: string, allow: boolean, mode: string | null = null) =>
-    invoke<void>("respond_permission", { threadId, requestId, allow, mode }),
+  respondPermission: (
+    threadId: string,
+    requestId: string,
+    allow: boolean,
+    mode: string | null = null,
+    /** Replies to Claude's AskUserQuestion: question → answer. */
+    answers: Record<string, string> | null = null,
+  ) => invoke<void>("respond_permission", { threadId, requestId, allow, mode, answers }),
   stopThread: (threadId: string) => invoke<void>("stop_thread", { threadId }),
   threadHistory: (threadId: string) => invoke<ChatItem[]>("get_thread_history", { threadId }),
   renameThread: (threadId: string, title: string) => invoke<void>("rename_thread", { threadId, title }),

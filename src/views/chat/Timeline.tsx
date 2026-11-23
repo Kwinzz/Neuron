@@ -9,6 +9,8 @@ import { FileEditBlock } from "./FileEditBlock";
 import { PermissionCard } from "./PermissionCard";
 import { PlanApproval } from "./PlanApproval";
 import { PlanBlock } from "./PlanBlock";
+import { QuestionCard } from "./QuestionCard";
+import { QuestionSummary } from "./QuestionSummary";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolBlock } from "./ToolBlock";
 import { baseToolName } from "./toolMeta";
@@ -25,6 +27,7 @@ const INPUT_DIFF_TOOLS = new Set(["Edit", "MultiEdit", "Write"]);
 /** File modifications are shown as code blocks in the conversation; other tools as collapsed rows. */
 function ToolItemView({ item }: { item: ToolItem }) {
   if (baseToolName(item.name) === "ExitPlanMode") return <PlanBlock item={item} />;
+  if (baseToolName(item.name) === "AskUserQuestion") return <QuestionSummary item={item} />;
   // Claude's own plan file (Plan mode) duplicates the plan block: keep it as a collapsed row.
   const planFile = item.changes.some((c) => c.path.includes("/.claude/plans/"));
   if (item.status === "ok" && item.changes.length > 0 && !planFile) {
@@ -76,6 +79,8 @@ const TimelineItem = memo(function TimelineItem({
     case "permission":
       return item.toolName === "ExitPlanMode" ? (
         <PlanApproval item={item} threadId={threadId} />
+      ) : item.toolName === "AskUserQuestion" ? (
+        <QuestionCard item={item} threadId={threadId} />
       ) : (
         <PermissionCard item={item} threadId={threadId} />
       );

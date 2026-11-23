@@ -202,6 +202,9 @@ pub enum AgentEvent {
     TokenUsageUpdate {
         delta: TokenUsage,
         cumulative: TokenUsage,
+        /// Total time of the turn (send → answer), in milliseconds.
+        #[ts(type = "number | null")]
+        duration_ms: Option<i64>,
     },
     /// Status transition; `detail` refines it (e.g. file name being edited).
     ThreadStatusChanged {
