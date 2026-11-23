@@ -88,6 +88,17 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Graphe de consommation de l'accueil retravaillé
+- Choix de la mesure : **Tokens** (entrée + sortie), **Coût**, **Requêtes** (`views/home/usageMetric.ts`) ; le
+  tableau suit la même mesure.
+- Légende remplacée par `AgentTotals` : total et part de chaque agent ; un clic masque / réaffiche ses barres
+  (couleurs inchangées, ordre fixe ; le dernier agent visible ne peut pas être masqué).
+- Barres : largeur max 24 px, espace de 2 px entre segments empilés, coins arrondis uniquement en haut de la
+  pile réelle (segment custom), survol par bande discrète.
+- Info-bulle `UsageTooltip` : valeur d'abord, agents de la tranche + total.
+- Description : total visible · période · pic de la période. Au changement de période, l'ancien graphe reste
+  affiché (atténué) avec ses propres libellés jusqu'à l'arrivée des données (plus d'axes mal libellés).
+
 ### 2026-11-23 — Logo de l'agent à la place de la bulle
 - Liste des chats (barre latérale), palette Ctrl+K et chat vide : l'icône bulle est remplacée par le logo de l'IA
   du chat (`AgentLogo` : Claude, Gemini pour Antigravity, OpenAI pour Codex, terminal pour les CLI génériques).

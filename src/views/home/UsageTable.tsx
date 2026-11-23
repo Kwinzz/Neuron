@@ -9,18 +9,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AGENTS } from "@/lib/agents";
-import { bucketTitle, formatTokens } from "@/lib/format";
+import { bucketTitle } from "@/lib/format";
+import { METRICS, type UsageMetric } from "./usageMetric";
 import type { UsageRow } from "./useUsageChartData";
 
 interface UsageTableProps {
   rows: UsageRow[];
   presentAgents: AgentKind[];
   range: UsageRange;
+  metric: UsageMetric;
 }
 
-export function UsageTable({ rows, presentAgents, range }: UsageTableProps) {
+export function UsageTable({ rows, presentAgents, range, metric }: UsageTableProps) {
+  const { format } = METRICS[metric];
   return (
-    <div className="max-h-[250px] overflow-auto rounded-lg border">
+    <div className="max-h-[260px] overflow-auto rounded-lg border">
       <Table>
         <caption className="sr-only">Consommation par période</caption>
         <TableHeader className="bg-muted/50">
@@ -40,11 +43,11 @@ export function UsageTable({ rows, presentAgents, range }: UsageTableProps) {
               <TableCell>{bucketTitle(row.key, range)}</TableCell>
               {presentAgents.map((agent) => (
                 <TableCell key={agent} className="text-right font-mono tabular-nums">
-                  {formatTokens(row[agent])}
+                  {format(row[agent])}
                 </TableCell>
               ))}
               <TableCell className="text-right font-mono font-medium tabular-nums">
-                {formatTokens(row.total)}
+                {format(row.total)}
               </TableCell>
             </TableRow>
           ))}

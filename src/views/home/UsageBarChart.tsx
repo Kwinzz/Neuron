@@ -1,94 +1,90 @@
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { useMemo } from "react";
+import { Bar, BarChart, type BarShapeProps, CartesianGrid, XAxis, YAxis } from "recharts";
 import type { AgentKind } from "@/bindings/AgentKind";
 import type { UsageRange } from "@/bindings/UsageRange";
-import {
-  type ChartConfig,
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
-import { bucketLabel, bucketTitle, formatTokens } from "@/lib/format";
+import { type ChartConfig, ChartContainer, ChartTooltip } from "@/components/ui/chart";
+import { bucketLabel } from "@/lib/format";
+import { UsageTooltip } from "./UsageTooltip";
+import { METRICS, type UsageMetric } from "./usageMetric";
 import type { UsageRow } from "./useUsageChartData";
 
 interface UsageBarChartProps {
   rows: UsageRow[];
-  presentAgents: AgentKind[];
+  visibleAgents: AgentKind[];
   config: ChartConfig;
   range: UsageRange;
+  metric: UsageMetric;
 }
 
-function toNumber(value: number | string | ReadonlyArray<number | string> | undefined): number {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  if (Array.isArray(value) && value.length > 0) {
-    const parsed = Number(value[0]);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  return 0;
+/** Surface gap between stacked segments (px). */
+const GAP = 2;
+/** Rounded data end (px). */
+const RADIUS = 4;
+/** Bars never fill their slot. */
+const MAX_BAR = 24;
+
+/** One stacked segment: rounded only at the top of its stack, a surface gap under it unless it sits on the baseline. */
+function segmentPath(x: number, y: number, w: number, h: number, rounded: boolean): string {
+  if (!rounded) return `M${x},${y}h${w}v${h}h${-w}Z`;
+  const r = Math.min(RADIUS, w / 2, h);
+  return `M${x},${y + h}V${y + r}A${r},${r} 0 0 1 ${x + r},${y}H${x + w - r}A${r},${r} 0 0 1 ${x + w},${y + r}V${y + h}Z`;
 }
 
-export function UsageBarChart({ rows, presentAgents, config, range }: UsageBarChartProps) {
+export function UsageBarChart({ rows, visibleAgents, config, range, metric }: UsageBarChartProps) {
+  const spec = METRICS[metric];
+  const byKey = useMemo(() => new Map(rows.map((row) => [row.key, row])), [rows]);
+
+  const shapeFor = (agent: AgentKind) =>
+    function Segment(props: BarShapeProps) {
+      const row = rows[props.index];
+      if (!row || props.height <= 0 || props.width <= 0) return <g />;
+      const gap = row.bottom === agent ? 0 : GAP;
+      // A tiny value keeps a visible sliver instead of disappearing into the gap.
+      const h = Math.max(1, props.height - gap);
+      return (
+        <path
+          d={segmentPath(props.x, props.y, props.width, h, row.top === agent)}
+          fill={`var(--color-${agent})`}
+        />
+      );
+    };
+
   return (
-    <ChartContainer config={config} className="aspect-auto h-[250px] w-full">
-      <BarChart data={rows} accessibilityLayer margin={{ left: 0, right: 0 }}>
+    <ChartContainer config={config} className="aspect-auto h-[260px] w-full">
+      <BarChart data={rows} accessibilityLayer margin={{ top: 8, left: 0, right: 0 }} barCategoryGap="20%">
         <CartesianGrid vertical={false} />
         <XAxis
           dataKey="key"
           tickLine={false}
           axisLine={false}
           tickMargin={8}
-          minTickGap={24}
+          minTickGap={range === "month" ? 16 : 24}
           tickFormatter={(k: string) => bucketLabel(k, range)}
         />
         <YAxis
           tickLine={false}
           axisLine={false}
-          width={44}
-          tickFormatter={(v: number) => formatTokens(v)}
+          width={metric === "cost" ? 52 : 44}
+          allowDecimals={!spec.integer}
+          tickFormatter={(v: number) => spec.axis(v)}
         />
         <ChartTooltip
-          cursor={false}
-          content={
-            <ChartTooltipContent
-              indicator="dot"
-              labelFormatter={(value) => bucketTitle(String(value), range)}
-              formatter={(value, name) => {
-                const key = String(name ?? "");
-                const numeric = toNumber(value);
-                return (
-                  <div className="flex w-full items-center gap-2">
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
-                      style={{ backgroundColor: `var(--color-${key})` }}
-                      aria-hidden
-                    />
-                    <span className="text-muted-foreground">{config[key]?.label ?? key}</span>
-                    <span className="ml-auto font-mono font-medium tabular-nums text-foreground">
-                      {formatTokens(numeric)}
-                    </span>
-                  </div>
-                );
-              }}
-            />
-          }
+          cursor={{ fill: "var(--muted)", opacity: 0.5, radius: 6 }}
+          content={<UsageTooltip byKey={byKey} visibleAgents={visibleAgents} config={config} range={range} metric={metric} />}
         />
-        {presentAgents.map((agent, i) => (
+        {visibleAgents.map((agent) => (
           <Bar
             key={agent}
             dataKey={agent}
-            stackId="a"
+            stackId="usage"
             fill={`var(--color-${agent})`}
-            radius={i === presentAgents.length - 1 ? [4, 4, 0, 0] : 0}
+            maxBarSize={MAX_BAR}
+            shape={shapeFor(agent)}
+            isAnimationActive
             animationDuration={350}
             animationEasing="ease-out"
           />
         ))}
-        <ChartLegend content={<ChartLegendContent />} />
       </BarChart>
     </ChartContainer>
   );
