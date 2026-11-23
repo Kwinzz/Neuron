@@ -313,6 +313,10 @@ pub fn with_memory(
 
 /// What every agent is told about Neuron: where it runs, the global memory it can read and edit, and the
 /// project context file it can maintain. Given at each session start (not frozen with the chat).
+/// Appended to later messages of agents without a system prompt (they saw the intro only once).
+pub const SUMMARY_REMINDER: &str =
+    "(Neuron : termine ta réponse par la ligne `<!-- neuron: ok|partiel|échec | résumé en une phrase -->`.)";
+
 pub fn neuron_intro(memory_file: Option<&Path>, project: Option<&Path>) -> String {
     let mut md = String::from(
         "# Neuron\n\
@@ -321,6 +325,11 @@ pub fn neuron_intro(memory_file: Option<&Path>, project: Option<&Path>) -> Strin
          rendu, et les fichiers que tu modifies y apparaissent automatiquement sous forme de diff. Pour montrer \
          une image (png, jpg, webp, gif, svg…) que tu as créée ou trouvée, cite son chemin dans ta réponse \
          (absolu, ou relatif au dossier du chat) : Neuron l'affiche sous ton message.\n\n\
+         ## Résumé de fin de réponse\n\
+         Termine **chaque** réponse par une dernière ligne seule, invisible dans le chat : \
+         `<!-- neuron: ok | résumé -->`. Statut : `ok` (demande accomplie), `partiel` (en partie) ou `échec` \
+         (pas faite, bloquée, erreur) ; résumé : une phrase de moins de 120 caractères, en français, qui dit ce \
+         que tu as fait ou pourquoi ça a échoué. Neuron s'en sert pour la notification envoyée à l'utilisateur.\n\n\
          ## Mémoire globale\n\
          Neuron tient une mémoire partagée par tous les agents de l'utilisateur — profil, préférences techniques, \
          style de code, règles strictes —, comme la mémoire d'un assistant web. Elle t'est donnée au démarrage du \

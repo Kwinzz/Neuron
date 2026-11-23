@@ -16,6 +16,7 @@ pub mod file_changes;
 pub mod process;
 pub mod registry;
 pub mod slash;
+pub mod summary;
 
 use std::path::PathBuf;
 

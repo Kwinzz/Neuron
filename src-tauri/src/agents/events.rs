@@ -211,6 +211,12 @@ pub enum AgentEvent {
         status: ThreadStatus,
         detail: Option<String>,
     },
+    /// End of a turn, judged by the agent itself (its hidden summary line) — sent just before the final
+    /// `ThreadStatusChanged`, for the notification.
+    TurnSummary {
+        outcome: crate::agents::summary::TurnOutcome,
+        summary: String,
+    },
     /// The chat's permission mode changed on the agent side (plan approved, `EnterPlanMode`...).
     PermissionModeChanged { mode: String },
     /// Error reported by the adapter or the process. `fatal` ends the thread.

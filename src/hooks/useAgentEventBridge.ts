@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import type { AgentEventEnvelope } from "@/bindings/AgentEventEnvelope";
+import type { TurnOutcome } from "@/bindings/TurnOutcome";
 import { events, notify } from "@/lib/ipc";
 import { useActivity } from "@/stores/activity";
 import { useChat } from "@/stores/chat";
@@ -28,6 +30,31 @@ function approvalTitle(toolName: string | null | undefined, fallback: string): s
   return fallback;
 }
 
+/** Last summary written by the agent, per chat (TurnSummary arrives just before the final status). */
+const summaries = new Map<string, TurnSummaryEvent>();
+
+type TurnSummaryEvent = Extract<AgentEventEnvelope["event"], { kind: "TurnSummary" }>;
+
+const OUTCOME_TITLE: Record<TurnOutcome, string> = {
+  success: "✅ Tâche réussie",
+  partial: "⚠️ Tâche faite en partie",
+  failure: "❌ Tâche non effectuée",
+  unknown: "Réponse terminée",
+};
+
+/** Notification text: the agent's own summary and verdict when it gave one, else the chat title. */
+function notificationText(threadId: string, why: Attention, detail: string | null): { title: string; body: string } {
+  const chatTitle = useLive.getState().threads[threadId]?.title || "Chat sans titre";
+  if (why === "approval") return { title: approvalTitle(detail, NOTIFY_TITLE.approval), body: chatTitle };
+  const summary = summaries.get(threadId);
+  summaries.delete(threadId);
+  if (why === "error") {
+    return { title: `❌ Erreur · ${chatTitle}`, body: summary?.summary || "L'agent s'est arrêté sur une erreur." };
+  }
+  if (!summary) return { title: NOTIFY_TITLE.done, body: chatTitle };
+  return { title: `${OUTCOME_TITLE[summary.outcome]} · ${chatTitle}`, body: summary.summary || chatTitle };
+}
+
 /** Last status notified per chat: one notification per transition. */
 const notified = new Map<string, Attention>();
 
@@ -43,10 +70,9 @@ function maybeNotify(threadId: string, why: Attention | null, detail: string | n
   const wanted = why === "done" ? prefs.onFinished : why === "approval" ? prefs.onPermission : prefs.onError;
   if (!wanted) return;
   notified.set(threadId, why);
-  const thread = useLive.getState().threads[threadId];
+  const { title, body } = notificationText(threadId, why, detail);
   void notify.ensurePermission().then((ok) => {
-    const title = why === "approval" ? approvalTitle(detail, NOTIFY_TITLE[why]) : NOTIFY_TITLE[why];
-    if (ok) notify.send(title, thread?.title || "Chat sans titre", threadId);
+    if (ok) notify.send(title, body, threadId);
   });
 }
 
@@ -84,6 +110,7 @@ export function useAgentEventBridge(): void {
 
     events
       .onAgentEvent((envelope) => {
+        if (envelope.event.kind === "TurnSummary") summaries.set(envelope.threadId, envelope.event);
         useChat.getState().enqueue(envelope);
         useActivity.getState().apply(envelope);
         const live = useLive.getState();

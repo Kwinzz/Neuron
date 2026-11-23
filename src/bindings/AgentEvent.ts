@@ -4,6 +4,7 @@ import type { FileChange } from "./FileChange";
 import type { SubagentStatus } from "./SubagentStatus";
 import type { ThreadStatus } from "./ThreadStatus";
 import type { TokenUsage } from "./TokenUsage";
+import type { TurnOutcome } from "./TurnOutcome";
 import type { JsonValue } from "./serde_json/JsonValue";
 
 /**
@@ -21,4 +22,4 @@ changes: Array<FileChange>, } | { "kind": "PermissionRequest", requestId: string
 /**
  * Total time of the turn (send → answer), in milliseconds.
  */
-durationMs: number | null, } | { "kind": "ThreadStatusChanged", status: ThreadStatus, detail: string | null, } | { "kind": "PermissionModeChanged", mode: string, } | { "kind": "ThreadError", message: string, fatal: boolean, } | { "kind": "SubagentUpdate", toolCallId: string, description: string | null, subagentType: string | null, status: SubagentStatus, toolUses: number | null, tokens: number | null, lastTool: string | null, };
+durationMs: number | null, } | { "kind": "ThreadStatusChanged", status: ThreadStatus, detail: string | null, } | { "kind": "TurnSummary", outcome: TurnOutcome, summary: string, } | { "kind": "PermissionModeChanged", mode: string, } | { "kind": "ThreadError", message: string, fatal: boolean, } | { "kind": "SubagentUpdate", toolCallId: string, description: string | null, subagentType: string | null, status: SubagentStatus, toolUses: number | null, tokens: number | null, lastTool: string | null, };

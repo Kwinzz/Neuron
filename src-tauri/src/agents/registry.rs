@@ -238,6 +238,9 @@ impl AgentRegistry {
                 (None, Some(ctx)) => crate::context::as_preamble(ctx, &text),
                 (None, None) => text,
             }
+        } else if !supports_system && runtime.agent != AgentKind::Generic {
+            // They only saw the intro once: keep the end-of-answer summary line alive.
+            format!("{text}\n\n{}", crate::context::SUMMARY_REMINDER)
         } else {
             text
         };
@@ -524,6 +527,8 @@ impl AgentRegistry {
         let mut last_status: Option<(ThreadStatus, Option<String>)> = None;
         // The current turn only ran a local slash command (no model call): no end-of-turn marker.
         let mut command_turn = false;
+        // Last assistant text of the current turn: its hidden summary line feeds the notification.
+        let mut last_text = String::new();
         // Before/after snapshots of the files edited by tool calls → diffs shown in the chat.
         let mut files = crate::agents::file_changes::FileTracker::new(rt.cwd.as_deref().map(PathBuf::from));
 
@@ -574,6 +579,9 @@ impl AgentRegistry {
                         crate::agents::events::DeltaChannel::Text => "assistant",
                         crate::agents::events::DeltaChannel::Thinking => "thinking",
                     };
+                    if role == "assistant" && !text.trim().is_empty() {
+                        last_text.clone_from(&text);
+                    }
                     let (tid, mid) = (id.clone(), item_id.clone());
                     persist!(move |c| chat::insert_message(c, &mid, &tid, role, &text, None, now_ms()));
                     emit(&app, &id, AgentEvent::MessageCompleted { message_id: item_id });
@@ -690,6 +698,15 @@ impl AgentRegistry {
                         });
                     }
                     emit(&app, &id, AgentEvent::TokenUsageUpdate { delta: usage, cumulative, duration_ms });
+                    let text = std::mem::take(&mut last_text);
+                    if !silent && !stopped {
+                        use crate::agents::summary::{TurnOutcome, turn_summary};
+                        let (outcome, summary) = match &error {
+                            Some(message) => (TurnOutcome::Failure, turn_summary(message).1),
+                            None => turn_summary(&text),
+                        };
+                        emit(&app, &id, AgentEvent::TurnSummary { outcome, summary });
+                    }
                     let status = if stopped {
                         ThreadStatus::Cancelled
                     } else if let Some(message) = error {

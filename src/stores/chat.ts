@@ -143,6 +143,9 @@ function reduce(items: ChatItem[], { ts, event }: AgentEventEnvelope): ChatItem[
     case "PermissionModeChanged":
       // Shown by the settings bar (live store).
       return items;
+    case "TurnSummary":
+      // Only used for the notification (useAgentEventBridge).
+      return items;
     case "SubagentUpdate":
       // Sub-agent progress is shown in the live dock; the chat timeline shows its tool calls.
       return items;

@@ -1,10 +1,11 @@
-import { memo, useEffect } from "react";
+import { memo, useEffect, useMemo } from "react";
 import { cn } from "cn";
 import type { AgentKind } from "@/bindings/AgentKind";
 import type { ChatItem } from "@/bindings/ChatItem";
 import { Markdown } from "@/components/markdown/Markdown";
 import { useReveal } from "@/stores/reveal";
 import { AgentImages } from "./AgentImages";
+import { stripSummaryLine } from "@/lib/turnSummary";
 import { useSmoothText } from "./useSmoothText";
 
 type TextItem = Extract<ChatItem, { kind: "text" }>;
@@ -23,7 +24,9 @@ export const AssistantText = memo(function AssistantText({
   fresh,
   threadId,
 }: AssistantTextProps) {
-  const { text, revealing } = useSmoothText(item.text, fresh || item.streaming);
+  // The agent's hidden summary line (for the notification) never shows, even mid-stream.
+  const visible = useMemo(() => stripSummaryLine(item.text), [item.text]);
+  const { text, revealing } = useSmoothText(visible, fresh || item.streaming);
   const writing = item.streaming || revealing;
 
   // Tell the timeline's agent cursor this text is still being written (it stays visible meanwhile).
@@ -51,7 +54,7 @@ export const AssistantText = memo(function AssistantText({
         {text}
       </Markdown>
       {/* Images the agent produced or referenced, once its message is complete. */}
-      {!writing && <AgentImages threadId={threadId} text={item.text} />}
+      {!writing && <AgentImages threadId={threadId} text={visible} />}
     </>
   );
 });

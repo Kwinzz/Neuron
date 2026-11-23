@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { cn } from "cn";
+import { stripSummaryLine } from "@/lib/turnSummary";
 import type { TermLine } from "@/stores/activity";
 
 interface TermLineViewProps {
@@ -73,7 +74,7 @@ export const TermLineView = memo(function TermLineView({ line, showResult }: Ter
         <span className="w-3 shrink-0 text-center text-muted-foreground/70" aria-hidden>
           ▍
         </span>
-        <span className="min-w-0 flex-1 truncate text-foreground">{line.text}</span>
+        <span className="min-w-0 flex-1 truncate text-foreground">{stripSummaryLine(line.text)}</span>
       </div>
     );
   }
