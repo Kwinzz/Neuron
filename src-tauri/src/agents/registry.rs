@@ -457,6 +457,8 @@ impl AgentRegistry {
         let mut last_status: Option<(ThreadStatus, Option<String>)> = None;
         // The current turn only ran a local slash command (no model call): no end-of-turn marker.
         let mut command_turn = false;
+        // Before/after snapshots of the files edited by tool calls → diffs shown in the chat.
+        let mut files = crate::agents::file_changes::FileTracker::new(rt.cwd.as_deref().map(PathBuf::from));
 
         macro_rules! persist {
             ($body:expr) => {{
@@ -515,6 +517,8 @@ impl AgentRegistry {
                     emit(&app, &id, AgentEvent::CommandOutput { message_id: item_id, name, text });
                 }
                 AdapterEvent::ToolCallStart { id: tool_id, name, input, parent_id } => {
+                    // First thing: the CLI writes the file right after announcing the call.
+                    files.start(&tool_id, &name, &input).await;
                     let (status, detail) = tool_activity(&name, &input);
                     {
                         let (tid, tool, n, inp) = (id.clone(), tool_id.clone(), name.clone(), input.clone());
@@ -542,11 +546,12 @@ impl AgentRegistry {
                 }
                 AdapterEvent::ToolCallResult { id: tool_id, output, is_error } => {
                     let status = if is_error { ToolStatus::Error } else { ToolStatus::Ok };
+                    let changes = files.finish(&tool_id).await;
                     {
-                        let (tool, out) = (tool_id.clone(), output.clone());
-                        persist!(move |c| chat::finish_tool_call(c, &tool, &out, status, now_ms()));
+                        let (tool, out, ch) = (tool_id.clone(), output.clone(), changes.clone());
+                        persist!(move |c| chat::finish_tool_call(c, &tool, &out, status, &ch, now_ms()));
                     }
-                    emit(&app, &id, AgentEvent::ToolCallResult { tool_call_id: tool_id, output, is_error });
+                    emit(&app, &id, AgentEvent::ToolCallResult { tool_call_id: tool_id, output, is_error, changes });
                 }
                 AdapterEvent::PermissionRequest { request_id, tool_name, description, input, .. } => {
                     if let Some(s) = self.lock().get_mut(&id) {

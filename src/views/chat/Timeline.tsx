@@ -5,11 +5,33 @@ import type { ChatItem } from "@/bindings/ChatItem";
 import { AssistantText } from "./AssistantText";
 import { CommandOutput } from "./CommandOutput";
 import { ErrorItem } from "./ErrorItem";
+import { FileEditBlock } from "./FileEditBlock";
 import { PermissionCard } from "./PermissionCard";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolBlock } from "./ToolBlock";
+import { baseToolName } from "./toolMeta";
 import { TurnMarker } from "./TurnMarker";
 import { UserMessage } from "./UserMessage";
+
+type ToolItem = Extract<ChatItem, { kind: "tool" }>;
+
+/** Claude edits whose input carries the change (chats from before the diffs were stored). */
+const INPUT_DIFF_TOOLS = new Set(["Edit", "MultiEdit", "Write"]);
+
+/** File modifications are shown as code blocks in the conversation; other tools as collapsed rows. */
+function ToolItemView({ item }: { item: ToolItem }) {
+  if (item.status === "ok" && item.changes.length > 0) {
+    return (
+      <div className="flex flex-col gap-2">
+        {item.changes.map((change) => (
+          <FileEditBlock key={change.path} change={change} />
+        ))}
+      </div>
+    );
+  }
+  const inputDiff = item.status === "ok" && INPUT_DIFF_TOOLS.has(baseToolName(item.name));
+  return <ToolBlock item={item} defaultOpen={inputDiff} />;
+}
 
 const TimelineItem = memo(function TimelineItem({
   item,
@@ -30,7 +52,7 @@ const TimelineItem = memo(function TimelineItem({
     case "thinking":
       return <ThinkingBlock item={item} />;
     case "tool":
-      return <ToolBlock item={item} />;
+      return <ToolItemView item={item} />;
     case "permission":
       return <PermissionCard item={item} threadId={threadId} />;
     case "error":

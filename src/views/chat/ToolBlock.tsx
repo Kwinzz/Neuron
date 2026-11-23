@@ -10,9 +10,9 @@ import { TOOL_STATUS, toolIcon } from "./toolMeta";
 
 type ToolItem = Extract<ChatItem, { kind: "tool" }>;
 
-export const ToolBlock = memo(function ToolBlock({ item }: { item: ToolItem }) {
+export const ToolBlock = memo(function ToolBlock({ item, defaultOpen = false }: { item: ToolItem; defaultOpen?: boolean }) {
   const [manual, setManual] = useState<boolean | null>(null);
-  const open = manual ?? item.status === "error";
+  const open = manual ?? (defaultOpen || item.status === "error");
   const statusMeta = TOOL_STATUS[item.status];
   const Icon = toolIcon(item.name);
 

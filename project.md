@@ -88,6 +88,16 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Blocs de code des fichiers modifiés dans la conversation
+- **Diff calculé par Neuron pour tous les agents** (`agents/file_changes.rs`, crate `similar`) : agy (`write_file`,
+  `edit_file`…) et Codex (`file_change`) ne donnent que les chemins, Claude `Write` que le nouveau contenu. Le pump
+  lit chaque fichier quand l'outil d'édition démarre (vérifié : agy `ACTIVE` et Codex `item.started` arrivent avant
+  l'écriture) puis quand il se termine → diff unifié (3 lignes de contexte, fichiers ≤ 1 Mo, texte UTF-8, 200 Ko max).
+- Migration `0006_tool_changes` (`tool_calls.changes_json`), `ChatItem::Tool.changes`, `AgentEvent::ToolCallResult.changes`.
+- UI : chaque fichier modifié s'affiche comme un bloc de code ouvert dans la conversation (`FileEditBlock` +
+  `UnifiedDiff` : chemin, nouveau/supprimé, +/−, numéros de ligne, parties inchangées repliées, « Afficher tout » au-delà
+  de 300 lignes). Anciens chats Claude : le bloc d'outil Edit/Write s'ouvre par défaut sur son diff.
+
 ### 2026-11-23 — Quotas Antigravity, /quota /usage /credits, Agents & MCP dans Paramètres
 - **Quotas Antigravity** (`agents/antigravity/quota.rs`) : `agy --print /quota --output-format json` (répondu par le
   CLI, aucun token ; refusé dans une session stream-json) → groupes de modèles (« Gemini Models », « Claude and GPT

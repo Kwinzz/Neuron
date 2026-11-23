@@ -246,6 +246,7 @@ pub async fn dev_simulate_activity(app: AppHandle, state: State<'_, AppState>) -
                             tool_call_id: format!("{thread_id}-t{}", tick - 1),
                             output: "ok".into(),
                             is_error: (tick + i) % 11 == 0,
+                            changes: Vec::new(),
                         });
                     }
                     let (name, input) = SIM_TOOLS[(tick + i) % SIM_TOOLS.len()];
@@ -293,6 +294,7 @@ pub async fn dev_simulate_activity(app: AppHandle, state: State<'_, AppState>) -
                             tool_call_id: launcher.clone(),
                             output: "Le module agents contient 4 adaptateurs.".into(),
                             is_error: false,
+                            changes: Vec::new(),
                         });
                     }
                 }

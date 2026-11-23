@@ -159,6 +159,10 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
   session stream-json**) → groupes de modèles × fenêtres 5 h / hebdo (`antigravity/quota.rs`), rafraîchi après chaque
   tour agy et toutes les 15 min, événement `quotas://changed`. Dans un chat agy, `/quota`, `/usage`, `/credits` sont
   interceptés par `send_prompt` et exécutés de la même façon (carte de commande).
+- **Diffs des fichiers modifiés** (`agents/file_changes.rs`) : agy et Codex ne transmettent que les chemins → le
+  pump lit chaque fichier au début de l'outil d'édition (les CLI annoncent avant d'écrire) et à la fin, diff unifié
+  (`similar`) stocké dans `tool_calls.changes_json` et envoyé dans `ToolCallResult.changes`. UI : `FileEditBlock`
+  (bloc de code ouvert dans la conversation), repli sur l'entrée Claude `Edit`/`Write` pour l'historique ancien.
 - **Commandes locales** (Claude `/usage`, `/context`… repérées par `local_command` dans `result`) : `ChatItem::Command`,
   pas de marqueur de fin de tour.
 - Front : `useChat` (timeline par thread, événements appliqués **une fois par frame**), `ChatItem` = même type

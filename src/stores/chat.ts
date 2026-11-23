@@ -80,6 +80,7 @@ function reduce(items: ChatItem[], { ts, event }: AgentEventEnvelope): ChatItem[
           output: null,
           startedAt: ts,
           endedAt: null,
+          changes: [],
         },
       ];
     }
@@ -87,7 +88,13 @@ function reduce(items: ChatItem[], { ts, event }: AgentEventEnvelope): ChatItem[
       const i = indexOf(event.toolCallId);
       const it = items[i];
       if (!it || it.kind !== "tool") return items;
-      return replaceAt(i, { ...it, status: event.isError ? "error" : "ok", output: event.output, endedAt: ts });
+      return replaceAt(i, {
+        ...it,
+        status: event.isError ? "error" : "ok",
+        output: event.output,
+        endedAt: ts,
+        changes: event.changes,
+      });
     }
     case "PermissionRequest":
       if (indexOf(event.requestId) >= 0) return items;

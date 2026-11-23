@@ -188,6 +188,8 @@ pub enum AgentEvent {
         tool_call_id: String,
         output: String,
         is_error: bool,
+        /// Files the call modified, with their diff (edit tools only).
+        changes: Vec<crate::agents::file_changes::FileChange>,
     },
     /// The agent asks for approval before running a tool.
     PermissionRequest {

@@ -71,6 +71,8 @@ pub enum ChatItem {
         started_at: i64,
         #[ts(type = "number | null")]
         ended_at: Option<i64>,
+        /// Files the call modified, with their diff (edit tools only).
+        changes: Vec<crate::agents::file_changes::FileChange>,
     },
     /// Pending/answered permission request (live only, not persisted).
     Permission {
@@ -151,10 +153,18 @@ pub fn insert_tool_call(conn: &Connection, id: &str, thread_id: &str, name: &str
     Ok(())
 }
 
-pub fn finish_tool_call(conn: &Connection, id: &str, output: &str, status: ToolStatus, ts: i64) -> AppResult<()> {
+pub fn finish_tool_call(
+    conn: &Connection,
+    id: &str,
+    output: &str,
+    status: ToolStatus,
+    changes: &[crate::agents::file_changes::FileChange],
+    ts: i64,
+) -> AppResult<()> {
+    let changes_json = if changes.is_empty() { None } else { serde_json::to_string(changes).ok() };
     conn.execute(
-        "UPDATE tool_calls SET output = ?2, status = ?3, ended_at = ?4 WHERE id = ?1",
-        params![id, output, status.as_str(), ts],
+        "UPDATE tool_calls SET output = ?2, status = ?3, ended_at = ?4, changes_json = ?5 WHERE id = ?1",
+        params![id, output, status.as_str(), ts, changes_json],
     )?;
     Ok(())
 }
@@ -174,7 +184,7 @@ pub fn history(conn: &Connection, thread_id: &str) -> AppResult<Vec<ChatItem>> {
         "SELECT seq, 'm' AS src, id, role, content, meta_json, created_at, NULL, NULL, NULL, NULL
            FROM messages WHERE thread_id = ?1
          UNION ALL
-         SELECT seq, 't', id, name, input_json, NULL, started_at, status, output, ended_at, NULL
+         SELECT seq, 't', id, name, input_json, NULL, started_at, status, output, ended_at, changes_json
            FROM tool_calls WHERE thread_id = ?1
          ORDER BY 1",
     )?;
@@ -197,6 +207,10 @@ pub fn history(conn: &Connection, thread_id: &str) -> AppResult<Vec<ChatItem>> {
                 output: r.get(8)?,
                 started_at: r.get(6)?,
                 ended_at: r.get(9)?,
+                changes: r
+                    .get::<_, Option<String>>(10)?
+                    .and_then(|s| serde_json::from_str(&s).ok())
+                    .unwrap_or_default(),
             });
         }
         let role: String = r.get(3)?;
@@ -298,7 +312,7 @@ mod tests {
             insert_message(c, "u1", "t", "user", "fais un test", None, 1)?;
             insert_message(c, "m:0", "t", "thinking", "je réfléchis", None, 2)?;
             insert_tool_call(c, "tool1", "t", "Edit", &json!({"file_path": "src/app.tsx"}), 3)?;
-            finish_tool_call(c, "tool1", "ok", ToolStatus::Ok, 4)?;
+            finish_tool_call(c, "tool1", "ok", ToolStatus::Ok, &[], 4)?;
             insert_message(c, "m:1", "t", "assistant", "fini", None, 5)?;
             let usage = TokenUsage { input: 10, output: 5, ..Default::default() };
             insert_message(c, "turn1", "t", "turn", "", Some(&json!({"usage": usage, "durationMs": 1200})), 6)?;

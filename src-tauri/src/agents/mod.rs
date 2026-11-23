@@ -12,6 +12,7 @@ pub mod claude;
 pub mod codex;
 pub mod generic;
 pub mod events;
+pub mod file_changes;
 pub mod process;
 pub mod registry;
 pub mod slash;
