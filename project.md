@@ -88,6 +88,16 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Notifications au nom et au logo de Neuron
+- Windows : le plugin de notification prenait l'identité de PowerShell (nom + icône) dès que l'exe tourne depuis
+  `target/debug|release`. Neuron enregistre désormais son propre AppUserModelID (`dev.neuron.app`) sous
+  `HKCU\Software\Classes\AppUserModelId` (DisplayName « Neuron », IconUri = icône 256 px copiée dans le dossier
+  de données) au démarrage, et envoie ses toasts lui-même (`notifications.rs`, `tauri-winrt-notification`,
+  `winreg`). Autres OS : plugin inchangé.
+- Nouvelle commande `send_notification(title, body, threadId)` ; un clic sur la notification ramène la fenêtre et
+  ouvre le chat concerné (événement `notification://clicked`).
+- `tests/live_agents.rs` recompilait plus (`McpLaunch::new` avec `project`) : corrigé.
+
 ### 2026-11-23 — Graphe de consommation de l'accueil retravaillé
 - Choix de la mesure : **Tokens** (entrée + sortie), **Coût**, **Requêtes** (`views/home/usageMetric.ts`) ; le
   tableau suit la même mesure.

@@ -33,6 +33,10 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 base64 = "0.22"
 similar = "2"
 
+[target.'cfg(windows)'.dependencies]
+tauri-winrt-notification = "0.7"
+winreg = "0.56"
+
 # Keep dependencies optimized so SQLite & JSON parsing stay fast in dev builds.
 [profile.dev.package."*"]
 opt-level = 2

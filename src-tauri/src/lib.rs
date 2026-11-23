@@ -8,6 +8,7 @@ pub mod context;
 pub mod db;
 pub mod error;
 pub mod memory;
+pub mod notifications;
 pub mod pricing;
 pub mod state;
 pub mod util;
@@ -43,6 +44,11 @@ pub fn run() {
             {
                 tracing::warn!(%err, "attachments folder not served");
             }
+            {
+                let handle = app.handle().clone();
+                let data_dir = state.paths.data_dir.clone();
+                std::thread::spawn(move || notifications::register(&handle, &data_dir));
+            }
             app.manage(state);
             commands::memory::spawn_memory_watcher(app.handle());
             commands::settings::spawn_idle_reaper(app.handle());
@@ -53,6 +59,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::system::app_info,
             commands::system::frontend_log,
+            commands::system::send_notification,
             commands::dashboard::dashboard_snapshot,
             commands::dashboard::usage_report,
             commands::dashboard::update_provider,

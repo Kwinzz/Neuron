@@ -46,7 +46,7 @@ function maybeNotify(threadId: string, why: Attention | null, detail: string | n
   const thread = useLive.getState().threads[threadId];
   void notify.ensurePermission().then((ok) => {
     const title = why === "approval" ? approvalTitle(detail, NOTIFY_TITLE[why]) : NOTIFY_TITLE[why];
-    if (ok) notify.send(title, thread?.title || "Chat sans titre");
+    if (ok) notify.send(title, thread?.title || "Chat sans titre", threadId);
   });
 }
 
@@ -60,6 +60,18 @@ export function useAgentEventBridge(): void {
     void useSettings.getState().load().catch(() => undefined);
     let unlisten: (() => void) | null = null;
     let unlistenQuotas: (() => void) | null = null;
+    let unlistenClicks: (() => void) | null = null;
+
+    // Clicking a notification brings the window back (backend) and opens the chat it was about.
+    events
+      .onNotificationClicked((threadId) => {
+        if (threadId) useUi.getState().focusThread(threadId);
+      })
+      .then((fn) => {
+        if (disposed) fn();
+        else unlistenClicks = fn;
+      })
+      .catch(() => undefined);
 
     // Antigravity quotas are fetched apart from the turns (`agy --print /quota`).
     events
@@ -115,6 +127,7 @@ export function useAgentEventBridge(): void {
       disposed = true;
       unlisten?.();
       unlistenQuotas?.();
+      unlistenClicks?.();
     };
   }, []);
 }

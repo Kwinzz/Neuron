@@ -2364,6 +2364,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-dialog",
  "tauri-plugin-notification",
+ "tauri-winrt-notification",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
@@ -2371,6 +2372,7 @@ dependencies = [
  "ts-rs",
  "uuid",
  "vte",
+ "winreg 0.56.0",
 ]
 
 [[package]]

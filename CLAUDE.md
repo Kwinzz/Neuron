@@ -150,8 +150,10 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
   `ESC[6n` par `ESC[1;1R`**, sinon le programme ne démarre jamais sous Windows.
 - **Arrêt des inactifs** : `AgentRegistry::reap_idle` (tâche toutes les 60 s, `idleShutdownMinutes`) ; le chat reprend
   au message suivant comme après un redémarrage.
-- **Notifications natives** (`tauri-plugin-notification`, mineure alignée crate/npm) : envoyées par
-  `useAgentEventBridge` sur transition de statut (terminé / autorisation / erreur) quand la fenêtre n'a pas le focus.
+- **Notifications natives** : déclenchées par `useAgentEventBridge` sur transition de statut (terminé / autorisation /
+  erreur) quand la fenêtre n'a pas le focus, envoyées par la commande `send_notification` (`notifications.rs`).
+  Windows : AppUserModelID `dev.neuron.app` enregistré dans HKCU (nom + icône Neuron, sinon icône PowerShell) ; clic →
+  `notification://clicked` (ouvre le chat). Autres OS : `tauri-plugin-notification` (mineure alignée crate/npm).
 - Vues chargées à la demande (`React.lazy` dans `AppShell`, préchargées au repos) : garder les imports lourds
   (markdown, highlight.js, recharts) hors du bundle principal.
 - **Coûts** : Claude Code communique son coût ; Codex/Antigravity sont estimés par `pricing.rs` (liste LiteLLM

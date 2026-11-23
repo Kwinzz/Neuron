@@ -136,7 +136,7 @@ async fn ask_with_memory(adapter: &dyn AgentAdapter, mut spec: SessionSpec, agen
     })
     .unwrap();
     drop(db);
-    spec.mcp = Some(McpLaunch::new(PathBuf::from(env!("CARGO_BIN_EXE_neuron")), &paths, agent));
+    spec.mcp = Some(McpLaunch::new(PathBuf::from(env!("CARGO_BIN_EXE_neuron")), &paths, agent, None));
 
     let mut handle = adapter.start(&spec).expect("start");
     handle

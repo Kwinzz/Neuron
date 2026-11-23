@@ -5,11 +5,7 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import {
-  isPermissionGranted,
-  requestPermission,
-  sendNotification,
-} from "@tauri-apps/plugin-notification";
+import { isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 import type { AgentEventEnvelope } from "@/bindings/AgentEventEnvelope";
 import type { AppInfo } from "@/bindings/AppInfo";
 import type { ChatItem } from "@/bindings/ChatItem";
@@ -46,6 +42,8 @@ export const AGENT_EVENT_CHANNEL = "agent://event";
 export const MEMORY_CHANGED_CHANNEL = "memory://changed";
 /** Subscription windows refreshed outside a chat turn (Antigravity `/quota`). */
 export const QUOTAS_CHANGED_CHANNEL = "quotas://changed";
+/** A native notification was clicked; payload = the chat it was about (or null). */
+export const NOTIFICATION_CLICKED_CHANNEL = "notification://clicked";
 
 /** True when running inside the Tauri webview (false in a plain browser via `npm run dev`). */
 export const isTauri = (): boolean => "__TAURI_INTERNALS__" in window;
@@ -166,6 +164,8 @@ export const events = {
     listen<AgentEventEnvelope>(AGENT_EVENT_CHANNEL, (e) => handler(e.payload)),
   onMemoryChanged: (handler: () => void): Promise<UnlistenFn> => listen(MEMORY_CHANGED_CHANNEL, () => handler()),
   onQuotasChanged: (handler: () => void): Promise<UnlistenFn> => listen(QUOTAS_CHANGED_CHANNEL, () => handler()),
+  onNotificationClicked: (handler: (threadId: string | null) => void): Promise<UnlistenFn> =>
+    listen<string | null>(NOTIFICATION_CLICKED_CHANNEL, (e) => handler(e.payload)),
 } as const;
 
 /** Native desktop notifications (asks the OS permission once). */
@@ -175,8 +175,12 @@ export const notify = {
     if (await isPermissionGranted()) return true;
     return (await requestPermission()) === "granted";
   },
-  send: (title: string, body: string): void => {
-    if (isTauri()) sendNotification({ title, body });
+  /** Sent by the backend under Neuron's own name and icon (Windows otherwise shows PowerShell's). */
+  send: (title: string, body: string, threadId: string | null = null): void => {
+    if (!isTauri()) return;
+    invoke<void>("send_notification", { title, body, threadId }).catch((err: unknown) =>
+      console.warn("notification failed", err),
+    );
   },
 };
 

@@ -65,3 +65,15 @@ pub fn frontend_log(level: String, message: String) {
         _ => tracing::info!(target: "frontend", "{message}"),
     }
 }
+
+/// Native notification under Neuron's own name and icon (see [`crate::notifications`]).
+/// `thread_id` comes back on `notification://clicked` when the user clicks it.
+#[tauri::command]
+pub async fn send_notification(
+    app: tauri::AppHandle,
+    title: String,
+    body: String,
+    thread_id: Option<String>,
+) -> AppResult<()> {
+    tokio::task::spawn_blocking(move || crate::notifications::show(&app, &title, &body, thread_id)).await?
+}
