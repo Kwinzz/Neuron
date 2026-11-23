@@ -88,6 +88,15 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-23 — Plans affichés comme des fichiers Markdown
+- `MarkdownFileCard` : document .md dans le chat (nom du fichier, badge « Plan », Aperçu rendu / Source, copier,
+  replier, « Afficher tout » au-delà de 40 lignes).
+- Claude : le plan d'`ExitPlanMode` s'affiche avec le nom de son fichier (`planFilePath`) ; Antigravity en Plan écrit
+  `~/.gemini/antigravity-cli/brain/<conv>/plan.md` (vérifié en réel) → affiché comme document au lieu d'un diff, de
+  même que ses autres artefacts du dossier `brain` et tout `*plan*.md`.
+- `FileChange.content` : contenu complet des fichiers Markdown modifiés (≤ 200 Ko) ; repli sur les lignes ajoutées
+  du diff pour un nouveau fichier.
+
 ### 2026-11-23 — Composer aligné, bascule Exécuter / Planifier
 - La zone de saisie reprend la colonne des messages (même gouttière `pl-10` que le curseur de l'agent), via
   `Composer timelineGutter` ; menu « / » et pastille « Nouveaux messages » restent centrés sur elle.

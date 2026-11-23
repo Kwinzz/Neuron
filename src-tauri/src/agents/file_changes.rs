@@ -33,6 +33,14 @@ pub struct FileChange {
     pub removed: u32,
     /// The diff was cut at 200 KB.
     pub truncated: bool,
+    /// Full new content of Markdown files (plans are shown as documents), up to 200 KB.
+    pub content: Option<String>,
+}
+
+fn is_markdown(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| matches!(e.to_ascii_lowercase().as_str(), "md" | "markdown" | "mdx"))
 }
 
 /// Tools that write files, lower-cased (Claude, Antigravity, Codex).
@@ -125,7 +133,7 @@ pub fn compute(path: &str, before: Option<&str>, after: Option<&str>) -> Option<
         }
         text.truncate(text[..cut].rfind('\n').map_or(cut, |i| i + 1));
     }
-    Some(FileChange { path: path.to_string(), kind: kind.into(), diff: text, added, removed, truncated })
+    Some(FileChange { path: path.to_string(), kind: kind.into(), diff: text, added, removed, truncated, content: None })
 }
 
 /// Per-session snapshots of the files being edited, keyed by tool call id.
@@ -162,7 +170,10 @@ impl FileTracker {
         let mut out = Vec::new();
         for (path, before) in snapshots {
             let Ok(after) = read_text(&path).await else { continue };
-            if let Some(change) = compute(&display_path(&path, self.cwd.as_deref()), before.as_deref(), after.as_deref()) {
+            if let Some(mut change) = compute(&display_path(&path, self.cwd.as_deref()), before.as_deref(), after.as_deref()) {
+                if is_markdown(&path) {
+                    change.content = after.filter(|a| a.len() <= MAX_DIFF_BYTES);
+                }
                 out.push(change);
             }
         }
@@ -212,7 +223,14 @@ mod tests {
         assert_eq!(changes.len(), 1);
         assert_eq!(changes[0].path, "a.txt");
         assert_eq!((changes[0].added, changes[0].removed), (1, 1));
+        assert_eq!(changes[0].content, None);
         assert!(t.finish("t1").await.is_empty());
+        // Markdown (plans): the full content is kept.
+        t.start("t2", "write_file", &json!({"Path": dir.join("plan.md").to_string_lossy()})).await;
+        std::fs::write(dir.join("plan.md"), "# Plan\n\n1. Fix\n").unwrap();
+        let plan = t.finish("t2").await;
+        assert_eq!(plan[0].kind, "add");
+        assert_eq!(plan[0].content.as_deref(), Some("# Plan\n\n1. Fix\n"));
         let _ = std::fs::remove_dir_all(dir);
     }
 }

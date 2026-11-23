@@ -19,4 +19,8 @@ diff: string, added: number, removed: number,
 /**
  * The diff was cut at 200 KB.
  */
-truncated: boolean, };
+truncated: boolean, 
+/**
+ * Full new content of Markdown files (plans are shown as documents), up to 200 KB.
+ */
+content: string | null, };

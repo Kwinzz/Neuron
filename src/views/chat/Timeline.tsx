@@ -12,6 +12,8 @@ import { PlanBlock } from "./PlanBlock";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolBlock } from "./ToolBlock";
 import { baseToolName } from "./toolMeta";
+import { MarkdownFileCard } from "./MarkdownFileCard";
+import { baseName, documentText, isDocument, isPlanName } from "./planDocs";
 import { TurnMarker } from "./TurnMarker";
 import { UserMessage } from "./UserMessage";
 
@@ -28,9 +30,22 @@ function ToolItemView({ item }: { item: ToolItem }) {
   if (item.status === "ok" && item.changes.length > 0 && !planFile) {
     return (
       <div className="flex flex-col gap-2">
-        {item.changes.map((change) => (
-          <FileEditBlock key={change.path} change={change} />
-        ))}
+        {item.changes.map((change) => {
+          // Plans and Antigravity artifacts: the Markdown document itself, not its diff.
+          const doc = isDocument(change) ? documentText(change) : null;
+          return doc !== null ? (
+            <MarkdownFileCard
+              key={change.path}
+              name={baseName(change.path)}
+              path={change.path}
+              content={doc}
+              badge={isPlanName(change.path) ? "Plan" : undefined}
+              note={change.kind === "update" ? "mis à jour" : undefined}
+            />
+          ) : (
+            <FileEditBlock key={change.path} change={change} />
+          );
+        })}
       </div>
     );
   }
