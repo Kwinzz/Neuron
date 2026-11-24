@@ -176,6 +176,12 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
 - **Coûts** : Claude Code communique son coût ; Codex/Antigravity sont estimés par `pricing.rs` (liste LiteLLM
   téléchargée ≤ 1×/jour, cache `<data_dir>/prices.json`, entrées des éditeurs uniquement, repli sur la table intégrée).
   Affichage via `components/ui/CostLabel` (« ≈ » pour les estimations). C'est le seul appel réseau de l'app.
+- **Usage hors Neuron** (`usage_import.rs`) : journaux locaux de Claude Code (`~/.claude/projects/**/*.jsonl`,
+  dédoublonnés par `message.id` + `requestId`) et de Codex (`~/.codex/sessions/**/rollout-*.jsonl`, hausses du
+  total cumulé) importés de façon incrémentale dans `token_usage` (`source`, `dedupe_key`) au démarrage, toutes
+  les 10 min et après chaque tour Claude / Codex ; projet déduit du dossier. Tableau de bord et quotas lisent la
+  vue `usage_effective` : pour un agent, à partir de sa première ligne de journal, les journaux font foi (les tours
+  de Neuron y sont déjà), avant on garde les lignes de Neuron. Antigravity : pas de journal lisible.
 - `rate_limit_event` (fenêtres 5h / 7j de l'abonnement Claude) → `settings.claude.rate_limits` → `ProviderUsage.live`.
 - **Quotas Antigravity** : `agy --print /quota --output-format json` (répondu par le CLI, 0 token, **refusé dans une
   session stream-json**) → groupes de modèles × fenêtres 5 h / hebdo (`antigravity/quota.rs`), rafraîchi après chaque
@@ -200,9 +206,8 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
 
 ## Dev
 
-- `NEURON_DATA_DIR=<dossier>` : base SQLite isolée (tests manuels, captures).
-- En debug, palette `Ctrl+K` → *Générer des données de démo* / *Simuler de l'activité live* / *Supprimer les données
-  de démo* (commandes `dev_*`, refusées en release, lignes préfixées `demo-`).
+- `NEURON_DATA_DIR=<dossier>` : base SQLite isolée (tests manuels, captures). Plus de données de démo : la
+  migration 0007 a supprimé les anciennes lignes `demo-`.
 
 ## Commandes
 

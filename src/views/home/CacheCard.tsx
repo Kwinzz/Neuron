@@ -49,7 +49,7 @@ export function CacheCard() {
       <CardContent className="flex flex-1 flex-col justify-between gap-4">
         {isLoading ? (
           <>
-            <Skeleton className="mx-auto size-[180px] rounded-full" />
+            <Skeleton className="mx-auto aspect-square w-full max-w-[280px] rounded-full" />
             <div className="flex flex-col gap-3">
               <Skeleton className="h-5 w-full" />
               <Skeleton className="h-5 w-full" />
@@ -62,18 +62,19 @@ export function CacheCard() {
               aria-label={
                 ratio != null ? `Taux de lecture cache : ${pctText}` : "Aucune donnée de cache"
               }
-              className="animate-in fade-in-0 duration-300"
+              // The ring fills the free height of the card (it stretches next to taller cards) and scales with it.
+              className="flex flex-1 items-center justify-center animate-in fade-in-0 duration-300"
             >
               <ChartContainer
                 config={CACHE_CHART_CONFIG}
-                className="mx-auto aspect-square max-h-[200px]"
+                className="aspect-square w-full max-w-[280px] min-w-[150px]"
               >
                 <RadialBarChart
                   data={chartData}
                   startAngle={90}
                   endAngle={-270}
-                  innerRadius={70}
-                  outerRadius={95}
+                  innerRadius="76%"
+                  outerRadius="98%"
                 >
                   <PolarAngleAxis type="number" domain={[0, 100]} tick={false} axisLine={false} />
                   <RadialBar

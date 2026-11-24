@@ -88,6 +88,24 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-24 — Usage réel des abonnements, données de démo retirées, anneau du cache (v0.1.1)
+- **Usage hors Neuron** : `usage_import.rs` importe les journaux locaux de Claude Code (`~/.claude/projects`) et de
+  Codex (`~/.codex/sessions`) — incrémental (position par fichier dans `usage_import_files`), dédoublonné
+  (`token_usage.dedupe_key`), projet déduit du dossier, coût estimé au tarif API. Au démarrage, toutes les 10 min et
+  après chaque tour Claude / Codex ; événement `usage://changed` → l'accueil se recharge. Migration
+  `0007_cli_usage_logs` : colonnes `source` / `dedupe_key`, tables `usage_import_files` / `usage_log_start`, vue
+  `usage_effective` (journaux = source de vérité d'un agent à partir de sa 1re ligne, lignes Neuron avant) lue par
+  le tableau de bord et les quotas. Premier import réel : Claude Code 2,51 Md tokens (7 090 réponses, ~762 $),
+  Codex 716 M (3 343 réponses, ~263 $). Claude Code efface ses journaux après 30 jours : l'historique plus ancien
+  n'existe plus sur le disque (Neuron garde désormais ce qu'il a importé).
+- Codex : `output_tokens` inclut déjà le raisonnement → l'adaptateur ne l'ajoute plus une 2e fois.
+- Graphe « Tokens » = cache compris (même compte que « Tokens au total »).
+- **Données de démo supprimées** : commandes `dev_*` (`commands/dev.rs`), entrées de la palette, IPC ; la migration
+  0007 efface les lignes `demo-` existantes.
+- Carte « Efficacité du cache » : anneau en rayons relatifs (76 % / 98 %), centré dans la hauteur libre de la carte
+  et mis à l'échelle (150–280 px) au lieu de rayons fixes en pixels.
+- Version 0.1.1 (l'installateur propose de remplacer la 0.1.0).
+
 ### 2026-11-24 — Installateur Windows
 - `tauri.conf.json` : bundle NSIS seul, `perMachine` (droits admin, Program Files), français, icône, visuels
   (`installer/sidebar.bmp`, `header.bmp`), dossier menu Démarrer « Neuron », métadonnées (éditeur, description,

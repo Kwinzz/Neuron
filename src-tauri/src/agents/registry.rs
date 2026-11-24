@@ -646,6 +646,10 @@ impl AgentRegistry {
                 }
                 AdapterEvent::TurnComplete { mut usage, duration_ms, error } => {
                     let (stopped, _) = self.take_flags(&id, generation);
+                    // The CLI logged this turn: bring it into the dashboard now (logs are its source of truth).
+                    if matches!(rt.agent, AgentKind::ClaudeCode | AgentKind::Codex) {
+                        crate::usage_import::trigger(&app);
+                    }
                     // Antigravity doesn't stream its quotas: ask for them after each turn (no token used).
                     if rt.agent == AgentKind::Antigravity {
                         tauri::async_runtime::spawn(crate::agents::antigravity::quota::refresh(

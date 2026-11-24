@@ -88,6 +88,16 @@ export function useAgentEventBridge(): void {
     let unlistenQuotas: (() => void) | null = null;
     let unlistenClicks: (() => void) | null = null;
     let unlistenNewChat: (() => void) | null = null;
+    let unlistenUsage: (() => void) | null = null;
+
+    // Usage read from the CLI logs (terminal sessions included): refresh the dashboard.
+    events
+      .onUsageChanged(() => useDashboard.getState().scheduleRefresh())
+      .then((fn) => {
+        if (disposed) fn();
+        else unlistenUsage = fn;
+      })
+      .catch(() => undefined);
 
     // Quick prompt « ouvrir » on « Nouveau chat »: the new-chat screen, in the chosen project.
     events
@@ -166,6 +176,7 @@ export function useAgentEventBridge(): void {
       unlistenQuotas?.();
       unlistenClicks?.();
       unlistenNewChat?.();
+      unlistenUsage?.();
     };
   }, []);
 }

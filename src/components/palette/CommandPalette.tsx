@@ -3,13 +3,10 @@ import {
   Brain,
   Keyboard,
   Settings,
-  Database,
-  FlaskConical,
   FolderGit2,
   LayoutDashboard,
   PanelRight,
   Plus,
-  Trash2,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { AgentBadge } from "@/components/ui/AgentBadge";
@@ -28,7 +25,7 @@ import { MOD_LABEL } from "@/components/ui/Kbd";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { formatRelative } from "@/lib/format";
 import { fuzzyScore, normalize } from "@/lib/fuzzy";
-import { ipc, ipcErrorMessage } from "@/lib/ipc";
+import { ipcErrorMessage } from "@/lib/ipc";
 import { STATUS, describeStatus } from "@/lib/status";
 import { useDashboard } from "@/stores/dashboard";
 import { useLive } from "@/stores/live";
@@ -170,50 +167,6 @@ function useCommands(): Command[] {
       });
     }
 
-    if (import.meta.env.DEV) {
-      const reload = () => useDashboard.getState().load();
-      list.push(
-        {
-          id: "dev:seed",
-          group: "Développement",
-          title: "Générer des données de démo",
-          subtitle: "Projets, chats et 30 jours de consommation (préfixe demo-)",
-          keywords: "seed demo fake",
-          icon: <Database size={15} />,
-          run: async () => {
-            const rows = await ipc.dev.seedDemo();
-            useLive.setState({ threads: {}, attention: {} });
-            await reload();
-            toast({ tone: "ok", title: "Données de démo générées", description: `${rows} relevés de consommation` });
-          },
-        },
-        {
-          id: "dev:simulate",
-          group: "Développement",
-          title: "Simuler de l'activité live",
-          subtitle: "Émet des événements agent://event pendant ~30 s",
-          keywords: "simulate events live",
-          icon: <FlaskConical size={15} />,
-          run: async () => {
-            const n = await ipc.dev.simulateActivity();
-            toast({ tone: "info", title: "Simulation lancée", description: `${n} chat(s) actif(s)` });
-          },
-        },
-        {
-          id: "dev:clear",
-          group: "Développement",
-          title: "Supprimer les données de démo",
-          keywords: "clear demo reset",
-          icon: <Trash2 size={15} />,
-          run: async () => {
-            await ipc.dev.clearDemo();
-            useLive.setState({ threads: {}, attention: {} });
-            await reload();
-            toast({ tone: "ok", title: "Données de démo supprimées" });
-          },
-        },
-      );
-    }
     return list;
   }, [dockOpen, projects, threads, ui]);
 }

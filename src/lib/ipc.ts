@@ -153,13 +153,6 @@ export const ipc = {
     const picked = await openDialog({ directory: true, multiple: false, ...(defaultPath ? { defaultPath } : {}) });
     return typeof picked === "string" ? picked : null;
   },
-
-  // Debug builds only (rejected in release)
-  dev: {
-    seedDemo: () => invoke<number>("dev_seed_demo"),
-    clearDemo: () => invoke<void>("dev_clear_demo"),
-    simulateActivity: () => invoke<number>("dev_simulate_activity"),
-  },
 } as const;
 
 export const events = {
@@ -168,6 +161,8 @@ export const events = {
     listen<AgentEventEnvelope>(AGENT_EVENT_CHANNEL, (e) => handler(e.payload)),
   onMemoryChanged: (handler: () => void): Promise<UnlistenFn> => listen(MEMORY_CHANGED_CHANNEL, () => handler()),
   onQuotasChanged: (handler: () => void): Promise<UnlistenFn> => listen(QUOTAS_CHANGED_CHANNEL, () => handler()),
+  /** Usage imported from the Claude Code / Codex logs. */
+  onUsageChanged: (handler: () => void): Promise<UnlistenFn> => listen("usage://changed", () => handler()),
   onNotificationClicked: (handler: (threadId: string | null) => void): Promise<UnlistenFn> =>
     listen<string | null>(NOTIFICATION_CLICKED_CHANNEL, (e) => handler(e.payload)),
   /** The quick prompt asks for the « Nouveau chat » screen (payload = project id or null). */

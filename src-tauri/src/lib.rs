@@ -12,6 +12,7 @@ pub mod memory;
 pub mod notifications;
 pub mod pricing;
 pub mod state;
+pub mod usage_import;
 pub mod util;
 
 use std::time::Instant;
@@ -64,6 +65,7 @@ pub fn run() {
             commands::settings::spawn_idle_reaper(app.handle());
             commands::pricing::spawn_price_refresh(app.handle());
             commands::pricing::spawn_agy_quota_refresh(app.handle());
+            usage_import::spawn_periodic(app.handle());
             Ok(())
         })
         .on_window_event(desktop::on_window_event)
@@ -116,9 +118,6 @@ pub fn run() {
             commands::memory::disconnect_antigravity_mcp,
             commands::threads::create_project,
             commands::threads::delete_project,
-            commands::dev::dev_seed_demo,
-            commands::dev::dev_clear_demo,
-            commands::dev::dev_simulate_activity,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Neuron");

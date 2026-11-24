@@ -313,7 +313,7 @@ pub fn usage(conn: &Connection, provider: Provider, now: i64) -> AppResult<Provi
                 COALESCE(SUM(cost_usd), 0.0),
                 COUNT(*),
                 MIN(ts)
-         FROM token_usage
+         FROM usage_effective
          WHERE agent = ?1 AND ts >= ?2",
     )?;
     let (tokens, cost, turns, oldest): (i64, f64, i64, Option<i64>) =

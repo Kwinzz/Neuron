@@ -165,7 +165,7 @@ pub fn report(conn: &Connection, range: UsageRange, now: i64) -> AppResult<Usage
     {
         let sql = format!(
             "SELECT strftime(?2, u.ts / 1000, 'unixepoch', 'localtime') AS k, u.agent, {SUMS_SQL}
-             FROM token_usage u WHERE u.ts >= ?1
+             FROM usage_effective u WHERE u.ts >= ?1
              GROUP BY k, u.agent"
         );
         let mut stmt = conn.prepare_cached(&sql)?;
@@ -205,7 +205,7 @@ pub fn report(conn: &Connection, range: UsageRange, now: i64) -> AppResult<Usage
     let by_project = {
         let sql = format!(
             "SELECT u.project_id, COALESCE(p.name, 'Hors projet'), {SUMS_SQL}
-             FROM token_usage u LEFT JOIN projects p ON p.id = u.project_id
+             FROM usage_effective u LEFT JOIN projects p ON p.id = u.project_id
              WHERE u.ts >= ?1
              GROUP BY u.project_id
              ORDER BY SUM(u.input_tokens + u.output_tokens) DESC
@@ -228,7 +228,7 @@ pub fn report(conn: &Connection, range: UsageRange, now: i64) -> AppResult<Usage
             |r| r.get(0),
         )?;
         let prev_until = prev_since + (now - since).max(0);
-        let sql = format!("SELECT {SUMS_SQL} FROM token_usage u WHERE u.ts >= ?1 AND u.ts < ?2");
+        let sql = format!("SELECT {SUMS_SQL} FROM usage_effective u WHERE u.ts >= ?1 AND u.ts < ?2");
         let mut stmt = conn.prepare_cached(&sql)?;
         stmt.query_row(params![prev_since, prev_until], |r| UsageSums::from_row(r, 0))?
     };

@@ -11,7 +11,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Kbd, MOD_LABEL } from "@/components/ui/Kbd";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { bucketTitle } from "@/lib/format";
@@ -140,7 +139,7 @@ export function ConsumptionCard() {
               {metric === "cost" ? "Aucun coût sur cette période" : "Aucune consommation sur cette période"}
             </p>
             <p className="text-xs text-muted-foreground">
-              En dev, <Kbd>{MOD_LABEL}</Kbd> <Kbd>K</Kbd> → « Générer des données de démo »
+              L&apos;usage de Claude Code et de Codex (terminal compris) apparaît ici dès leur prochaine réponse.
             </p>
           </div>
         ) : (

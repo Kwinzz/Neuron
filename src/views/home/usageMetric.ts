@@ -27,8 +27,9 @@ interface MetricSpec {
 export const METRICS: Record<UsageMetric, MetricSpec> = {
   tokens: {
     label: "Tokens",
-    unit: "tokens",
-    value: (s) => s.input + s.output,
+    unit: "tokens (cache compris)",
+    // Same count as « Tokens au total » and the providers' dashboards: cache reads and writes included.
+    value: (s) => s.input + s.output + s.cacheRead + s.cacheWrite,
     format: formatTokens,
     axis: formatTokens,
     integer: true,

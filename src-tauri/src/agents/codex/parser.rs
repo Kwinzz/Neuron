@@ -77,7 +77,8 @@ impl CodexParser {
                 vec![AdapterEvent::TurnComplete {
                     usage: TokenUsage {
                         input: input.saturating_sub(cached),
-                        output: u(&usage, "output_tokens") + u(&usage, "reasoning_output_tokens"),
+                        // `output_tokens` already includes the reasoning tokens.
+                        output: u(&usage, "output_tokens"),
                         cache_read: cached,
                         cache_write: u(&usage, "cache_write_input_tokens"),
                         cost_usd: 0.0,
