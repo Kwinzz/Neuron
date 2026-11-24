@@ -1,7 +1,7 @@
 # Neuron — Contexte projet
 
 > Document vivant. **Mis à jour à chaque changement** (voir règle dans `CLAUDE.md`).
-> Dernière mise à jour : 2026-11-24 (fournisseurs IA : installer / se connecter)
+> Dernière mise à jour : 2026-11-24 (import de mémoire, version Arch Linux)
 
 ## Vision
 
@@ -87,6 +87,40 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 - [x] **Phase 5** — Adaptateurs Antigravity / Codex, CLI génériques (pipe + PTY), Paramètres, raccourcis, notifications, fluidité
 
 ## Journal des changements
+
+### 2026-11-24 — Version Arch Linux
+- **Paquet** : `packaging/arch/PKGBUILD` (construit le dépôt local : `npm ci` + `tauri build --no-bundle`, installe
+  `/usr/bin/neuron`, `neuron.desktop` avec l'action « Demande rapide », icônes hicolor) + `packaging/arch/README.md`
+  (installation, Wayland, dépannage). `src-tauri/tauri.linux.conf.json` : cibles `deb` / `appimage` sous Linux,
+  Windows inchangé (NSIS).
+- **PATH** (`env_path.rs`, ex-`access::refresh_path`) : sous Linux, PATH du shell de connexion lu une fois en
+  arrière-plan (`$SHELL -ilc`, fish géré, marqueurs pour ignorer les messages d'accueil, 3 s max) + `~/.local/bin`,
+  `~/.npm-global/bin`, `~/.bun/bin`, `~/.cargo/bin`, `~/.codex/bin` ; donné explicitement aux enfants
+  (`process::command`, PTY, terminal) — l'environnement du processus n'est jamais modifié sous Unix.
+- **Processus** : agents lancés dans leur propre groupe (`process_group(0)`) ; `kill_process_tree` envoie `TERM` au
+  groupe puis `KILL` 3 s plus tard.
+- **Installer / Se connecter sous Linux** : terminal `$TERMINAL` puis kitty, alacritty, foot, wezterm, ghostty,
+  konsole, gnome-terminal, kgx, ptyxis, xfce4-terminal, x-terminal-emulator, xterm ; script bash ; commandes
+  officielles `curl -fsSL https://claude.ai/install.sh | bash`, `https://chatgpt.com/codex/install.sh | sh`,
+  `https://antigravity.google/cli/install.sh | bash`. Scripts bash vérifiés par `bash -n` (test `dump_terminal_scripts`).
+- **Demande rapide sous Wayland** : `neuron --quick` (instance unique → `toggle_quick`, ou démarrage en arrière-plan
+  + demande rapide) ; message d'erreur explicite quand le raccourci global échoue sous Wayland ; aide dans Paramètres.
+- `WEBKIT_DISABLE_DMABUF_RENDERER=1` par défaut sous Linux ; `util::neuron_exe()` (préfère `$APPIMAGE`) pour le
+  serveur MCP ; libellés selon l'OS (`lib/platform.ts` : « Lancer à l'ouverture de session », notifications).
+- Non compilé ici (Windows sans WebKitGTK) : à valider par `makepkg -si` sur la machine Arch.
+
+### 2026-11-24 — Importer une mémoire (claude.ai, ChatGPT, Gemini, CLI)
+- Vue Mémoire → **Importer** : texte collé ou fichier (.txt/.md/.json) depuis claude.ai / ChatGPT / Gemini (prompt
+  à copier pour obtenir la liste), ou fichiers des CLI détectés (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`,
+  `~/.gemini/GEMINI.md`). Aperçu modifiable (cases, catégorie, texte, doublons signalés), puis import.
+- **Reformuler avec l'IA** (optionnel) : un agent installé (Claude Code par défaut, Haiku ; Codex `exec` en lecture
+  seule ; Antigravity `--print --mode plan`) fusionne, réécrit et classe les souvenirs (`agents/oneshot.rs`,
+  20 000 caractères max). Essai réel : 3 souvenirs bruts → 2 souvenirs propres bien classés.
+- Backend `memory/import.rs` (fonctions pures testées : `split_memories` JSON / Markdown à titres / puces / texte,
+  `guess_category` par mots-clés, `parse_reformulated`), commandes `memory_import_sources`,
+  `read_memory_import_file`, `split_memory_import`, `reformulate_memory_import`, `import_memories`
+  (`source = import:<origine>`, doublons ignorés). UI par neon : `MemoryImportDialog` + `Import*`, source affichée
+  « Importé de ChatGPT ».
 
 ### 2026-11-24 — Fournisseurs IA : installer / se connecter, « non connecté » dans le chat
 - **`agents/access.rs`** : pour Claude Code, Codex et Antigravity — installé ? (`--version`, absence = `NotFound`),

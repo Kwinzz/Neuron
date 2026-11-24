@@ -3,6 +3,7 @@
 //! through the MCP server) re-exports the file. Both the app and the MCP process share the same rules,
 //! with the hash of the last synchronized file stored in `settings` so either side can detect edits.
 
+pub mod import;
 pub mod mcp;
 
 use std::path::{Path, PathBuf};

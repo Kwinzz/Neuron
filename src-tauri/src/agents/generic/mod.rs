@@ -149,6 +149,9 @@ fn start_pty(profile: &GenericCliProfile, spec: &SessionSpec, prompt: &str) -> A
         .map_err(|e| pty_err(&e))?;
     let mut cmd = CommandBuilder::new(&profile.command);
     cmd.args(&args);
+    if let Some(path) = crate::env_path::path() {
+        cmd.env("PATH", path);
+    }
     cmd.cwd(&spec.cwd);
     let mut child = pair
         .slave

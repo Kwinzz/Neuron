@@ -24,6 +24,15 @@ pub fn command(binary: &str, args: &[String], cwd: &Path) -> Command {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
+    #[cfg(unix)]
+    {
+        // Own process group: `kill_process_tree` signals the agent and everything it spawned.
+        cmd.process_group(0);
+    }
+    // Linux: the login shell's PATH (an app started from the menu doesn't have it).
+    if let Some(path) = crate::env_path::path() {
+        cmd.env("PATH", path);
+    }
     cmd
 }
 

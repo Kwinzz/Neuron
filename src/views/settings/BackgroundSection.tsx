@@ -1,3 +1,4 @@
+import { IS_LINUX, IS_WINDOWS } from "@/lib/platform";
 import { useState, type KeyboardEvent } from "react";
 import { AppWindow, Keyboard, RotateCcw } from "lucide-react";
 import type { AppSettings } from "@/bindings/AppSettings";
@@ -105,7 +106,7 @@ export function BackgroundSection({ settings }: { settings: AppSettings }) {
           <Separator />
           <SettingRow
             id="bg-autostart"
-            label="Lancer avec Windows"
+            label={IS_WINDOWS ? "Lancer avec Windows" : "Lancer à l'ouverture de session"}
             description={
               import.meta.env.DEV
                 ? "Démarre Neuron discrètement dans la zone de notification à l'ouverture de session (sans effet en mode dev : seule l'app installée s'inscrit au démarrage)."
@@ -154,7 +155,11 @@ export function BackgroundSection({ settings }: { settings: AppSettings }) {
           <SettingRow
             id="quick-shortcut"
             label="Raccourci global"
-            description="Clique puis appuie sur la combinaison (avec Ctrl, Alt ou Win). Échap pour annuler."
+            description={
+              IS_LINUX
+                ? "Clique puis appuie sur la combinaison. Sous Wayland, les raccourcis globaux n'existent pas : lie la commande « neuron --quick » à un raccourci de ton bureau (Hyprland, KDE, GNOME…)."
+                : "Clique puis appuie sur la combinaison (avec Ctrl, Alt ou Win). Échap pour annuler."
+            }
             disabled={!quickLauncher.enabled}
             control={
               <div className="flex items-center gap-1">

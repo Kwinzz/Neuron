@@ -2,6 +2,7 @@ import { Code2, Cpu, ShieldAlert, StickyNote, User, type LucideIcon } from "luci
 import type { AgentKind } from "@/bindings/AgentKind";
 import type { MemoryCategory } from "@/bindings/MemoryCategory";
 import { AGENTS } from "@/lib/agents";
+import { IMPORT_ORIGINS, isMemoryImportOrigin } from "./importOrigins";
 
 export const CATEGORY_ORDER: readonly MemoryCategory[] = [
   "profile",
@@ -80,11 +81,17 @@ function isNamedAgentKind(value: string): value is Exclude<AgentKind, "generic">
 export type SourceDescription =
   | { kind: "user" }
   | { kind: "file" }
+  | { kind: "import"; origin: string; label: string }
   | { kind: "agent"; agent: AgentKind | null; label: string };
 
 export function describeSource(source: string): SourceDescription {
   if (source === "user") return { kind: "user" };
   if (source === "file") return { kind: "file" };
+  if (source.startsWith("import:")) {
+    const origin = source.slice("import:".length);
+    const label = isMemoryImportOrigin(origin) ? IMPORT_ORIGINS[origin].source : IMPORT_ORIGINS.other.source;
+    return { kind: "import", origin, label };
+  }
   if (source.startsWith("agent:")) {
     const suffix = source.slice("agent:".length);
     if (isNamedAgentKind(suffix)) {

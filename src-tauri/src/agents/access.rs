@@ -7,7 +7,7 @@
 //!
 //! Installing and signing in are interactive (browser, prompts): Neuron opens a PowerShell window running the
 //! official command, then the frontend re-checks until the state changes. A CLI installed while Neuron runs is not
-//! in its PATH yet: [`refresh_path`] re-reads it from the registry (+ the installers' known folders).
+//! in its PATH yet: [`crate::env_path::refresh_path`] re-reads it (registry on Windows, login shell on Linux).
 
 use std::process::Stdio;
 use std::sync::Mutex;
@@ -100,21 +100,33 @@ fn spec(agent: AgentKind) -> Option<Spec> {
             label: "Claude Code",
             env: "NEURON_CLAUDE_BIN",
             default_bin: "claude",
-            install: "irm https://claude.ai/install.ps1 | iex",
+            install: if cfg!(windows) {
+                "irm https://claude.ai/install.ps1 | iex"
+            } else {
+                "curl -fsSL https://claude.ai/install.sh | bash"
+            },
             login: "claude auth login",
         }),
         AgentKind::Codex => Some(Spec {
             label: "Codex",
             env: "NEURON_CODEX_BIN",
             default_bin: "codex",
-            install: "irm https://chatgpt.com/codex/install.ps1 | iex",
+            install: if cfg!(windows) {
+                "irm https://chatgpt.com/codex/install.ps1 | iex"
+            } else {
+                "curl -fsSL https://chatgpt.com/codex/install.sh | sh"
+            },
             login: "codex login",
         }),
         AgentKind::Antigravity => Some(Spec {
             label: "Antigravity",
             env: "NEURON_AGY_BIN",
             default_bin: "agy",
-            install: "irm https://antigravity.google/cli/install.ps1 | iex",
+            install: if cfg!(windows) {
+                "irm https://antigravity.google/cli/install.ps1 | iex"
+            } else {
+                "curl -fsSL https://antigravity.google/cli/install.sh | bash"
+            },
             login: "agy",
         }),
         AgentKind::Generic => None,
@@ -123,6 +135,16 @@ fn spec(agent: AgentKind) -> Option<Spec> {
 
 fn binary(spec: &Spec) -> String {
     std::env::var(spec.env).unwrap_or_else(|_| spec.default_bin.into())
+}
+
+/// Program to run for an agent (honours `NEURON_*_BIN`); None for generic CLIs.
+pub fn binary_for(agent: AgentKind) -> Option<String> {
+    spec(agent).map(|s| binary(&s))
+}
+
+/// Display name of a managed agent.
+pub fn label(agent: AgentKind) -> &'static str {
+    spec(agent).map_or("CLI générique", |s| s.label)
 }
 
 enum Probe {
@@ -324,7 +346,7 @@ pub async fn list(refresh: bool) -> Vec<AgentAccess> {
             }
         }
     }
-    refresh_path();
+    crate::env_path::refresh_path();
     let (c, x, a) = tokio::join!(
         check_uncached(AgentKind::ClaudeCode),
         check_uncached(AgentKind::Codex),
@@ -337,7 +359,7 @@ pub async fn list(refresh: bool) -> Vec<AgentAccess> {
 
 /// One agent, always fresh (after « Installer » / « Se connecter »).
 pub async fn check(agent: AgentKind) -> AppResult<AgentAccess> {
-    refresh_path();
+    crate::env_path::refresh_path();
     let access = check_uncached(agent)
         .await
         .ok_or_else(|| AppError::Invalid("les CLI génériques se configurent dans Paramètres".into()))?;
@@ -357,7 +379,11 @@ pub fn login(agent: AgentKind) -> AppResult<()> {
     open_terminal(&title, &script)
 }
 
+#[cfg(not(windows))]
+use {bash_install_script as install_script, bash_login_script as login_script};
+
 /// (window title, PowerShell script) of the installer.
+#[cfg(windows)]
 fn install_script(agent: AgentKind) -> AppResult<(String, String)> {
     let spec = spec(agent).ok_or_else(|| AppError::Invalid("rien à installer pour ce fournisseur".into()))?;
     let script = format!(
@@ -374,6 +400,7 @@ fn install_script(agent: AgentKind) -> AppResult<(String, String)> {
 }
 
 /// (window title, PowerShell script) of the sign-in.
+#[cfg(windows)]
 fn login_script(agent: AgentKind) -> AppResult<(String, String)> {
     let spec = spec(agent).ok_or_else(|| AppError::Invalid("pas de connexion pour ce fournisseur".into()))?;
     let bin = binary(&spec);
@@ -402,7 +429,7 @@ fn login_script(agent: AgentKind) -> AppResult<(String, String)> {
 fn open_terminal(title: &str, script: &str) -> AppResult<()> {
     use std::os::windows::process::CommandExt;
     const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
-    refresh_path();
+    crate::env_path::refresh_path();
     // Single quotes only in scripts: Rust's argument quoting then reaches PowerShell untouched.
     let full = format!("$Host.UI.RawUI.WindowTitle = '{title}'; {script}");
     let home = std::env::var_os("USERPROFILE").map(std::path::PathBuf::from).unwrap_or_else(std::env::temp_dir);
@@ -415,78 +442,102 @@ fn open_terminal(title: &str, script: &str) -> AppResult<()> {
     Ok(())
 }
 
-#[cfg(not(windows))]
-fn open_terminal(_title: &str, _script: &str) -> AppResult<()> {
-    Err(AppError::Invalid(
-        "ouverture d'un terminal disponible uniquement sous Windows : lance la commande affichée".into(),
-    ))
+/// (window title, bash script) of the installer (Linux; compiled everywhere so the tests check it).
+#[cfg_attr(windows, allow(dead_code))]
+fn bash_install_script(agent: AgentKind) -> AppResult<(String, String)> {
+    let spec = spec(agent).ok_or_else(|| AppError::Invalid("rien à installer pour ce fournisseur".into()))?;
+    let script = format!(
+        "set -o pipefail; printf '\\033[36m%s\\033[0m\\n\\n' 'Installation de {label} ({cmd})'; \
+         if {cmd}; then printf '\\n\\033[32m%s\\033[0m\\n' '{label} est installé. Retourne dans Neuron : la fenêtre se ferme toute seule.'; \
+         sleep 4; exit 0; fi; \
+         printf '\\n\\033[31m%s\\033[0m\\n' 'Échec de l’installation.'; read -r -p 'Entrée pour fermer… ' _",
+        label = spec.label,
+        cmd = spec.install,
+    );
+    Ok((format!("Neuron - installation de {}", spec.label), script))
 }
 
-/// Re-read the PATH from the registry (user + machine) and add the folders the official installers use, so a
-/// CLI installed while Neuron runs is found without restarting it. Every child process inherits it.
-#[cfg(windows)]
-pub fn refresh_path() {
-    use std::ffi::OsString;
-    use std::path::PathBuf;
-    use winreg::RegKey;
-    use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
-
-    fn expand(raw: &str) -> String {
-        let mut out = String::new();
-        let mut rest = raw;
-        while let Some(start) = rest.find('%') {
-            let Some(len) = rest[start + 1..].find('%') else { break };
-            let name = &rest[start + 1..start + 1 + len];
-            out.push_str(&rest[..start]);
-            match std::env::var(name) {
-                Ok(value) => out.push_str(&value),
-                Err(_) => out.push_str(&rest[start..start + len + 2]),
-            }
-            rest = &rest[start + len + 2..];
+/// (window title, bash script) of the sign-in (Linux; compiled everywhere so the tests check it).
+#[cfg_attr(windows, allow(dead_code))]
+fn bash_login_script(agent: AgentKind) -> AppResult<(String, String)> {
+    let spec = spec(agent).ok_or_else(|| AppError::Invalid("pas de connexion pour ce fournisseur".into()))?;
+    let bin = binary(&spec).replace('\'', "");
+    let script = match agent {
+        // agy has no sign-in subcommand: its interactive session asks for it (or `/login`).
+        AgentKind::Antigravity => format!(
+            "printf '\\033[36m%s\\033[0m\\n\\n' 'Connecte-toi à Antigravity dans la session qui s’ouvre (commande /login si rien ne s’affiche), puis quitte avec /exit.'; \
+             '{bin}'; exit 0"
+        ),
+        _ => {
+            let args = spec.login.split_once(' ').map_or("", |(_, a)| a);
+            format!(
+                "printf '\\033[36m%s\\033[0m\\n\\n' 'Connexion à {label} : suis les instructions (une page de connexion peut s’ouvrir dans le navigateur).'; \
+                 '{bin}' {args} && {{ printf '\\n\\033[32m%s\\033[0m\\n' 'Connecté. Retourne dans Neuron : la fenêtre se ferme toute seule.'; sleep 3; exit 0; }}; \
+                 read -r -p 'Entrée pour fermer… ' _",
+                label = spec.label,
+            )
         }
-        out.push_str(rest);
-        out
-    }
-    let read = |root, key: &str| -> Option<String> {
-        RegKey::predef(root).open_subkey(key).ok()?.get_value::<String, _>("Path").ok()
     };
+    Ok((format!("Neuron - connexion à {}", spec.label), script))
+}
+/// Terminals tried in order (after `$TERMINAL`), with the arguments that precede the command to run.
+#[cfg(not(windows))]
+const TERMINALS: &[(&str, &[&str])] = &[
+    ("kitty", &[]),
+    ("alacritty", &["-e"]),
+    ("foot", &[]),
+    ("wezterm", &["start", "--"]),
+    ("ghostty", &["-e"]),
+    ("konsole", &["-e"]),
+    ("gnome-terminal", &["--"]),
+    ("kgx", &["--"]),
+    ("ptyxis", &["--"]),
+    ("xfce4-terminal", &["-x"]),
+    ("x-terminal-emulator", &["-e"]),
+    ("xterm", &["-e"]),
+];
 
-    let mut dirs: Vec<PathBuf> =
-        std::env::var_os("PATH").map(|p| std::env::split_paths(&p).collect()).unwrap_or_default();
-    let registry = [
-        read(HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment"),
-        read(HKEY_CURRENT_USER, "Environment"),
-    ];
-    for raw in registry.into_iter().flatten() {
-        dirs.extend(std::env::split_paths(&expand(&raw)));
+/// The terminal to open: `$TERMINAL` first (arguments of a known one, `-e` otherwise), then [`TERMINALS`].
+#[cfg(not(windows))]
+fn pick_terminal() -> Option<(std::path::PathBuf, Vec<&'static str>)> {
+    use crate::env_path::find_program;
+    if let Some(wanted) = std::env::var("TERMINAL").ok().filter(|t| !t.trim().is_empty()) {
+        let program = std::path::Path::new(wanted.trim());
+        let name = program.file_name().and_then(|n| n.to_str()).unwrap_or_default();
+        let args = TERMINALS.iter().find(|(t, _)| *t == name).map_or(vec!["-e"], |(_, a)| a.to_vec());
+        let found = if program.is_absolute() { Some(program.to_path_buf()) } else { find_program(name) };
+        if let Some(path) = found.filter(|p| p.is_file()) {
+            return Some((path, args));
+        }
     }
-    let home = std::env::var_os("USERPROFILE").map(PathBuf::from);
-    let local = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
-    let roaming = std::env::var_os("APPDATA").map(PathBuf::from);
-    let known = [
-        home.map(|h| h.join(".local").join("bin")),
-        local.as_ref().map(|l| l.join("Programs").join("OpenAI").join("Codex").join("bin")),
-        local.map(|l| l.join("agy").join("bin")),
-        roaming.map(|r| r.join("npm")),
-    ];
-    dirs.extend(known.into_iter().flatten().filter(|d| d.is_dir()));
-
-    let mut seen = std::collections::HashSet::new();
-    dirs.retain(|d| {
-        !d.as_os_str().is_empty() && seen.insert(d.to_string_lossy().trim_end_matches('\\').to_lowercase())
-    });
-    let Ok(joined) = std::env::join_paths(&dirs) else { return };
-    if std::env::var_os("PATH").as_deref() == Some(joined.as_os_str()) {
-        return;
-    }
-    let joined: OsString = joined;
-    // SAFETY: on Windows the process environment is guarded by the OS (and std's own lock); the races that make
-    // `set_var` unsafe concern libc `getenv` readers on Unix.
-    unsafe { std::env::set_var("PATH", joined) };
+    TERMINALS.iter().find_map(|(name, args)| find_program(name).map(|p| (p, args.to_vec())))
 }
 
 #[cfg(not(windows))]
-pub fn refresh_path() {}
+fn open_terminal(title: &str, script: &str) -> AppResult<()> {
+    use std::process::Stdio;
+    crate::env_path::refresh_path();
+    let (terminal, args) = pick_terminal().ok_or_else(|| {
+        AppError::Invalid(
+            "aucun terminal trouvé (kitty, alacritty, konsole, gnome-terminal…) : lance la commande affichée".into(),
+        )
+    })?;
+    let full = format!("printf '\\033]0;%s\\007' '{title}'; {script}");
+    let home = std::env::var_os("HOME").map(std::path::PathBuf::from).unwrap_or_else(std::env::temp_dir);
+    let mut cmd = std::process::Command::new(&terminal);
+    cmd.args(args).args(["bash", "-lc", &full]).current_dir(home);
+    cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    if let Some(path) = crate::env_path::path() {
+        cmd.env("PATH", path);
+    }
+    let mut child =
+        cmd.spawn().map_err(|e| AppError::Other(format!("impossible d'ouvrir {} ({e})", terminal.display())))?;
+    // Reap it when the window closes (no zombie).
+    std::thread::spawn(move || {
+        let _ = child.wait();
+    });
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {
@@ -512,6 +563,11 @@ mod tests {
             {
                 let full = format!("$Host.UI.RawUI.WindowTitle = '{title}'; {script}");
                 std::fs::write(format!("{dir}/{}-{kind}.ps1", agent.as_str()), full).unwrap();
+            }
+            for (kind, (_, script)) in
+                [("install", bash_install_script(agent).unwrap()), ("login", bash_login_script(agent).unwrap())]
+            {
+                std::fs::write(format!("{dir}/{}-{kind}.sh", agent.as_str()), script).unwrap();
             }
         }
     }

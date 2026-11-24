@@ -20,7 +20,10 @@ import type { PricingStatus } from "@/bindings/PricingStatus";
 import type { GenericCliProfile } from "@/bindings/GenericCliProfile";
 import type { GenericCliTest } from "@/bindings/GenericCliTest";
 import type { ContextBundle } from "@/bindings/ContextBundle";
+import type { ImportedMemory } from "@/bindings/ImportedMemory";
+import type { LocalMemorySource } from "@/bindings/LocalMemorySource";
 import type { Memory } from "@/bindings/Memory";
+import type { MemoryImportOrigin } from "@/bindings/MemoryImportOrigin";
 import type { MemoryCategory } from "@/bindings/MemoryCategory";
 import type { MemoryHit } from "@/bindings/MemoryHit";
 import type { MemoryInfo } from "@/bindings/MemoryInfo";
@@ -144,6 +147,22 @@ export const ipc = {
   searchMemories: (query: string, limit?: number) => invoke<MemoryHit[]>("search_memories", { query, limit }),
   memoryInfo: () => invoke<MemoryInfo>("memory_info"),
   openMemoryFile: () => invoke<void>("open_memory_file"),
+  memoryImportSources: () => invoke<LocalMemorySource[]>("memory_import_sources"),
+  readMemoryImportFile: (path: string) => invoke<string>("read_memory_import_file", { path }),
+  splitMemoryImport: (text: string) => invoke<ImportedMemory[]>("split_memory_import", { text }),
+  reformulateMemoryImport: (agent: AgentKind, text: string) =>
+    invoke<ImportedMemory[]>("reformulate_memory_import", { agent, text }),
+  importMemories: (items: ImportedMemory[], origin: MemoryImportOrigin) =>
+    invoke<number>("import_memories", { items, origin }),
+  /** One text file to import (memory export), or null when cancelled. */
+  pickImportFile: async (): Promise<string | null> => {
+    const picked = await openDialog({
+      multiple: false,
+      directory: false,
+      filters: [{ name: "Texte", extensions: ["txt", "md", "json"] }],
+    });
+    return typeof picked === "string" ? picked : null;
+  },
   antigravityMcpStatus: () => invoke<AgyMcpStatus>("antigravity_mcp_status"),
   connectAntigravityMcp: () => invoke<AgyMcpStatus>("connect_antigravity_mcp"),
   disconnectAntigravityMcp: () => invoke<AgyMcpStatus>("disconnect_antigravity_mcp"),

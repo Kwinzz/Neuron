@@ -1,3 +1,4 @@
+import { IS_WINDOWS } from "@/lib/platform";
 import { useEffect, useRef, useState } from "react";
 import { Bell, BellOff, BellRing, CheckCircle2 } from "lucide-react";
 import type { AppSettings } from "@/bindings/AppSettings";
@@ -127,8 +128,9 @@ export function NotificationsSection({ settings }: NotificationsSectionProps) {
             <BellOff className="text-warn!" aria-hidden />
             <AlertTitle>Notifications bloquées</AlertTitle>
             <AlertDescription className="text-xs">
-              Windows a bloqué les notifications de Neuron. Autorise-les dans Paramètres
-              Windows › Système › Notifications.
+              {IS_WINDOWS
+                ? "Windows a bloqué les notifications de Neuron. Autorise-les dans Paramètres Windows › Système › Notifications."
+                : "Le système a bloqué les notifications de Neuron. Autorise-les dans les réglages de notifications de ton bureau."}
             </AlertDescription>
           </Alert>
         )}

@@ -11,6 +11,7 @@ import { CATEGORY_ORDER } from "./categories";
 import { MemoryCategoryCard } from "./MemoryCategoryCard";
 import { MemoryComposer } from "./MemoryComposer";
 import { MemoryHeaderCard } from "./MemoryHeaderCard";
+import { MemoryImportDialog } from "./MemoryImportDialog";
 import { MemorySearchBar } from "./MemorySearchBar";
 import { MemorySearchResults } from "./MemorySearchResults";
 import { useMemorySearch } from "./useMemorySearch";
@@ -25,6 +26,9 @@ export function MemoryView() {
 
   const [query, setQuery] = useState("");
   const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  /** Remounts the import dialog after a successful import (fresh state next time). */
+  const [importKey, setImportKey] = useState(0);
 
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -142,6 +146,13 @@ export function MemoryView() {
     });
   }, []);
 
+  const handleOpenImport = useCallback(() => setImportOpen(true), []);
+
+  const handleImported = useCallback(() => {
+    setImportOpen(false);
+    setImportKey((key) => key + 1);
+  }, []);
+
   const handleRetry = useCallback(() => {
     void useMemory.getState().load();
   }, []);
@@ -160,6 +171,7 @@ export function MemoryView() {
         counts={counts}
         total={items.length}
         onNew={handleFocusComposer}
+        onImport={handleOpenImport}
         onJumpToCategory={handleJumpToCategory}
       />
 
@@ -236,6 +248,13 @@ export function MemoryView() {
           </>
         )}
       </div>
+
+      <MemoryImportDialog
+        key={importKey}
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={handleImported}
+      />
     </div>
   );
 }

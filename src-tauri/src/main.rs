@@ -2,6 +2,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
+    // WebKitGTK: the DMA-BUF renderer shows a blank window on many NVIDIA / Wayland setups.
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+        // SAFETY: first statement of `main`, before any other thread exists.
+        unsafe { std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1") };
+    }
     // `neuron --mcp-memory …`: the embedded memory MCP server launched by agents (no window).
     if let Some(code) = neuron_lib::memory::mcp::entry_from_args() {
         std::process::exit(code);

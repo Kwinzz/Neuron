@@ -4,8 +4,11 @@ use std::time::{Duration, SystemTime};
 
 use tauri::{AppHandle, Emitter, Manager, State};
 
+use crate::agents::events::AgentKind;
 use crate::db::memories;
+use crate::error::AppError;
 use crate::error::AppResult;
+use crate::memory::import::{self, ImportedMemory, LocalMemorySource, MemoryImportOrigin};
 use crate::memory::{self, Memory, MemoryCategory, MemoryHit, MemoryInfo};
 use crate::state::AppState;
 use crate::util::now_ms;
@@ -81,7 +84,7 @@ pub async fn search_memories(
 
 #[tauri::command]
 pub async fn memory_info(state: State<'_, AppState>) -> AppResult<MemoryInfo> {
-    let launch = std::env::current_exe().ok().map(|exe| {
+    let launch = crate::util::neuron_exe().ok().map(|exe| {
         let paths =
             memory::MemoryPaths { db_path: state.paths.db_path.clone(), file_path: state.paths.memory_file.clone() };
         memory::mcp::McpLaunch::new(exe, &paths, "<agent>", None).display()
@@ -154,7 +157,7 @@ pub enum AgyMcpStatus {
 }
 
 fn launch_for(state: &AppState, agent: &str) -> AppResult<memory::mcp::McpLaunch> {
-    let exe = std::env::current_exe()?;
+    let exe = crate::util::neuron_exe()?;
     let paths =
         memory::MemoryPaths { db_path: state.paths.db_path.clone(), file_path: state.paths.memory_file.clone() };
     Ok(memory::mcp::McpLaunch::new(exe, &paths, agent, None))
@@ -198,4 +201,85 @@ pub async fn connect_antigravity_mcp(state: State<'_, AppState>) -> AppResult<Ag
 pub async fn disconnect_antigravity_mcp(state: State<'_, AppState>) -> AppResult<AgyMcpStatus> {
     crate::agents::catalog::run_cli("agy", &["mcp", "remove", memory::mcp::SERVER_NAME]).await;
     agy_status(&state).await
+}
+
+/// Max text sent to an agent for a reformulation (it goes on a command line for Antigravity).
+const MAX_REFORMULATE_CHARS: usize = 20_000;
+
+/// Instruction files of the agent CLIs found on this computer (Claude Code, Codex, Gemini CLI).
+#[tauri::command]
+pub async fn memory_import_sources(app: AppHandle) -> AppResult<Vec<LocalMemorySource>> {
+    let home = app.path().home_dir()?;
+    Ok(tokio::task::spawn_blocking(move || import::local_sources(&home)).await?)
+}
+
+/// Text of a file to import (picked by the user or a CLI instruction file), 200 KB max.
+#[tauri::command]
+pub async fn read_memory_import_file(path: String) -> AppResult<String> {
+    tokio::task::spawn_blocking(move || {
+        let meta = std::fs::metadata(&path)?;
+        if meta.len() > import::MAX_IMPORT_BYTES {
+            return Err(AppError::Invalid("fichier trop gros pour un import de mémoire (200 Ko max)".into()));
+        }
+        Ok(String::from_utf8_lossy(&std::fs::read(&path)?).into_owned())
+    })
+    .await?
+}
+
+/// Split text into memories with a guessed category (preview, nothing saved).
+#[tauri::command]
+pub async fn split_memory_import(text: String) -> AppResult<Vec<ImportedMemory>> {
+    Ok(import::split_memories(&text))
+}
+
+/// Ask an agent to rewrite the text into clean, categorized memories (preview, nothing saved).
+#[tauri::command]
+pub async fn reformulate_memory_import(agent: AgentKind, text: String) -> AppResult<Vec<ImportedMemory>> {
+    let text = text.trim();
+    if text.is_empty() {
+        return Err(AppError::Invalid("rien à reformuler".into()));
+    }
+    if text.chars().count() > MAX_REFORMULATE_CHARS {
+        return Err(AppError::Invalid(format!(
+            "texte trop long pour une reformulation ({MAX_REFORMULATE_CHARS} caractères max) : importe-le en plusieurs fois"
+        )));
+    }
+    let answer = crate::agents::oneshot::run(agent, &import::reformulation_prompt(text)).await?;
+    import::parse_reformulated(&answer).ok_or_else(|| {
+        AppError::Other("l'agent n'a pas renvoyé de souvenirs lisibles : réessaie ou importe sans reformuler".into())
+    })
+}
+
+/// Save imported memories (`source = import:<origin>`); duplicates of existing memories are skipped.
+/// Returns how many were added.
+#[tauri::command]
+pub async fn import_memories(
+    state: State<'_, AppState>,
+    items: Vec<ImportedMemory>,
+    origin: MemoryImportOrigin,
+) -> AppResult<u32> {
+    let file = state.paths.memory_file.clone();
+    let source = format!("import:{}", origin.as_str());
+    state
+        .db
+        .call(move |c| {
+            let now = now_ms();
+            memory::import_if_changed(c, &file, now)?;
+            let mut seen: std::collections::HashSet<String> =
+                memories::list(c)?.iter().map(|m| import::normalize(&m.content)).collect();
+            let mut added = 0u32;
+            for item in &items {
+                let key = import::normalize(&item.content);
+                if key.is_empty() || !seen.insert(key) {
+                    continue;
+                }
+                memories::insert(c, item.category, &item.content, &source, now)?;
+                added += 1;
+            }
+            if added > 0 {
+                memory::export(c, &file)?;
+            }
+            Ok(added)
+        })
+        .await
 }

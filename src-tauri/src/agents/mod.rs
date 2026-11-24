@@ -14,6 +14,7 @@ pub mod codex;
 pub mod events;
 pub mod file_changes;
 pub mod generic;
+pub mod oneshot;
 pub mod process;
 pub mod registry;
 pub mod slash;
@@ -223,7 +224,17 @@ pub fn kill_process_tree(pid: u32) {
     }
     #[cfg(not(windows))]
     {
-        let _ = std::process::Command::new("kill").args(["-TERM", &format!("-{pid}")]).status();
+        // Agents run in their own process group (`process::command`): signal the whole group, then force it.
+        let group = format!("-{pid}");
+        let _ = std::process::Command::new("kill").args(["-TERM", "--", &group]).status();
         let _ = std::process::Command::new("kill").args(["-TERM", &pid.to_string()]).status();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_secs(3));
+            let _ = std::process::Command::new("kill")
+                .args(["-KILL", "--", &group])
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status();
+        });
     }
 }

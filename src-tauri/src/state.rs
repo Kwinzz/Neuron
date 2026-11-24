@@ -78,7 +78,7 @@ impl AppState {
             }
         }
         let memory_paths = crate::memory::MemoryPaths { db_path: db_path.clone(), file_path: memory_file.clone() };
-        let mcp = match std::env::current_exe() {
+        let mcp = match crate::util::neuron_exe() {
             Ok(exe) => Some((exe, memory_paths)),
             Err(err) => {
                 tracing::warn!(%err, "no executable path: memory MCP server disabled");

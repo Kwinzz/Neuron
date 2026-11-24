@@ -14,6 +14,8 @@ use crate::app_settings::AppSettings;
 
 /// Argument given to the autostart entry: start hidden in the tray.
 pub const BACKGROUND_ARG: &str = "--background";
+/// `neuron --quick`: open the quick prompt (a desktop shortcut on Wayland, where global shortcuts don't exist).
+pub const QUICK_ARG: &str = "--quick";
 /// Emitted to the quick window each time it is shown (reset + refresh the recent chats).
 pub const QUICK_OPENED_EVENT: &str = "quick://opened";
 const MAIN: &str = "main";
@@ -108,7 +110,16 @@ fn apply_shortcut(app: &AppHandle, settings: &AppSettings) -> Result<(), String>
                 toggle_quick(app);
             }
         })
-        .map_err(|e| format!("raccourci « {} » indisponible (déjà pris par une autre app ?) : {e}", quick.shortcut))?;
+        .map_err(|e| {
+            if cfg!(target_os = "linux") && std::env::var_os("WAYLAND_DISPLAY").is_some() {
+                format!(
+                    "raccourci global indisponible sous Wayland : lie la commande « neuron --quick » à {} dans les                      raccourcis de ton bureau",
+                    quick.shortcut
+                )
+            } else {
+                format!("raccourci « {} » indisponible (déjà pris par une autre app ?) : {e}", quick.shortcut)
+            }
+        })?;
     *current = Some(shortcut);
     Ok(())
 }
@@ -172,9 +183,13 @@ pub fn setup(app: &AppHandle, settings: &AppSettings) {
     }
     let settings = sync_autostart_setting(app, settings);
     apply(app, &settings);
-    let background = std::env::args().any(|a| a == BACKGROUND_ARG);
+    let quick = std::env::args().any(|a| a == QUICK_ARG);
+    let background = quick || std::env::args().any(|a| a == BACKGROUND_ARG);
     if !background {
         show_main(app);
+    }
+    if quick {
+        toggle_quick(app);
     }
 }
 

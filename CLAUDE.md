@@ -28,7 +28,8 @@ src-tauri/
     state.rs                AppState partagé (managed state Tauri)
     db/                     connexion, PRAGMAs, migrations (PRAGMA user_version) + requêtes par domaine
                             (projects, threads, providers, usage) — fonctions sync `fn(&Connection, ...)`
-    util.rs                 now_ms, constantes de durée
+    util.rs                 now_ms, constantes de durée, neuron_exe
+    env_path.rs             PATH des CLI (registre Windows, shell de connexion Linux)
     app_settings.rs         Paramètres (document JSON unique dans `settings`, valeurs par défaut tolérantes)
     context.rs              contexte projet : .neuron/context.md, instantané git, fichiers récents, assemblage
     memory/                 mémoire globale (memory.md ⇄ SQLite) + serveur MCP stdio embarqué (mcp.rs)
@@ -188,6 +189,9 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
   officielle, re-vérification par le front (`stores/access.ts`). `refresh_path()` relit le PATH (registre + dossiers
   des installateurs). Erreurs d'agent classées `AccessIssue` (`ThreadError.issue`, `ChatItem::Error.issue`, meta du
   message) → bouton « Installer » / « Se connecter » dans le chat.
+- **Import de mémoire** (`memory/import.rs`, vue Mémoire → Importer) : texte collé / fichier / fichiers des CLI →
+  `split_memories` (aperçu modifiable) → `import_memories` (`source = import:<origine>`, doublons ignorés) ;
+  reformulation optionnelle par un agent via `agents/oneshot.rs` (appel unique sans session, dossier temporaire).
 - `rate_limit_event` (fenêtres 5h / 7j de l'abonnement Claude) → `settings.claude.rate_limits` → `ProviderUsage.live`.
 - **Quotas Antigravity** : `agy --print /quota --output-format json` (répondu par le CLI, 0 token, **refusé dans une
   session stream-json**) → groupes de modèles × fenêtres 5 h / hebdo (`antigravity/quota.rs`), rafraîchi après chaque
@@ -248,6 +252,16 @@ scripts/neon-bridge.sh -d . -f brief.md     # déléguer une tâche UI à Antigr
   `tauri build` (ex. `--no-bundle` avec un identifiant et un `NEURON_DATA_DIR` à part) avant de publier.
 - Dev et app installée partagent l'identifiant `dev.neuron.app` : mêmes données, et une seule instance à la fois
   (lancer l'une pendant que l'autre tourne ramène simplement la fenêtre existante).
+
+## Linux / Arch
+
+- Paquet : `packaging/arch/PKGBUILD` (`cd packaging/arch && makepkg -si`, construit le dépôt local), mode d'emploi
+  dans `packaging/arch/README.md`. `tauri.linux.conf.json` surcharge les cibles (`deb`, `appimage`).
+- Ne **jamais** appeler `std::env::set_var` sous Unix après le démarrage : le PATH des enfants passe par
+  `env_path::path()` (shell de connexion + dossiers connus), appliqué dans `process::command`.
+- Agents dans leur propre groupe de processus (`process_group(0)`) pour que l'arrêt tue tout l'arbre.
+- Wayland : pas de raccourci global → `neuron --quick`. WebKitGTK : `WEBKIT_DISABLE_DMABUF_RENDERER=1` par défaut.
+- Code `#[cfg(unix)]` non compilable depuis Windows (WebKitGTK) : le relire avec soin, le valider sur Arch.
 
 ## Workflow par phase
 

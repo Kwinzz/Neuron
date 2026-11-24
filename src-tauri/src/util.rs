@@ -9,3 +9,12 @@ pub fn now_ms() -> i64 {
 
 pub const HOUR_MS: i64 = 3_600_000;
 pub const DAY_MS: i64 = 24 * HOUR_MS;
+
+/// Path of Neuron's own executable, as agents must launch it (memory MCP server). An AppImage runs from a
+/// temporary mount that changes at each launch: its stable path is `$APPIMAGE`.
+pub fn neuron_exe() -> std::io::Result<std::path::PathBuf> {
+    if let Some(appimage) = std::env::var_os("APPIMAGE").filter(|p| !p.is_empty()) {
+        return Ok(std::path::PathBuf::from(appimage));
+    }
+    std::env::current_exe()
+}

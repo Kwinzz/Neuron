@@ -1,6 +1,7 @@
-import { Bot, FileText, UserRound } from "lucide-react";
+import { Bot, Download, FileText, UserRound } from "lucide-react";
 import { AgentLogo } from "@/components/ui/AgentLogo";
 import { describeSource } from "./categories";
+import { IMPORT_ORIGINS } from "./importOrigins";
 
 interface MemorySourceProps {
   source: string;
@@ -23,6 +24,18 @@ export function MemorySource({ source }: MemorySourceProps) {
       <span className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
         <FileText className="size-3 shrink-0" aria-hidden />
         <span className="truncate font-mono">memory.md</span>
+      </span>
+    );
+  }
+
+  if (described.kind === "import") {
+    return (
+      <span className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+        <Download className="size-3 shrink-0" aria-hidden />
+        <span className="truncate">
+          {/* « Importé de un import » reads badly: unknown / « Autre » origins just say « Importé ». */}
+          {described.label === IMPORT_ORIGINS.other.source ? "Importé" : `Importé de ${described.label}`}
+        </span>
       </span>
     );
   }

@@ -1,0 +1,45 @@
+# Neuron — paquet Arch Linux construit depuis les sources du dépôt.
+# Depuis un clone :  cd packaging/arch && makepkg -si
+pkgname=neuron
+pkgver=0.1.2
+pkgrel=1
+pkgdesc="Poste de pilotage graphique des agents IA en ligne de commande (Claude Code, Codex, Antigravity)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/Kwinzz/Neuron"
+license=('custom')
+depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator' 'openssl' 'hicolor-icon-theme')
+makedepends=('rust' 'cargo' 'nodejs' 'npm' 'git')
+optdepends=(
+  'claude-code: agent Claude Code (sinon bouton « Installer » dans Neuron)'
+  'libnotify: notifications de bureau'
+  'kitty: terminal ouvert pour installer / connecter les agents (ou alacritty, konsole, gnome-terminal…)'
+)
+options=('!lto' '!debug')
+# Pas de source à télécharger : on construit le dépôt qui contient ce PKGBUILD.
+source=()
+sha256sums=()
+
+_root() { realpath "$startdir/../.."; }
+
+pkgver() {
+  sed -n 's/^\s*"version": "\(.*\)",/\1/p' "$(_root)/src-tauri/tauri.conf.json" | head -n1
+}
+
+build() {
+  cd "$(_root)"
+  export CARGO_TARGET_DIR="$srcdir/target"
+  npm ci
+  npm run tauri build -- --no-bundle
+}
+
+package() {
+  local root
+  root="$(_root)"
+  install -Dm755 "$srcdir/target/release/neuron" "$pkgdir/usr/bin/neuron"
+  install -Dm644 "$startdir/neuron.desktop" "$pkgdir/usr/share/applications/neuron.desktop"
+  install -Dm644 "$root/src-tauri/icons/32x32.png" "$pkgdir/usr/share/icons/hicolor/32x32/apps/neuron.png"
+  install -Dm644 "$root/src-tauri/icons/64x64.png" "$pkgdir/usr/share/icons/hicolor/64x64/apps/neuron.png"
+  install -Dm644 "$root/src-tauri/icons/128x128.png" "$pkgdir/usr/share/icons/hicolor/128x128/apps/neuron.png"
+  install -Dm644 "$root/src-tauri/icons/128x128@2x.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/neuron.png"
+  install -Dm644 "$root/src-tauri/icons/icon.png" "$pkgdir/usr/share/icons/hicolor/512x512/apps/neuron.png"
+}

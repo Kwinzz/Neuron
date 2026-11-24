@@ -7,6 +7,7 @@ pub mod commands;
 pub mod context;
 pub mod db;
 pub mod desktop;
+pub mod env_path;
 pub mod error;
 pub mod memory;
 pub mod notifications;
@@ -29,7 +30,14 @@ pub fn run() {
 
     let app = tauri::Builder::default()
         // First: a second launch (shortcut, autostart while running) just brings the window back.
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| desktop::show_main(app)))
+        // `neuron --quick` (bound to a desktop shortcut, Wayland) opens the quick prompt of the running instance.
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            if args.iter().any(|a| a == desktop::QUICK_ARG) {
+                desktop::toggle_quick(app);
+            } else {
+                desktop::show_main(app);
+            }
+        }))
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec![desktop::BACKGROUND_ARG]),
@@ -39,7 +47,8 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .setup(move |app| {
             // CLIs installed since the session started (or in the installers' folders) are found right away.
-            agents::access::refresh_path();
+            env_path::probe_login_shell();
+            env_path::refresh_path();
             let state = AppState::init(app.handle(), started)?;
             tracing::info!(
                 setup_ms = state.setup_ms,
@@ -119,6 +128,11 @@ pub fn run() {
             commands::memory::search_memories,
             commands::memory::memory_info,
             commands::memory::open_memory_file,
+            commands::memory::memory_import_sources,
+            commands::memory::read_memory_import_file,
+            commands::memory::split_memory_import,
+            commands::memory::reformulate_memory_import,
+            commands::memory::import_memories,
             commands::memory::antigravity_mcp_status,
             commands::memory::connect_antigravity_mcp,
             commands::memory::disconnect_antigravity_mcp,

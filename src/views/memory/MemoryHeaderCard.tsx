@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { cn } from "cn";
-import { Brain, FileText, FolderOpen, Loader2, Plus } from "lucide-react";
+import { Brain, Download, FileText, FolderOpen, Loader2, Plus } from "lucide-react";
 import type { MemoryCategory } from "@/bindings/MemoryCategory";
 import type { MemoryInfo } from "@/bindings/MemoryInfo";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,8 @@ interface MemoryHeaderCardProps {
   counts: Record<MemoryCategory, number>;
   total: number;
   onNew: () => void;
+  /** Open the « Importer une mémoire » dialog. */
+  onImport: () => void;
   /** Jump to a category card (the view clears an active search first). */
   onJumpToCategory: (category: MemoryCategory) => void;
 }
@@ -32,6 +34,7 @@ export function MemoryHeaderCard({
   counts,
   total,
   onNew,
+  onImport,
   onJumpToCategory,
 }: MemoryHeaderCardProps) {
   const [openingFile, setOpeningFile] = useState(false);
@@ -87,6 +90,10 @@ export function MemoryHeaderCard({
               <FileText aria-hidden />
             )}
             <span>Ouvrir memory.md</span>
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={onImport}>
+            <Download aria-hidden />
+            <span>Importer</span>
           </Button>
           <Button type="button" size="sm" onClick={onNew}>
             <Plus aria-hidden />
