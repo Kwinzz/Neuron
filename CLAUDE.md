@@ -255,6 +255,8 @@ scripts/neon-bridge.sh -d . -f brief.md     # déléguer une tâche UI à Antigr
 
 ## Linux / Arch
 
+- Installation en une commande : `install.sh` (racine, `curl … | bash`) — pacman / apt / dnf, menu mise à jour /
+  réinstallation / désinstallation, lit les réponses sur `/dev/tty`. Garder LF (`.gitattributes`) et `bash -n` vert.
 - Paquet : `packaging/arch/PKGBUILD` (`cd packaging/arch && makepkg -si`, construit le dépôt local), mode d'emploi
   dans `packaging/arch/README.md`. `tauri.linux.conf.json` surcharge les cibles (`deb`, `appimage`).
 - Ne **jamais** appeler `std::env::set_var` sous Unix après le démarrage : le PATH des enfants passe par

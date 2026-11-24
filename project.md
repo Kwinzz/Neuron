@@ -88,6 +88,17 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-24 — Installation Linux en une commande
+- `install.sh` à la racine : `curl -fsSL https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh | bash`.
+  Détecte pacman / apt / dnf, installe les dépendances, Rust (rustup si absent, hors Arch) et vérifie Node ≥ 20.19,
+  clone ou met à jour les sources dans `~/.local/share/neuron-src`, compile et installe (Arch : `makepkg -sif` du
+  PKGBUILD ; Debian : `.deb` ; Fedora : `.rpm` via `tauri build --bundles`). Déjà installé → menu mettre à jour /
+  réinstaller / désinstaller (questions lues sur `/dev/tty`, compatible `curl | bash`) ; options `--install`,
+  `--update`, `--reinstall`, `--uninstall`, `--yes`. Désinstallation : paquet + entrée de démarrage auto ; données
+  (`~/.local/share/dev.neuron.app`, `~/.neuron`) supprimées seulement sur demande explicite, jamais avec `--yes`.
+- Testé ici par simulation (faux `uname` / `pacman` / `sudo`) : désinstallation et mise à jour jusqu'à `makepkg` ;
+  à valider en vrai sur Arch.
+
 ### 2026-11-24 — README d'installation
 - `README.md` à la racine : présentation, installation Windows (installateur de la release, SmartScreen,
   compilation), Linux (Arch via `makepkg -si`, autres distributions via `tauri build` → `.deb` / AppImage,

@@ -4,6 +4,14 @@ Paquet construit depuis les sources de ce dépôt (binaire `/usr/bin/neuron`, en
 
 ## Installer
 
+Le plus simple, depuis n'importe où (propose aussi mise à jour / désinstallation si Neuron est déjà là) :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh | bash
+```
+
+À la main :
+
 ```bash
 sudo pacman -S --needed base-devel git rust nodejs npm webkit2gtk-4.1 gtk3 libayatana-appindicator
 git clone https://github.com/Kwinzz/Neuron

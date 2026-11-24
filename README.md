@@ -38,7 +38,30 @@ L'installateur est créé dans `src-tauri\target\release\bundle\nsis\`.
 
 ## Installation sous Linux
 
-### Arch Linux (et dérivées : EndeavourOS, Manjaro, CachyOS…)
+### En une commande (Arch, Debian / Ubuntu, Fedora)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh | bash
+```
+
+Le script installe les dépendances (sudo est demandé), récupère les sources, compile Neuron (quelques minutes la
+première fois) et l'installe avec le gestionnaire de paquets de ta distribution : `pacman` sur Arch et dérivées
+(EndeavourOS, Manjaro, CachyOS…), `.deb` sur Debian / Ubuntu, `.rpm` sur Fedora.
+
+**Déjà installé ?** Relance la même commande : elle propose de **mettre à jour**, **réinstaller** ou
+**désinstaller** (tes chats et ta mémoire sont gardés, sauf si tu demandes de les supprimer).
+
+Sans question :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh | bash -s -- --update      # ou --install, --reinstall
+curl -fsSL https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh | bash -s -- --uninstall
+```
+
+(`--yes` répond oui aux questions ; la suppression des données n'est jamais automatique.)
+Les sources compilées restent dans `~/.local/share/neuron-src` pour accélérer les mises à jour.
+
+### Arch Linux à la main
 
 Le paquet est construit depuis les sources avec `makepkg` (compter quelques minutes pour la première compilation) :
 
@@ -60,9 +83,9 @@ cd packaging/arch && makepkg -si
 
 Désinstallation : `sudo pacman -R neuron`.
 
-### Autres distributions (Debian, Ubuntu, Fedora…)
+### Autres distributions, à la main
 
-Pas encore de paquet tout prêt : compile avec Tauri, qui produit un `.deb` et un AppImage.
+Compile avec Tauri, qui produit un `.deb`, un `.rpm` ou un AppImage.
 
 ```bash
 # Debian / Ubuntu : dépendances de compilation
