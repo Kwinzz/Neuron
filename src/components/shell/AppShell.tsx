@@ -1,3 +1,4 @@
+import { whenIdle } from "@/lib/idle";
 import { type CSSProperties, Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { cn } from "cn";
 import { CommandPalette } from "@/components/palette/CommandPalette";
@@ -38,9 +39,8 @@ function usePrefetchViews(): void {
     const warm = () => {
       for (const load of [loadHome, loadChat, loadDraft, loadProject, loadMemory]) void load().catch(() => undefined);
     };
-    // WebView2 has requestIdleCallback; the timeout only bounds how long the warm-up may wait.
-    const id = window.requestIdleCallback(warm, { timeout: 2000 });
-    return () => window.cancelIdleCallback(id);
+    // The timeout only bounds how long the warm-up may wait (fallback without requestIdleCallback: WebKitGTK).
+    return whenIdle(warm, 2000);
   }, []);
 }
 

@@ -19,6 +19,15 @@ interface ImportPreviewRowProps {
   onRemove: (id: number) => void;
 }
 
+/**
+ * Visible lines for the content: Chromium sizes the field itself (`field-sizing: content`), WebKitGTK (Linux)
+ * doesn't, so give it a height that fits (~70 characters per line, 8 lines max, then it scrolls).
+ */
+function estimateRows(content: string): number {
+  const lines = content.split("\n").reduce((n, line) => n + Math.max(1, Math.ceil(line.length / 70)), 0);
+  return Math.min(8, Math.max(1, lines));
+}
+
 export const ImportPreviewRow = memo(function ImportPreviewRow({
   row,
   index,
@@ -46,7 +55,7 @@ export const ImportPreviewRow = memo(function ImportPreviewRow({
 
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <Textarea
-          rows={1}
+          rows={estimateRows(row.content)}
           value={row.content}
           onChange={(e) => onChange(row.id, { content: e.target.value })}
           disabled={disabled}

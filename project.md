@@ -88,6 +88,12 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-24 — Premier lancement sur Arch : compatibilité WebKitGTK
+- Écran planté au démarrage : `window.requestIdleCallback` n'existe pas dans WebKitGTK → `lib/idle.ts::whenIdle`
+  (repli `setTimeout`), utilisé par le préchargement des vues (`AppShell`).
+- `field-sizing: content` non géré par WebKit : hauteur des lignes de l'aperçu d'import calculée d'après le texte
+  (la zone de saisie du chat se redimensionnait déjà en JS).
+
 ### 2026-11-24 — Installation Linux en une commande
 - `install.sh` à la racine : `curl -fsSL https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh | bash`.
   Détecte pacman / apt / dnf, installe les dépendances, Rust (rustup si absent, hors Arch) et vérifie Node ≥ 20.19,

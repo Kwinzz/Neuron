@@ -262,6 +262,8 @@ scripts/neon-bridge.sh -d . -f brief.md     # déléguer une tâche UI à Antigr
 - Ne **jamais** appeler `std::env::set_var` sous Unix après le démarrage : le PATH des enfants passe par
   `env_path::path()` (shell de connexion + dossiers connus), appliqué dans `process::command`.
 - Agents dans leur propre groupe de processus (`process_group(0)`) pour que l'arrêt tue tout l'arbre.
+- Front sous WebKitGTK (≈ Safari) : pas de `requestIdleCallback` (→ `lib/idle.ts`), pas de `field-sizing`
+  (hauteur en JS ou `rows`). Toute API récente côté Chromium doit avoir un repli.
 - Wayland : pas de raccourci global → `neuron --quick`. WebKitGTK : `WEBKIT_DISABLE_DMABUF_RENDERER=1` par défaut.
 - Code `#[cfg(unix)]` non compilable depuis Windows (WebKitGTK) : le relire avec soin, le valider sur Arch.
 
