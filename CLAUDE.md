@@ -273,6 +273,9 @@ scripts/neon-bridge.sh -d . -f brief.md     # déléguer une tâche UI à Antigr
   `html.platform-linux`, fin de `styles/index.css`), pas de transitions CSS (durée 0 sous Linux), graphiques sans
   animation (`IS_LINUX`). DMA-BUF désactivé uniquement si NVIDIA est la seule carte
   (`env_path::needs_dmabuf_workaround` ; jamais sur un portable hybride).
+- Jamais de mesure de mise en page (`offsetTop`, `getBoundingClientRect`) dans une boucle rAF permanente : observer
+  (`ResizeObserver` / `MutationObserver`) et arrêter la boucle une fois stable. Pas d'animation infinie sur un élément
+  caché. Sous Linux, pas d'animation de fermeture Radix (`[data-state="closed"]`, le menu « revenait » sinon).
 - Wayland : pas de raccourci global → `neuron --quick`. WebKitGTK : `WEBKIT_DISABLE_DMABUF_RENDERER=1` seulement si NVIDIA est la seule carte.
 - Code `#[cfg(unix)]` non compilable depuis Windows (WebKitGTK) : le relire avec soin, le valider sur Arch.
 

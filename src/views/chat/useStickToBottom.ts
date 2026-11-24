@@ -1,4 +1,5 @@
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
+import { IS_LINUX } from "@/lib/platform";
 
 const BOTTOM_THRESHOLD_PX = 120;
 
@@ -87,7 +88,8 @@ export function useStickToBottom(
         rafRef.current = null;
         root.scrollTo({
           top: root.scrollHeight,
-          behavior: smooth ? "smooth" : "auto",
+          // WebKitGTK's smooth scroll fights the follow-on-growth above while the answer arrives: jump on Linux.
+          behavior: smooth && !IS_LINUX ? "smooth" : "auto",
         });
       });
     },

@@ -88,6 +88,16 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-24 — Chat sous Linux : lag à l'envoi, logo figé, menus qui clignotent
+- **Logo de l'agent** (`AgentCursor`) : mesurait la conversation à chaque image pendant tout le tour (une mise en
+  page forcée par image) → piloté par `ResizeObserver` + `MutationObserver`, boucle rAF arrêtée une fois arrivé ;
+  `invisible` en plus de `opacity-0` (WebKitGTK pouvait laisser le logo affiché, immobile, après la fin) ;
+  animation « respiration » seulement quand il est visible.
+- « Working » : sous Linux, pulsation d'opacité au lieu du dégradé animé (repeint à chaque image).
+- Défilement vers le bas à l'envoi : instantané sous Linux (le défilement doux se battait avec le suivi du contenu).
+- **Menus** (modèle, raisonnement…) qui disparaissaient, réapparaissaient ~1 s puis disparaissaient : animation de
+  fermeture Radix sous WebKitGTK → pas d'animation de fermeture sous Linux (`[data-state="closed"]`).
+
 ### 2026-11-24 — Rendu GPU rétabli sur les portables hybrides (Linux)
 - Le correctif « écran blanc NVIDIA » (`WEBKIT_DISABLE_DMABUF_RENDERER=1`) se déclenchait dès que le pilote NVIDIA
   était chargé, donc aussi sur les portables Intel/AMD + NVIDIA, où la fenêtre est dessinée par la puce intégrée :

@@ -301,3 +301,25 @@ html.platform-linux *::after {
   transition-duration: 0s !important;
   transition-delay: 0s !important;
 }
+/* "Working" label: the shimmer animates a text-clipped gradient (a full repaint every frame for the whole
+   turn); on Linux an opacity pulse instead, which the compositor handles alone. */
+html.platform-linux .chat-working-text {
+  background: none;
+  color: var(--muted-foreground);
+  animation: chat-pulse-lite 1.8s ease-in-out infinite;
+}
+@keyframes chat-pulse-lite {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+/* Menus, selects, popovers, tooltips, dialogs: no closing animation on Linux. Radix waits for the end of the exit
+   animation before removing them, and under WebKitGTK the menu could snap back for a moment after a choice
+   (disappear, reappear ~1 s, disappear). Opening animations stay. */
+html.platform-linux [data-state="closed"] {
+  animation: none !important;
+}
