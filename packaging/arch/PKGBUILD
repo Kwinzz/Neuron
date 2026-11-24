@@ -8,7 +8,7 @@ arch=('x86_64' 'aarch64')
 url="https://github.com/Kwinzz/Neuron"
 license=('custom')
 depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator' 'openssl' 'hicolor-icon-theme')
-makedepends=('rust' 'cargo' 'nodejs' 'npm' 'git')
+makedepends=('rust' 'cargo' 'nodejs' 'npm' 'git' 'mold')
 optdepends=(
   'claude-code: agent Claude Code (sinon bouton « Installer » dans Neuron)'
   'libnotify: notifications de bureau'
@@ -28,6 +28,9 @@ pkgver() {
 build() {
   cd "$(_root)"
   export CARGO_TARGET_DIR="$srcdir/target"
+  # Pas de LTO, compilation incrémentale, mold si présent (voir le fichier).
+  # shellcheck disable=SC1091
+  . "$(_root)/packaging/linux-build-env.sh"
   npm ci
   npm run tauri build -- --no-bundle
 }

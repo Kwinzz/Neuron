@@ -88,6 +88,13 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-24 — Compilation Linux plus rapide
+- Les deux dernières étapes (crate `neuron` + édition des liens) prenaient ~5 min : profil release de Windows
+  (LTO complet, `codegen-units = 1`). `packaging/linux-build-env.sh` (sourcé par le PKGBUILD et `install.sh`) :
+  pas de LTO, 16 unités, compilation incrémentale (les mises à jour ne recompilent que ce qui a changé), éditeur
+  de liens `mold` (ajouté aux dépendances), npm sans audit / fund. `NEURON_FULL_OPT=1` garde le profil complet.
+  Windows (installateur NSIS) inchangé.
+
 ### 2026-11-24 — Fluidité sous Linux, Accueil remonté en haut
 - **Linux lent / saccadé** : sous WebKitGTK, les flous et ombres animées sont repeints à chaque image. Classe
   `platform-linux` sur `<html>` (`main.tsx`) → sans `backdrop-filter`, apparition des blocs de réponse sans flou,

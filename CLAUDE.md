@@ -261,6 +261,8 @@ scripts/neon-bridge.sh -d . -f brief.md     # déléguer une tâche UI à Antigr
   dans `packaging/arch/README.md`. `tauri.linux.conf.json` surcharge les cibles (`deb`, `appimage`).
 - Ne **jamais** appeler `std::env::set_var` sous Unix après le démarrage : le PATH des enfants passe par
   `env_path::path()` (shell de connexion + dossiers connus), appliqué dans `process::command`.
+- Compilation Linux allégée par `packaging/linux-build-env.sh` (sans LTO, incrémentale, mold) : ne pas remettre
+  le profil release complet dans le PKGBUILD / `install.sh` (5 min de compilation pour rien).
 - Agents dans leur propre groupe de processus (`process_group(0)`) pour que l'arrêt tue tout l'arbre.
 - Front sous WebKitGTK (≈ Safari) : pas de `requestIdleCallback` (→ `lib/idle.ts`), pas de `field-sizing`
   (hauteur en JS ou `rows`). Toute API récente côté Chromium doit avoir un repli.

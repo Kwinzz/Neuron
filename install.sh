@@ -114,7 +114,7 @@ install_deps() {
   step "Dépendances de compilation"
   case "$FAMILY" in
     arch)
-      local deps=(base-devel git rust nodejs npm webkit2gtk-4.1 gtk3 libayatana-appindicator openssl)
+      local deps=(base-devel git rust nodejs npm mold webkit2gtk-4.1 gtk3 libayatana-appindicator openssl)
       if ! sudo pacman -S --needed --noconfirm "${deps[@]}"; then
         # Base de paquets locale périmée (le miroir n'a plus ces versions → 404). Sur Arch, la seule bonne
         # réponse est une mise à jour complète (-Syu), jamais -Sy seul (mise à jour partielle).
@@ -126,11 +126,11 @@ install_deps() {
       ;;
     debian)
       sudo apt-get update
-      sudo apt-get install -y build-essential curl wget file git pkg-config libssl-dev libxdo-dev \
+      sudo apt-get install -y build-essential curl wget file git pkg-config libssl-dev libxdo-dev mold \
         libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
       ;;
     fedora)
-      sudo dnf install -y webkit2gtk4.1-devel openssl-devel curl wget file git libappindicator-gtk3-devel \
+      sudo dnf install -y webkit2gtk4.1-devel openssl-devel curl wget file git mold libappindicator-gtk3-devel \
         librsvg2-devel libxdo-devel gcc gcc-c++ make
       ;;
   esac
@@ -196,7 +196,12 @@ build_and_install() {
     debian | fedora)
       local bundle=deb
       [ "$FAMILY" = fedora ] && bundle=rpm
-      (cd "$SRC_DIR" && npm ci && npm run tauri build -- --bundles "$bundle")
+      (
+        cd "$SRC_DIR"
+        # shellcheck disable=SC1091
+        . packaging/linux-build-env.sh
+        npm ci && npm run tauri build -- --bundles "$bundle"
+      )
       local pkg
       pkg="$(ls -t "$SRC_DIR"/src-tauri/target/release/bundle/"$bundle"/*."$bundle" 2>/dev/null | head -n1)"
       [ -n "$pkg" ] || die "Paquet .$bundle introuvable après la compilation."
