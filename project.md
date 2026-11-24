@@ -88,6 +88,16 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-24 — Couleurs noires du graphe dans l'app installée (v0.1.2)
+- Cause (vérifiée sur un build de release isolé, via le protocole DevTools) : en production, Tauri ajoute des
+  empreintes (hash) à la CSP des ressources embarquées ; dès qu'une empreinte figure dans `style-src`, le
+  navigateur ignore `'unsafe-inline'` et bloque les `<style>` injectés à l'exécution — dont celui du composant de
+  graphe shadcn qui définit `--color-<série>` → barres (et anneau du cache) en noir. Invisible en dev (front servi
+  par Vite, sans empreintes).
+- Correctif : `app.security.dangerousDisableAssetCspModification: ["style-src"]` — la CSP déclarée (`style-src
+  'self' 'unsafe-inline'`) s'applique telle quelle. Vérifié : barres orange avant et après changement de période.
+- Version 0.1.2.
+
 ### 2026-11-24 — Usage réel des abonnements, données de démo retirées, anneau du cache (v0.1.1)
 - **Usage hors Neuron** : `usage_import.rs` importe les journaux locaux de Claude Code (`~/.claude/projects`) et de
   Codex (`~/.codex/sessions`) — incrémental (position par fichier dans `usage_import_files`), dédoublonné

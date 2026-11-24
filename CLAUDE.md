@@ -236,6 +236,10 @@ scripts/neon-bridge.sh -d . -f brief.md     # déléguer une tâche UI à Antigr
   `header.bmp` (150×57) : visuels générés depuis `src/assets/neuron-mark.png`.
 - Au démarrage de l'app installée, l'entrée de démarrage du système fait foi et met à jour le réglage
   `background.launchAtLogin` (`desktop::sync_autostart_setting`) ; un build de dev ne touche jamais au démarrage.
+- **CSP en production** : `dangerousDisableAssetCspModification: ["style-src"]` est indispensable — sinon Tauri
+  ajoute des empreintes à `style-src`, `'unsafe-inline'` est ignoré et les `<style>` injectés à l'exécution
+  (graphes shadcn `--color-*`, toasts) sont bloqués. Ce genre de bug ne se voit **qu'en release** : tester un
+  `tauri build` (ex. `--no-bundle` avec un identifiant et un `NEURON_DATA_DIR` à part) avant de publier.
 - Dev et app installée partagent l'identifiant `dev.neuron.app` : mêmes données, et une seule instance à la fois
   (lancer l'une pendant que l'autre tourne ramène simplement la fenêtre existante).
 
