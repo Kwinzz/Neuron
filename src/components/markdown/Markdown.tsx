@@ -4,6 +4,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
 import { CodeBlock } from "./CodeBlock";
+import { splitBlocks } from "./splitBlocks";
 import "./markdown.css";
 
 type ReactMarkdownProps = ComponentProps<typeof ReactMarkdown>;
@@ -55,7 +56,21 @@ interface MarkdownProps {
    * est ré-analysé à chaque mise à jour, colorer tous ses blocs à chaque fois saccade (surtout sous Linux).
    */
   highlight?: boolean;
+  /**
+   * Réponse en cours d'écriture : rendue bloc par bloc (seul le dernier change, les autres ne sont pas ré-analysés à
+   * chaque mise à jour). Analysée d'un seul tenant une fois terminée.
+   */
+  streaming?: boolean;
 }
+
+/** One top-level block of a streaming answer; unchanged blocks keep their parsed output. */
+const MarkdownBlock = memo(function MarkdownBlock({ text, highlight }: { text: string; highlight: boolean }) {
+  return (
+    <ReactMarkdown remarkPlugins={REMARK} rehypePlugins={highlight ? REHYPE : NO_REHYPE} components={COMPONENTS}>
+      {text}
+    </ReactMarkdown>
+  );
+});
 
 export const Markdown = memo(function Markdown({
   children,
@@ -64,6 +79,7 @@ export const Markdown = memo(function Markdown({
   className,
   trailing,
   highlight = true,
+  streaming = false,
 }: MarkdownProps) {
   return (
     <div
@@ -74,9 +90,13 @@ export const Markdown = memo(function Markdown({
         className,
       )}
     >
-      <ReactMarkdown remarkPlugins={REMARK} rehypePlugins={highlight ? REHYPE : NO_REHYPE} components={COMPONENTS}>
-        {children}
-      </ReactMarkdown>
+      {streaming ? (
+        splitBlocks(children).map((block, i) => <MarkdownBlock key={i} text={block} highlight={highlight} />)
+      ) : (
+        <ReactMarkdown remarkPlugins={REMARK} rehypePlugins={highlight ? REHYPE : NO_REHYPE} components={COMPONENTS}>
+          {children}
+        </ReactMarkdown>
+      )}
       {trailing}
     </div>
   );

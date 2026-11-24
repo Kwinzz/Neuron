@@ -276,6 +276,8 @@ scripts/neon-bridge.sh -d . -f brief.md     # déléguer une tâche UI à Antigr
 - Jamais de mesure de mise en page (`offsetTop`, `getBoundingClientRect`) dans une boucle rAF permanente : observer
   (`ResizeObserver` / `MutationObserver`) et arrêter la boucle une fois stable. Pas d'animation infinie sur un élément
   caché. Sous Linux, pas d'animation de fermeture Radix (`[data-state="closed"]`, le menu « revenait » sinon).
+- Sous Linux, pas d'animation infinie d'opacité / d'échelle (calque WebKit → trace qui reste à l'écran) : visibilité ou
+  couleur seulement (fin de `styles/index.css`). Événements `agent://event` : `emit_to("main")` uniquement.
 - Wayland : pas de raccourci global → `neuron --quick`. WebKitGTK : `WEBKIT_DISABLE_DMABUF_RENDERER=1` seulement si NVIDIA est la seule carte.
 - Code `#[cfg(unix)]` non compilable depuis Windows (WebKitGTK) : le relire avec soin, le valider sur Arch.
 

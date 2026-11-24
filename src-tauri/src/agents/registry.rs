@@ -113,7 +113,9 @@ async fn run_agy_command(app: AppHandle, db: Db, rt: ThreadRuntime, name: &'stat
 
 fn emit(app: &AppHandle, thread_id: &str, event: AgentEvent) {
     let envelope = AgentEventEnvelope { thread_id: thread_id.to_string(), ts: now_ms(), event };
-    if let Err(err) = app.emit(AGENT_EVENT_CHANNEL, envelope) {
+    // Main window only: it is the single consumer (`useAgentEventBridge`). Broadcasting also ran every token
+    // through the hidden quick-prompt webview — one script evaluation per event, costly in WebKitGTK.
+    if let Err(err) = app.emit_to("main", AGENT_EVENT_CHANNEL, envelope) {
         tracing::warn!(%err, "emit failed");
     }
 }

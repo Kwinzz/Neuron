@@ -280,18 +280,6 @@ html.platform-linux .chat-reveal > * {
     transform: translateY(4px);
   }
 }
-html.platform-linux .chat-working-logo {
-  animation-name: chat-breathe-lite;
-}
-@keyframes chat-breathe-lite {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.06);
-  }
-}
 /* Hover / focus transitions: in WebKitGTK each frame of a 150 ms color fade can repaint the whole window, so
    moving the mouse across buttons and cards made the UI stutter. Instant state changes on Linux (entrance
    animations — `animate-in`, menus, dialogs — are animations, not transitions, and stay). */
@@ -301,25 +289,57 @@ html.platform-linux *::after {
   transition-duration: 0s !important;
   transition-delay: 0s !important;
 }
-/* "Working" label: the shimmer animates a text-clipped gradient (a full repaint every frame for the whole
-   turn); on Linux an opacity pulse instead, which the compositor handles alone. */
-html.platform-linux .chat-working-text {
-  background: none;
-  color: var(--muted-foreground);
-  animation: chat-pulse-lite 1.8s ease-in-out infinite;
-}
-@keyframes chat-pulse-lite {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 1;
-  }
-}
 /* Menus, selects, popovers, tooltips, dialogs: no closing animation on Linux. Radix waits for the end of the exit
    animation before removing them, and under WebKitGTK the menu could snap back for a moment after a choice
    (disappear, reappear ~1 s, disappear). Opening animations stay. */
 html.platform-linux [data-state="closed"] {
   animation: none !important;
+}
+
+/* Endless opacity / scale animations get their own compositing layer in WebKitGTK, and when the element goes away
+   (end of a turn, finished tool) its last frame could stay on screen: a frozen agent logo, a white caret bar. On
+   Linux they become paint-only animations (visibility, colors) or stay still. */
+html.platform-linux .chat-working-logo,
+html.platform-linux .chat-pulse,
+html.platform-linux .animate-pulse {
+  animation: none !important;
+}
+html.platform-linux .animate-ping {
+  display: none;
+}
+html.platform-linux .chat-caret,
+html.platform-linux .chat-streaming > :is(p, h1, h2, h3, h4, h5, h6):last-child::after,
+html.platform-linux .chat-streaming > :is(ul, ol):last-child > li:last-child::after {
+  animation-name: chat-blink-paint;
+}
+@keyframes chat-blink-paint {
+  from {
+    visibility: visible;
+  }
+  to {
+    visibility: hidden;
+  }
+}
+html.platform-linux .chat-working-text {
+  background: none;
+  color: var(--muted-foreground);
+  animation: chat-text-paint 1.8s ease-in-out infinite;
+}
+@keyframes chat-text-paint {
+  50% {
+    color: var(--foreground);
+  }
+}
+html.platform-linux .chat-working-dot {
+  animation-name: chat-dot-paint;
+}
+@keyframes chat-dot-paint {
+  0%,
+  80%,
+  100% {
+    background-color: var(--muted);
+  }
+  40% {
+    background-color: var(--foreground);
+  }
 }

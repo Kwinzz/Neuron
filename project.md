@@ -88,6 +88,18 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-24 — Traces d'affichage sous Linux (logo figé, barre blanche) + optimisations du chat
+- Logo de l'agent et curseur blanc restés à l'écran après la fin d'un tour : les animations infinies d'opacité /
+  d'échelle ont leur propre calque dans WebKitGTK, dont la dernière image pouvait rester affichée. Sous Linux :
+  curseur clignotant par `visibility`, « Working » et ses points animés par la couleur, logo / icône d'outil / points
+  d'état sans animation, halos `animate-ping` masqués ; le logo est retiré de la page quand il est caché (sans
+  `will-change`).
+- **Réponse en cours d'écriture rendue bloc par bloc** (`components/markdown/splitBlocks.ts`, `Markdown streaming`) :
+  seul le dernier bloc est ré-analysé à chaque mise à jour au lieu du message entier ; analyse complète une fois
+  terminée.
+- Événements d'agent envoyés à la seule fenêtre principale (`emit_to("main")`) : la fenêtre cachée de demande rapide
+  recevait chaque morceau de texte pour rien.
+
 ### 2026-11-24 — Chat sous Linux : lag à l'envoi, logo figé, menus qui clignotent
 - **Logo de l'agent** (`AgentCursor`) : mesurait la conversation à chaque image pendant tout le tour (une mise en
   page forcée par image) → piloté par `ResizeObserver` + `MutationObserver`, boucle rAF arrêtée une fois arrivé ;

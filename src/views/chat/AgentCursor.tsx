@@ -2,6 +2,7 @@ import { type RefObject, memo, useEffect, useRef } from "react";
 import { cn } from "cn";
 import type { AgentKind } from "@/bindings/AgentKind";
 import { AgentLogo } from "@/components/ui/AgentLogo";
+import { IS_LINUX } from "@/lib/platform";
 
 /** Height of one text line (leading-7): the cursor sits on the last line of the last element. */
 const LINE = 28;
@@ -98,12 +99,17 @@ export const AgentCursor = memo(function AgentCursor({ containerRef, agent, visi
     if (!visible) pos.current.placed = false;
   }, [visible]);
 
+  // Linux (WebKitGTK): removed from the page when hidden, and no `will-change` layer — a hidden layer could leave
+  // its last frame on screen.
+  if (IS_LINUX && !visible) return null;
+
   return (
     <span
       ref={ref}
       aria-hidden
       className={cn(
-        "pointer-events-none absolute left-0 top-0 z-10 transition-[opacity,visibility] duration-300 will-change-transform",
+        "pointer-events-none absolute left-0 top-0 z-10 transition-[opacity,visibility] duration-300",
+        !IS_LINUX && "will-change-transform",
         // `invisible` too: once faded out it is really gone (WebKitGTK could leave the last frame on screen).
         visible ? "visible opacity-100" : "invisible opacity-0",
       )}
