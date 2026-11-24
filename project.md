@@ -88,6 +88,12 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-24 — Rendu GPU rétabli sur les portables hybrides (Linux)
+- Le correctif « écran blanc NVIDIA » (`WEBKIT_DISABLE_DMABUF_RENDERER=1`) se déclenchait dès que le pilote NVIDIA
+  était chargé, donc aussi sur les portables Intel/AMD + NVIDIA, où la fenêtre est dessinée par la puce intégrée :
+  WebKitGTK perdait le rendu GPU → tout saccadait (survol, défilement). Maintenant : seulement si NVIDIA est la
+  seule carte (`env_path::gpu_drivers` lit `/sys/class/drm/card*/device/driver`, `needs_dmabuf_workaround` testé).
+
 ### 2026-11-24 — Survol à la souris saccadé sous Linux
 - Transitions CSS coupées sous Linux (`html.platform-linux`, durée 0) : chaque fondu de couleur de 150 ms au survol
   pouvait redessiner toute la fenêtre dans WebKitGTK. Les animations d'entrée (`animate-in`, menus, dialogues)

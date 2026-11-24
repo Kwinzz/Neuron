@@ -186,9 +186,46 @@ pub fn find_program(name: &str) -> Option<std::path::PathBuf> {
     std::env::split_paths(&path).map(|d| d.join(name)).find(|p| p.is_file())
 }
 
+/// Kernel drivers of the graphics cards (`/sys/class/drm/card*/device/driver`): `i915`, `xe`, `amdgpu`, `nvidia`…
+pub fn gpu_drivers() -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir("/sys/class/drm") else { return Vec::new() };
+    let mut drivers: Vec<String> = entries
+        .flatten()
+        .filter(|e| {
+            let name = e.file_name();
+            let name = name.to_string_lossy();
+            name.starts_with("card") && !name.contains('-') // card0, not card0-HDMI-A-1
+        })
+        .filter_map(|e| std::fs::read_link(e.path().join("device").join("driver")).ok())
+        .filter_map(|link| link.file_name().map(|n| n.to_string_lossy().into_owned()))
+        .collect();
+    drivers.sort();
+    drivers.dedup();
+    drivers
+}
+
+/// The WebKitGTK DMA-BUF renderer shows a blank window with the proprietary NVIDIA driver, but only when NVIDIA is the
+/// only GPU: on hybrid laptops (Intel / AMD integrated + NVIDIA) the window is drawn by the integrated GPU, where
+/// DMA-BUF works — disabling it there drops GPU rendering and makes the whole UI stutter.
+pub fn needs_dmabuf_workaround(drivers: &[String]) -> bool {
+    let nvidia = drivers.iter().any(|d| d == "nvidia");
+    let other = drivers.iter().any(|d| d != "nvidia");
+    nvidia && !other
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dmabuf_workaround_only_for_nvidia_alone() {
+        let v = |l: &[&str]| l.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert!(needs_dmabuf_workaround(&v(&["nvidia"])));
+        assert!(!needs_dmabuf_workaround(&v(&["i915", "nvidia"])), "hybrid laptop: integrated GPU draws");
+        assert!(!needs_dmabuf_workaround(&v(&["amdgpu", "nvidia"])));
+        assert!(!needs_dmabuf_workaround(&v(&["amdgpu"])));
+        assert!(!needs_dmabuf_workaround(&v(&[])));
+    }
 
     #[test]
     fn extracts_marked_path() {

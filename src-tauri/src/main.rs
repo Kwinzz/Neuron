@@ -2,11 +2,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    // WebKitGTK: the DMA-BUF renderer shows a blank window with the proprietary NVIDIA driver. Only there: turning
-    // it off elsewhere drops GPU rendering and makes the whole app lag. (A value set by the user always wins.)
+    // WebKitGTK: the DMA-BUF renderer shows a blank window when the proprietary NVIDIA driver is the only GPU. Only
+    // there: turning it off elsewhere (hybrid laptops included) drops GPU rendering and the whole app lags.
+    // (A value set by the user always wins.)
     #[cfg(target_os = "linux")]
     if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none()
-        && std::path::Path::new("/proc/driver/nvidia/version").exists()
+        && neuron_lib::env_path::needs_dmabuf_workaround(&neuron_lib::env_path::gpu_drivers())
     {
         // SAFETY: first statement of `main`, before any other thread exists.
         unsafe { std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1") };
