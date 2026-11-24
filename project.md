@@ -88,6 +88,12 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-24 — README d'installation
+- `README.md` à la racine : présentation, installation Windows (installateur de la release, SmartScreen,
+  compilation), Linux (Arch via `makepkg -si`, autres distributions via `tauri build` → `.deb` / AppImage,
+  spécificités Wayland / GNOME / WebKitGTK / PATH), premier lancement des agents (Fournisseurs IA, commandes
+  officielles), import de mémoire, emplacement des données.
+
 ### 2026-11-24 — Version Arch Linux
 - **Paquet** : `packaging/arch/PKGBUILD` (construit le dépôt local : `npm ci` + `tauri build --no-bundle`, installe
   `/usr/bin/neuron`, `neuron.desktop` avec l'action « Demande rapide », icônes hicolor) + `packaging/arch/README.md`
