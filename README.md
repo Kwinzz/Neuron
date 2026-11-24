@@ -8,6 +8,8 @@ from any app.
 
 Neuron contains no AI of its own: it runs the CLIs installed on your computer, with your own subscriptions.
 
+![Neuron — Home: token usage per agent over the last 7 days, projects and chats (example data)](docs/screenshot-home-en.png)
+
 **Install:** [Windows](#install-on-windows) · [Linux in one command](#one-command-arch-debian--ubuntu-fedora)
 · [First launch](#first-launch-the-agents)
 

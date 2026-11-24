@@ -225,7 +225,8 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
 
 ## Dev
 
-- `NEURON_DATA_DIR=<dossier>` : base SQLite isolée (tests manuels, captures). Plus de données de démo : la
+- `NEURON_DATA_DIR=<dossier>` : base SQLite isolée (tests manuels, captures). Avec `NEURON_NO_CLI_LOGS=1`, les
+  journaux réels de Claude Code / Codex ne sont pas importés (captures sans données personnelles). Plus de données de démo : la
   migration 0007 a supprimé les anciennes lignes `demo-`.
 
 ## Commandes

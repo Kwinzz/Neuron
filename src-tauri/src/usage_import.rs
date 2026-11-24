@@ -310,6 +310,10 @@ fn store(
 
 /// One import pass over every log file. Returns the number of usage rows added.
 async fn import_once(app: &AppHandle) -> usize {
+    // Screenshots / manual tests on an isolated `NEURON_DATA_DIR`: keep the real CLI logs out.
+    if std::env::var_os("NEURON_NO_CLI_LOGS").is_some() {
+        return 0;
+    }
     let Some(state) = app.try_state::<AppState>() else { return 0 };
     let Ok(home) = app.path().home_dir() else { return 0 };
     let files = tokio::task::spawn_blocking(move || log_files(&home)).await.unwrap_or_default();

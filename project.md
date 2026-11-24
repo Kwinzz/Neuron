@@ -88,6 +88,17 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-25 — Version 0.2.0, captures du README, boucle de rendu corrigée
+- **Bug** : `useNow` recréait sa fonction d'abonnement à chaque rendu → React se désabonnait / réabonnait, et un
+  abonné seul (dock « Threads live ») redémarrait l'horloge pendant son propre commit → « Maximum update depth
+  exceeded » (écran d'erreur) dès que le dock affichait des chats récents. `subscribe` / `getSnapshot` créés une
+  fois par horloge, jamais de changement de valeur synchrone dans `subscribe`.
+- `NEURON_NO_CLI_LOGS=1` : n'importe pas les journaux de Claude Code / Codex (captures, essais sur un
+  `NEURON_DATA_DIR` isolé).
+- Captures `docs/screenshot-home-en.png` / `-fr.png` (base isolée remplie de données d'exemple, aucune donnée
+  personnelle) dans `README.md` / `README.fr.md`.
+- Version **0.2.0** (fournisseurs IA, import de mémoire, Linux / Arch, anglais).
+
 ### 2026-11-24 — Anglais + français, choix de la langue à l'installation
 - **Interface** : `src/i18n` — `t("ns.clé", vars)` utilisable partout, messages par espace de noms (`fr/<ns>.ts` =
   référence, `en/<ns>.ts` typé `Translation<…>` : une clé manquante casse la compilation), app remontée au

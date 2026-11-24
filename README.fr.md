@@ -8,6 +8,8 @@ notifications et demande rapide depuis n'importe quelle app.
 
 Neuron ne contient pas d'IA : il lance les CLI installés sur ton ordinateur, avec ton propre abonnement.
 
+![Neuron — Accueil : consommation de tokens par agent sur 7 jours, projets et chats (données d'exemple)](docs/screenshot-home-fr.png)
+
 **Installer :** [Windows](#installation-sous-windows) · [Linux en une commande](#en-une-commande-arch-debian--ubuntu-fedora)
 · [Premier lancement](#premier-lancement--les-agents)
 
