@@ -260,6 +260,8 @@ scripts/neon-bridge.sh -d . -f brief.md     # déléguer une tâche UI à Antigr
   ajoute des empreintes à `style-src`, `'unsafe-inline'` est ignoré et les `<style>` injectés à l'exécution
   (graphes shadcn `--color-*`, toasts) sont bloqués. Ce genre de bug ne se voit **qu'en release** : tester un
   `tauri build` (ex. `--no-bundle` avec un identifiant et un `NEURON_DATA_DIR` à part) avant de publier.
+  **Jamais lancer `target\release\neuron.exe` construit avec l'identifiant réel** : au démarrage il réécrit
+  l'entrée « démarrer avec Windows » (`HKCU\…\Run\Neuron`) et l'identité des notifications vers son propre chemin.
 - Dev et app installée partagent l'identifiant `dev.neuron.app` : mêmes données, et une seule instance à la fois
   (lancer l'une pendant que l'autre tourne ramène simplement la fenêtre existante).
 
