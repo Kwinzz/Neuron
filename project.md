@@ -1,7 +1,7 @@
 # Neuron — Contexte projet
 
 > Document vivant. **Mis à jour à chaque changement** (voir règle dans `CLAUDE.md`).
-> Dernière mise à jour : 2026-11-22 (shadcn + chats)
+> Dernière mise à jour : 2026-11-24 (fournisseurs IA : installer / se connecter)
 
 ## Vision
 
@@ -87,6 +87,30 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 - [x] **Phase 5** — Adaptateurs Antigravity / Codex, CLI génériques (pipe + PTY), Paramètres, raccourcis, notifications, fluidité
 
 ## Journal des changements
+
+### 2026-11-24 — Fournisseurs IA : installer / se connecter, « non connecté » dans le chat
+- **`agents/access.rs`** : pour Claude Code, Codex et Antigravity — installé ? (`--version`, absence = `NotFound`),
+  connecté ? (`claude auth status` JSON, `codex login status`, et pour agy `agy --print /quota` : répond si connecté,
+  erreur d'authentification sinon), type de compte (« Claude Pro », « ChatGPT », « Clé API » ; jamais la clé ni
+  l'e-mail). Cache 2 min. Commandes `agent_access`, `check_agent_access`, `install_agent`, `login_agent`.
+- **Installer / Se connecter** ouvrent une fenêtre PowerShell (nouvelle console) avec la commande officielle :
+  `irm https://claude.ai/install.ps1 | iex`, `irm https://chatgpt.com/codex/install.ps1 | iex`,
+  `irm https://antigravity.google/cli/install.ps1 | iex` ; `claude auth login`, `codex login`, `agy` (`/login`).
+  La fenêtre se ferme seule si tout s'est bien passé. Le front revérifie l'agent toutes les 4 s (10 min max) et
+  prévient (toast) ; le catalogue de modèles est rechargé.
+- **PATH** : `access::refresh_path()` relit le PATH utilisateur + machine dans le registre et ajoute les dossiers des
+  installateurs (`~/.local/bin`, `%LOCALAPPDATA%\Programs\OpenAI\Codex\bin`, `%LOCALAPPDATA%\agy\bin`,
+  `%APPDATA%\npm`) — au démarrage et avant chaque vérification : un CLI installé pendant que Neuron tourne est
+  trouvé sans redémarrer.
+- **Chat** : `AccessIssue` (`not_installed` / `not_logged_in`) porté par `AgentEvent::ThreadError.issue` et
+  `ChatItem::Error.issue` (persisté dans `messages.meta_json`). Détecté sur l'erreur de fin de tour, la sortie
+  d'erreur du processus et les commandes agy (« Not logged in · Please run /login », « 401 Unauthorized »…), et sur
+  le lancement d'un CLI absent (`AppError::AgentNotInstalled` → carte d'erreur au lieu d'un envoi en échec). La
+  carte d'erreur affiche le bouton adapté, puis « prêt : renvoie ton message » une fois réglé ; un bandeau au-dessus
+  de la zone de saisie (chat et nouveau chat) prévient avant d'envoyer.
+- **UI** : carte « Fournisseurs IA » en tête de Paramètres → Agents & MCP (version, état, compte, bouton, commande
+  affichée) ; « agy introuvable » de la carte MCP propose aussi « Installer ». Composants
+  `components/agents/AgentAccessButton`, `components/chat/AgentAccessNotice`, store `stores/access.ts`.
 
 ### 2026-11-24 — Couleurs noires du graphe dans l'app installée (v0.1.2)
 - Cause (vérifiée sur un build de release isolé, via le protocole DevTools) : en production, Tauri ajoute des

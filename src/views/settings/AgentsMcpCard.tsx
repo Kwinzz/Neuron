@@ -9,6 +9,7 @@ import {
   Plug,
   TriangleAlert,
 } from "lucide-react";
+import { AgentAccessButton } from "@/components/agents/AgentAccessButton";
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { AgentLogo } from "@/components/ui/AgentLogo";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AGENTS } from "@/lib/agents";
 import { ipcErrorMessage } from "@/lib/ipc";
+import { useAccess } from "@/stores/access";
 import { useMemory } from "@/stores/memory";
 import { toast } from "@/stores/toast";
 import { CardSectionLabel } from "@/views/project/CardSectionLabel";
@@ -68,6 +70,12 @@ const MCP_TOOLS: ReadonlyArray<{ name: string; description: string }> = [
 export function AgentsMcpCard() {
   const agy = useMemory((s) => s.agy);
   const info = useMemory((s) => s.info);
+  const agyInstalled = useAccess((s) => s.byAgent.antigravity?.installed);
+
+  // Antigravity installed from the card above: ask again whether it is connected to the memory.
+  useEffect(() => {
+    if (agyInstalled) void useMemory.getState().refreshAgy().catch(() => undefined);
+  }, [agyInstalled]);
 
   const [pending, setPending] = useState<"connect" | "disconnect" | null>(null);
   const [copied, setCopied] = useState(false);
@@ -277,14 +285,12 @@ export function AgentsMcpCard() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-0.5">
+                    <div className="flex flex-col items-start gap-1.5">
                       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                         <CircleSlash className="size-3.5 shrink-0" aria-hidden />
                         <span>agy introuvable</span>
                       </span>
-                      <span className="text-xs text-muted-foreground">
-                        Installe Antigravity puis rouvre cette page.
-                      </span>
+                      <AgentAccessButton agent="antigravity" issue="not_installed" />
                     </div>
                   )}
                 </div>

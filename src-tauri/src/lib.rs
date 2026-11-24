@@ -38,6 +38,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .setup(move |app| {
+            // CLIs installed since the session started (or in the installers' folders) are found right away.
+            agents::access::refresh_path();
             let state = AppState::init(app.handle(), started)?;
             tracing::info!(
                 setup_ms = state.setup_ms,
@@ -97,6 +99,10 @@ pub fn run() {
             commands::threads::default_cwd,
             commands::threads::update_thread_settings,
             commands::threads::list_models,
+            commands::access::agent_access,
+            commands::access::check_agent_access,
+            commands::access::install_agent,
+            commands::access::login_agent,
             commands::projects::project_context,
             commands::projects::save_project_context,
             commands::projects::project_overview,

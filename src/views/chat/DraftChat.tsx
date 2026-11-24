@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { DraftContextPreview } from "@/components/context/DraftContextPreview";
 import type { Attachment } from "@/bindings/Attachment";
 import { FolderGit2, FolderOpen, MessageSquarePlus } from "lucide-react";
+import { AgentAccessNotice } from "@/components/chat/AgentAccessNotice";
 import { ChatSettingsBar } from "@/components/chat/ChatSettingsBar";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -127,6 +128,7 @@ export function DraftChat({ projectId }: { projectId: string | null }) {
         </p>
         {projectId && <DraftContextPreview projectId={projectId} />}
       </div>
+      <AgentAccessNotice agent={settings.agent} />
       <Composer
         threadId={null}
         projectId={projectId}

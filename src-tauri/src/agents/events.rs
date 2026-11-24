@@ -192,7 +192,12 @@ pub enum AgentEvent {
     /// The chat's permission mode changed on the agent side (plan approved, `EnterPlanMode`...).
     PermissionModeChanged { mode: String },
     /// Error reported by the adapter or the process. `fatal` ends the thread.
-    ThreadError { message: String, fatal: bool },
+    ThreadError {
+        message: String,
+        fatal: bool,
+        /// Set when Neuron can offer the fix (install the CLI, sign in).
+        issue: Option<crate::agents::access::AccessIssue>,
+    },
     /// A sub-agent (Claude Code `Agent`/`Task` tool) started, progressed or ended. `toolCallId` is the call
     /// that launched it; its own tool calls carry it as `parentToolCallId`.
     SubagentUpdate {

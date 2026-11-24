@@ -7,6 +7,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
+import type { AgentAccess } from "@/bindings/AgentAccess";
 import type { AgentEventEnvelope } from "@/bindings/AgentEventEnvelope";
 import type { AppInfo } from "@/bindings/AppInfo";
 import type { ChatItem } from "@/bindings/ChatItem";
@@ -148,6 +149,10 @@ export const ipc = {
   disconnectAntigravityMcp: () => invoke<AgyMcpStatus>("disconnect_antigravity_mcp"),
   /** Models per provider, read from the installed CLIs (cached 10 min server-side). */
   listModels: (refresh = false) => invoke<ProviderCatalog[]>("list_models", { refresh }),
+  agentAccess: (refresh = false) => invoke<AgentAccess[]>("agent_access", { refresh }),
+  checkAgentAccess: (agent: AgentKind) => invoke<AgentAccess>("check_agent_access", { agent }),
+  installAgent: (agent: AgentKind) => invoke<void>("install_agent", { agent }),
+  loginAgent: (agent: AgentKind) => invoke<void>("login_agent", { agent }),
   /** Native folder picker; resolves to null when cancelled. */
   pickDirectory: async (defaultPath?: string): Promise<string | null> => {
     const picked = await openDialog({ directory: true, multiple: false, ...(defaultPath ? { defaultPath } : {}) });

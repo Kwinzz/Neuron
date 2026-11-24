@@ -5,6 +5,7 @@
 //! - [`registry::AgentRegistry`] owns running sessions and runs one *pump* task per thread that persists
 //!   adapter events to SQLite and emits normalized [`events::AgentEvent`]s to the frontend.
 
+pub mod access;
 pub mod activity;
 pub mod antigravity;
 pub mod catalog;

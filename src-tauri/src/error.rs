@@ -19,6 +19,9 @@ pub enum AppError {
     NotFound(String),
     #[error("invalid input: {0}")]
     Invalid(String),
+    /// An agent CLI could not be started because it does not exist (not installed / not in the PATH).
+    #[error("« {0} » est introuvable : le CLI n'est pas installé (ou pas dans le PATH).")]
+    AgentNotInstalled(String),
     #[error("{0}")]
     Other(String),
 }
@@ -30,7 +33,7 @@ impl AppError {
             AppError::Io(_) => IpcErrorKind::Io,
             AppError::Tauri(_) | AppError::Join(_) | AppError::Other(_) => IpcErrorKind::Internal,
             AppError::Json(_) | AppError::Invalid(_) => IpcErrorKind::Invalid,
-            AppError::NotFound(_) => IpcErrorKind::NotFound,
+            AppError::NotFound(_) | AppError::AgentNotInstalled(_) => IpcErrorKind::NotFound,
         }
     }
 }

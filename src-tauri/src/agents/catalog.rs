@@ -228,6 +228,13 @@ async fn antigravity() -> ProviderCatalog {
     }
 }
 
+/// Forget the cached catalog (a CLI was installed or signed in).
+pub fn invalidate() {
+    if let Ok(mut guard) = CACHE.lock() {
+        *guard = None;
+    }
+}
+
 /// All providers (cached for 10 min unless `refresh`).
 /// The "Generic" provider: one model per CLI configured in Paramètres.
 pub fn generic_provider(profiles: &[crate::app_settings::GenericCliProfile]) -> ProviderCatalog {

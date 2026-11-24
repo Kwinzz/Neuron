@@ -85,7 +85,7 @@ const TimelineItem = memo(function TimelineItem({
         <PermissionCard item={item} threadId={threadId} />
       );
     case "error":
-      return <ErrorItem item={item} />;
+      return <ErrorItem item={item} agent={agent} />;
     case "command":
       return <CommandOutput item={item} />;
     case "turn":

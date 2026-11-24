@@ -46,7 +46,7 @@ src/
   lib/ipc.ts                SEUL point d'accès à invoke()/listen()
   lib/                      agents.ts (méta + ordre), status.ts, format.ts, fuzzy.ts, models.ts, chatDefaults.ts,
                             turnSummary.ts, browserKeys.ts (raccourcis du navigateur désactivés)
-  stores/                   zustand : ui, live (threads temps réel), chat, dashboard, nav, models, settings,
+  stores/                   zustand : ui, live (threads temps réel), chat, dashboard, nav, models, settings, access,
                             layout (largeur de la barre latérale), toast
   hooks/                    useAgentEventBridge, useHotkey, useNow
   components/shell/         AppShell, Sidebar, SiteHeader (= barre de titre, `decorations: false`), WindowControls, LiveDock, Toaster
@@ -56,6 +56,7 @@ src/
   views/chat/               ChatView (chat existant) + DraftChat (nouveau chat vide, créé au 1er message)
   views/quick/              QuickLauncher : fenêtre `quick` de la demande rapide (raccourci global)
   views/project/            page projet (éditeur context.md, git, fichiers récents, chats du projet)
+  components/agents/        AgentAccessButton (« Installer » / « Se connecter » d'un CLI)
   components/context/       indicateur de contexte injecté (en-tête de chat, nouveau chat)
   components/markdown/      rendu Markdown partagé (chat + aperçus) : Markdown, CodeBlock, markdown.css
   views/memory/             vue Mémoire (souvenirs par catégorie, recherche)
@@ -182,6 +183,11 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
   les 10 min et après chaque tour Claude / Codex ; projet déduit du dossier. Tableau de bord et quotas lisent la
   vue `usage_effective` : pour un agent, à partir de sa première ligne de journal, les journaux font foi (les tours
   de Neuron y sont déjà), avant on garde les lignes de Neuron. Antigravity : pas de journal lisible.
+- **Installation / connexion des CLI** (`agents/access.rs`) : état installé / connecté par agent (`claude auth status`,
+  `codex login status`, agy via `--print /quota`), boutons qui ouvrent une fenêtre PowerShell avec la commande
+  officielle, re-vérification par le front (`stores/access.ts`). `refresh_path()` relit le PATH (registre + dossiers
+  des installateurs). Erreurs d'agent classées `AccessIssue` (`ThreadError.issue`, `ChatItem::Error.issue`, meta du
+  message) → bouton « Installer » / « Se connecter » dans le chat.
 - `rate_limit_event` (fenêtres 5h / 7j de l'abonnement Claude) → `settings.claude.rate_limits` → `ProviderUsage.live`.
 - **Quotas Antigravity** : `agy --print /quota --output-format json` (répondu par le CLI, 0 token, **refusé dans une
   session stream-json**) → groupes de modèles × fenêtres 5 h / hebdo (`antigravity/quota.rs`), rafraîchi après chaque

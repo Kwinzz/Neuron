@@ -129,7 +129,7 @@ function reduce(items: ChatItem[], { ts, event }: AgentEventEnvelope): ChatItem[
       ];
     }
     case "ThreadError":
-      return [...endStreaming(items), { kind: "error", id: localId("err"), message: event.message }];
+      return [...endStreaming(items), { kind: "error", id: localId("err"), message: event.message, issue: event.issue }];
     case "ThreadStatusChanged": {
       if (event.status === "done" || event.status === "error" || event.status === "cancelled") {
         // Unanswered permission cards can no longer be acted upon.
@@ -208,7 +208,7 @@ export const useChat = create<ChatState>((set, get) => {
         return true;
       } catch (err) {
         const message = ipcErrorMessage(err);
-        patch(threadId, (t) => ({ ...t, items: [...t.items, { kind: "error", id: localId("err"), message }] }));
+        patch(threadId, (t) => ({ ...t, items: [...t.items, { kind: "error", id: localId("err"), message, issue: null }] }));
         return false;
       }
     },

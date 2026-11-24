@@ -12,6 +12,7 @@ use serde_json::{Value, json};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
 
+use crate::agents::access;
 use crate::agents::activity::tool_activity;
 use crate::agents::antigravity::AntigravityAdapter;
 use crate::agents::claude::ClaudeCodeAdapter;
@@ -83,7 +84,10 @@ async fn run_agy_command(app: AppHandle, db: Db, rt: ThreadRuntime, name: &'stat
             let now = now_ms();
             match &outcome {
                 Ok(text) => chat::insert_message(c, &mid, &tid, "command", text, Some(&json!({ "name": name })), now)?,
-                Err(message) => chat::insert_message(c, &mid, &tid, "error", message, None, now)?,
+                Err(message) => {
+                    let meta = access::error_meta(access::classify_error(message));
+                    chat::insert_message(c, &mid, &tid, "error", message, meta.as_ref(), now)?
+                }
             }
             if track_status {
                 threads::set_status(c, &tid, status, now)?;
@@ -97,7 +101,10 @@ async fn run_agy_command(app: AppHandle, db: Db, rt: ThreadRuntime, name: &'stat
     }
     match outcome {
         Ok(text) => emit(&app, &id, AgentEvent::CommandOutput { message_id: item_id, name: name.to_string(), text }),
-        Err(message) => emit(&app, &id, AgentEvent::ThreadError { message, fatal: false }),
+        Err(message) => {
+            let issue = access::classify_error(&message);
+            emit(&app, &id, AgentEvent::ThreadError { message, fatal: false, issue })
+        }
     }
     if track_status {
         emit(&app, &id, AgentEvent::ThreadStatusChanged { status, detail: None });
@@ -242,7 +249,34 @@ impl AgentRegistry {
         emit(app, thread_id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::Starting, detail: None });
 
         for attempt in 0..2 {
-            let sender = self.ensure_session(app, db, &runtime).await?;
+            let sender = match self.ensure_session(app, db, &runtime).await {
+                Ok(sender) => sender,
+                // CLI missing: a chat error with the « Installer » action rather than a failed send.
+                Err(err @ AppError::AgentNotInstalled(_)) => {
+                    let message = err.to_string();
+                    let issue = Some(access::AccessIssue::NotInstalled);
+                    let (tid, m) = (thread_id.to_string(), message.clone());
+                    db.call(move |c| {
+                        let now = now_ms();
+                        let meta = access::error_meta(issue);
+                        chat::insert_message(
+                            c,
+                            &uuid::Uuid::new_v4().to_string(),
+                            &tid,
+                            "error",
+                            &m,
+                            meta.as_ref(),
+                            now,
+                        )?;
+                        threads::set_status(c, &tid, ThreadStatus::Error, now)
+                    })
+                    .await?;
+                    emit(app, thread_id, AgentEvent::ThreadError { message, fatal: false, issue });
+                    emit(app, thread_id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::Error, detail: None });
+                    return Ok(());
+                }
+                Err(err) => return Err(err),
+            };
             let turn = crate::agents::UserTurn { text: text.clone(), attachments: attachments.clone() };
             if sender.send(SessionCommand::Prompt(turn)).is_ok() {
                 if let Some(s) = self.lock().get_mut(thread_id) {
@@ -681,13 +715,14 @@ impl AgentRegistry {
                         persist!(move |c| {
                             let now = now_ms();
                             if let Some(message) = &err {
+                                let meta = access::error_meta(access::classify_error(message));
                                 chat::insert_message(
                                     c,
                                     &uuid::Uuid::new_v4().to_string(),
                                     &tid,
                                     "error",
                                     message,
-                                    None,
+                                    meta.as_ref(),
                                     now,
                                 )?;
                             }
@@ -720,7 +755,8 @@ impl AgentRegistry {
                     let status = if stopped {
                         ThreadStatus::Cancelled
                     } else if let Some(message) = error {
-                        emit(&app, &id, AgentEvent::ThreadError { message, fatal: false });
+                        let issue = access::classify_error(&message);
+                        emit(&app, &id, AgentEvent::ThreadError { message, fatal: false, issue });
                         ThreadStatus::Error
                     } else {
                         ThreadStatus::Done
@@ -787,6 +823,7 @@ impl AgentRegistry {
                         );
                     } else if was_active && !shutdown {
                         let tail = stderr_tail.trim();
+                        let issue = access::classify_error(tail);
                         let message = if tail.is_empty() {
                             format!(
                                 "Le processus de l'agent s'est arrêté (code {}).",
@@ -805,14 +842,14 @@ impl AgentRegistry {
                                     &tid,
                                     "error",
                                     &m,
-                                    None,
+                                    access::error_meta(issue).as_ref(),
                                     now,
                                 )?;
                                 chat::close_dangling_tools(c, &tid, now)?;
                                 threads::set_status(c, &tid, ThreadStatus::Error, now)
                             });
                         }
-                        emit(&app, &id, AgentEvent::ThreadError { message, fatal: true });
+                        emit(&app, &id, AgentEvent::ThreadError { message, fatal: true, issue });
                         emit(&app, &id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::Error, detail: None });
                     }
                     break;

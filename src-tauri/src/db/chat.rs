@@ -85,6 +85,8 @@ pub enum ChatItem {
     Error {
         id: String,
         message: String,
+        /// Set when Neuron can offer the fix (install the CLI, sign in).
+        issue: Option<crate::agents::access::AccessIssue>,
     },
     /// Output of a slash command run by the CLI itself (`/usage`, `/context`…). `name` without the slash.
     Command {
@@ -234,7 +236,15 @@ pub fn history(conn: &Connection, thread_id: &str) -> AppResult<Vec<ChatItem>> {
                     .unwrap_or_default(),
             },
             "thinking" => ChatItem::Thinking { id, text: content, streaming: false },
-            "error" => ChatItem::Error { id, message: content },
+            "error" => ChatItem::Error {
+                id,
+                message: content,
+                issue: meta
+                    .as_ref()
+                    .and_then(|m| m.get("issue"))
+                    .and_then(Value::as_str)
+                    .and_then(crate::agents::access::AccessIssue::parse),
+            },
             "command" => ChatItem::Command {
                 id,
                 name: meta.as_ref().and_then(|m| m.get("name")).and_then(Value::as_str).unwrap_or_default().to_string(),

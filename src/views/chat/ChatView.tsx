@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { XCircle } from "lucide-react";
+import { AgentAccessNotice } from "@/components/chat/AgentAccessNotice";
 import { AgentLogo } from "@/components/ui/AgentLogo";
 import type { ChatItem } from "@/bindings/ChatItem";
 import { useScrollRoot } from "@/components/shell/ScrollRoot";
@@ -128,6 +129,9 @@ export function ChatView({ threadId }: { threadId: string }) {
         {/* Absolutely positioned in the column gutter; it skips itself when measuring the last element. */}
         {loaded && <AgentCursor containerRef={contentRef} agent={agent} visible={active || revealing} />}
       </div>
+
+      {/* The last error card already offers the fix. */}
+      {!(last?.kind === "error" && last.issue !== null) && <AgentAccessNotice agent={agent} timelineGutter />}
 
       <Composer
         threadId={threadId}

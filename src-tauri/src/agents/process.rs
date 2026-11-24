@@ -28,6 +28,9 @@ pub fn command(binary: &str, args: &[String], cwd: &Path) -> Command {
 }
 
 pub fn spawn_error(binary: &str, err: std::io::Error) -> AppError {
+    if err.kind() == std::io::ErrorKind::NotFound {
+        return AppError::AgentNotInstalled(binary.to_string());
+    }
     AppError::Other(format!("impossible de lancer « {binary} » ({err}). Le CLI est-il installé et dans le PATH ?"))
 }
 
