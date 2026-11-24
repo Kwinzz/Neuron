@@ -10,6 +10,7 @@ type ReactMarkdownProps = ComponentProps<typeof ReactMarkdown>;
 
 const REMARK: ReactMarkdownProps["remarkPlugins"] = [remarkGfm];
 const REHYPE: ReactMarkdownProps["rehypePlugins"] = [[rehypeHighlight, { detect: false }]];
+const NO_REHYPE: ReactMarkdownProps["rehypePlugins"] = [];
 const COMPONENTS: Components = {
   pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
   a: ({ href, children }) => (
@@ -49,6 +50,11 @@ interface MarkdownProps {
   className?: string;
   /** Élément rendu après le contenu, dans le wrapper (ex. caret autonome du chat). */
   trailing?: ReactNode;
+  /**
+   * Coloration syntaxique des blocs de code (défaut : oui). Désactivée pendant qu'une réponse s'écrit : le message
+   * est ré-analysé à chaque mise à jour, colorer tous ses blocs à chaque fois saccade (surtout sous Linux).
+   */
+  highlight?: boolean;
 }
 
 export const Markdown = memo(function Markdown({
@@ -57,6 +63,7 @@ export const Markdown = memo(function Markdown({
   doc = false,
   className,
   trailing,
+  highlight = true,
 }: MarkdownProps) {
   return (
     <div
@@ -67,7 +74,7 @@ export const Markdown = memo(function Markdown({
         className,
       )}
     >
-      <ReactMarkdown remarkPlugins={REMARK} rehypePlugins={REHYPE} components={COMPONENTS}>
+      <ReactMarkdown remarkPlugins={REMARK} rehypePlugins={highlight ? REHYPE : NO_REHYPE} components={COMPONENTS}>
         {children}
       </ReactMarkdown>
       {trailing}

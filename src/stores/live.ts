@@ -8,6 +8,7 @@ import type { AgentEventEnvelope } from "@/bindings/AgentEventEnvelope";
 import type { ThreadStatus } from "@/bindings/ThreadStatus";
 import type { ThreadSummary } from "@/bindings/ThreadSummary";
 import { ipc } from "@/lib/ipc";
+import { keepIfSame } from "@/lib/sameValue";
 import { STATUS } from "@/lib/status";
 
 export interface LiveThread extends ThreadSummary {
@@ -64,27 +65,33 @@ export const useLive = create<LiveState>((set, get) => ({
 
   hydrate: (summaries) =>
     set((state) => {
-      const threads = { ...state.threads };
+      // Periodic refreshes mostly bring unchanged rows: keep those objects (and the map itself when nothing
+      // changed), otherwise every chat in the sidebar, dock and header re-renders at each refresh.
+      let threads: Record<string, LiveThread> | null = null;
       for (const s of summaries) {
-        const prev = threads[s.id];
+        const prev = state.threads[s.id];
         // Never let an older DB snapshot overwrite fresher live state (status, tokens, timers)…
-        if (prev && prev.lastEventAt > s.updatedAt) {
-          // …but static fields (edited outside the event stream) always follow the database.
-          threads[s.id] = {
-            ...prev,
-            title: s.title,
-            model: s.model,
-            effort: s.effort,
-            permissionMode: s.permissionMode,
-            cwd: s.cwd,
-            projectId: s.projectId,
-            projectName: s.projectName,
-          };
-          continue;
+        const next =
+          prev && prev.lastEventAt > s.updatedAt
+            ? // …but static fields (edited outside the event stream) always follow the database.
+              {
+                ...prev,
+                title: s.title,
+                model: s.model,
+                effort: s.effort,
+                permissionMode: s.permissionMode,
+                cwd: s.cwd,
+                projectId: s.projectId,
+                projectName: s.projectName,
+              }
+            : fromSummary(s, prev);
+        const kept = keepIfSame(prev, next);
+        if (kept !== prev) {
+          threads ??= { ...state.threads };
+          threads[s.id] = kept;
         }
-        threads[s.id] = fromSummary(s, prev);
       }
-      return { threads };
+      return threads ? { threads } : state;
     }),
 
   applyEvent: ({ threadId, ts, event }, focusedThreadId) => {

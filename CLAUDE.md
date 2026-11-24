@@ -110,6 +110,9 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
 - Valeurs KPI `text-2xl font-semibold tabular-nums`, descriptions `text-muted-foreground`. Police Geist / Geist Mono.
 - **Vocabulaire UI** : on dit « chat » (pas « thread ») partout, sauf le panneau « Threads live ». L'accueil s'appelle
   « Accueil ». Le code (types, tables, commandes) garde `thread`.
+- **Rafraîchissements** : garder les références inchangées (`keepIfSame` de `lib/sameValue.ts`) quand un store
+  recharge des données identiques ; ne recharger tableau de bord / barre latérale qu'aux changements de phase d'un
+  chat (début / fin de tour), pas à chaque statut intermédiaire.
 - **Sélecteurs zustand** : ne jamais créer d'objets/tableaux neufs dans un sélecteur sans `useShallow`, et même avec
   `useShallow`, ne pas `map` vers des objets neufs (boucle de rendu infinie → écran noir). Renvoyer des primitives ou
   les objets du store.

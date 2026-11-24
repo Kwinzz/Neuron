@@ -1,3 +1,4 @@
+import { STATUS } from "@/lib/status";
 import { useEffect } from "react";
 import type { AgentEventEnvelope } from "@/bindings/AgentEventEnvelope";
 import type { TurnOutcome } from "@/bindings/TurnOutcome";
@@ -135,7 +136,9 @@ export function useAgentEventBridge(): void {
         useActivity.getState().apply(envelope);
         const live = useLive.getState();
         const before = live.attention[envelope.threadId];
+        const statusBefore = live.threads[envelope.threadId]?.status;
         live.applyEvent(envelope, useUi.getState().focusedThreadId);
+        const statusAfter = useLive.getState().threads[envelope.threadId]?.status;
 
         const after = useLive.getState().attention[envelope.threadId];
         if (after && after !== before) {
@@ -158,8 +161,14 @@ export function useAgentEventBridge(): void {
           maybeNotify(envelope.threadId, attentionFor(envelope.event.status), envelope.event.detail);
         }
 
+        // Reload the lists only when a turn starts or ends (or fails) — not at every intermediate status (tool
+        // started, approval asked…): each reload re-reads the whole dashboard, which made the UI stutter.
         const kind = envelope.event.kind;
-        if (kind === "TokenUsageUpdate" || kind === "ThreadStatusChanged" || kind === "ThreadError") {
+        const phaseChanged =
+          statusBefore === undefined ||
+          statusAfter === undefined ||
+          STATUS[statusBefore].active !== STATUS[statusAfter].active;
+        if (kind === "TokenUsageUpdate" || kind === "ThreadError" || (kind === "ThreadStatusChanged" && phaseChanged)) {
           useDashboard.getState().scheduleRefresh();
           useNav.getState().scheduleRefresh();
         }

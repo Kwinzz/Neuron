@@ -3,6 +3,7 @@ import type { DashboardSnapshot } from "@/bindings/DashboardSnapshot";
 import type { ProviderUpdate } from "@/bindings/ProviderUpdate";
 import type { UsageRange } from "@/bindings/UsageRange";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
+import { keepIfSame } from "@/lib/sameValue";
 import { useLive } from "@/stores/live";
 
 const REFRESH_THROTTLE_MS = 2500;
@@ -36,7 +37,20 @@ export const useDashboard = create<DashboardState>((set, get) => ({
       const snapshot = await ipc.dashboardSnapshot(get().range);
       if (seq !== requestSeq) return; // a newer request superseded this one
       useLive.getState().hydrate([...snapshot.activeThreads, ...snapshot.recentThreads]);
-      set({ snapshot, error: null, loading: false });
+      // Keep unchanged parts (providers, usage, lists…): the cards reading them don't re-render.
+      const prev = get().snapshot;
+      const merged: DashboardSnapshot = prev
+        ? {
+            ...snapshot,
+            providers: keepIfSame(prev.providers, snapshot.providers),
+            usage: keepIfSame(prev.usage, snapshot.usage),
+            activeThreads: keepIfSame(prev.activeThreads, snapshot.activeThreads),
+            recentThreads: keepIfSame(prev.recentThreads, snapshot.recentThreads),
+            projects: keepIfSame(prev.projects, snapshot.projects),
+            liveQuotas: keepIfSame(prev.liveQuotas, snapshot.liveQuotas),
+          }
+        : snapshot;
+      set({ snapshot: merged, error: null, loading: false });
     } catch (err) {
       if (seq !== requestSeq) return;
       set({ error: ipcErrorMessage(err), loading: false });

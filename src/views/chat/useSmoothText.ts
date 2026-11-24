@@ -1,4 +1,13 @@
 import { useEffect, useRef, useState } from "react";
+import { IS_LINUX } from "@/lib/platform";
+
+/**
+ * Minimum time between two updates. Each update re-parses the whole message as Markdown: fine at 60 fps in
+ * WebView2, too heavy for WebKitGTK (Linux) → 20 updates per second there, with proportionally bigger steps.
+ */
+const MIN_UPDATE_MS = IS_LINUX ? 50 : 0;
+/** Length of one display frame, to size the steps when updates are spaced out. */
+const FRAME_MS = 1000 / 60;
 
 /**
  * Reveals `target` progressively (one rAF step per frame) so text appears fluidly instead of in
@@ -22,10 +31,19 @@ export function useSmoothText(target: string, animate: boolean): { text: string;
       setLength(target.length);
     }
     let frame = 0;
-    const tick = () => {
+    let last = 0;
+    const tick = (now: number) => {
       const backlog = target.length - lengthRef.current;
       if (backlog <= 0) return;
-      const step = Math.max(2, Math.ceil(backlog / 14));
+      const elapsed = last === 0 ? FRAME_MS : now - last;
+      if (elapsed < MIN_UPDATE_MS) {
+        frame = requestAnimationFrame(tick);
+        return;
+      }
+      last = now;
+      // Same speed whatever the update rate: one step per elapsed display frame.
+      const frames = Math.max(1, Math.round(elapsed / FRAME_MS));
+      const step = Math.max(2, Math.ceil(backlog / 14)) * frames;
       lengthRef.current = Math.min(target.length, lengthRef.current + step);
       setLength(lengthRef.current);
       frame = requestAnimationFrame(tick);

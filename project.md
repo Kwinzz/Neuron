@@ -88,6 +88,17 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-24 — Saccades pendant le travail des agents (surtout Linux)
+- **Rechargements** : chaque `ThreadStatusChanged` (outil lancé, approbation demandée…) relançait le tableau de bord
+  complet + la liste de la barre latérale (toutes les 2,5–3 s pendant qu'un agent travaille) → seulement au
+  début / à la fin d'un tour, sur erreur ou fin de tour (`useAgentEventBridge`).
+- **Re-rendus inutiles** : `lib/sameValue.ts::keepIfSame` — `useLive.hydrate` garde les fiches inchangées (et la
+  map quand rien ne change), `useNav.load` garde `projects` / `chats`, `useDashboard.load` garde chaque partie du
+  snapshot inchangée (cartes de l'Accueil, quotas de l'en-tête de chat).
+- **Réponse en cours d'écriture** : le message entier était ré-analysé en Markdown + coloré (highlight.js) à chaque
+  image → coloration syntaxique seulement une fois la réponse affichée (`Markdown highlight`), et sous Linux
+  20 mises à jour / s au lieu de 60 (`useSmoothText`, même vitesse de défilement).
+
 ### 2026-11-24 — Compilation Linux plus rapide
 - Les deux dernières étapes (crate `neuron` + édition des liens) prenaient ~5 min : profil release de Windows
   (LTO complet, `codegen-units = 1`). `packaging/linux-build-env.sh` (sourcé par le PKGBUILD et `install.sh`) :

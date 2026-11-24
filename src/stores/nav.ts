@@ -2,6 +2,7 @@
  * Sidebar data: every project and every chat (the dashboard snapshot only carries recent ones).
  * Reloaded after create/rename/delete and, throttled, on agent events.
  */
+import { keepIfSame } from "@/lib/sameValue";
 import { create } from "zustand";
 import type { ProjectSummary } from "@/bindings/ProjectSummary";
 import type { ThreadSummary } from "@/bindings/ThreadSummary";
@@ -44,7 +45,9 @@ export const useNav = create<NavState>((set, get) => ({
     try {
       const [projects, chats] = await Promise.all([ipc.listProjects(), ipc.listThreads(CHAT_LIMIT)]);
       useLive.getState().hydrate(chats);
-      set({ projects, chats, loaded: true });
+      // Same lists as before (the usual case for a periodic refresh): keep them, the sidebar doesn't re-render.
+      const state = get();
+      set({ projects: keepIfSame(state.projects, projects), chats: keepIfSame(state.chats, chats), loaded: true });
     } catch {
       set({ loaded: true });
     }
