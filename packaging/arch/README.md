@@ -1,9 +1,8 @@
-# Neuron on Arch Linux / Neuron sur Arch Linux
+# Neuron on Arch Linux
 
 Package built from the sources of this repository (`/usr/bin/neuron` binary, menu entry, icons).
-*Paquet construit depuis les sources du dépôt (binaire `/usr/bin/neuron`, entrée de menu, icônes).*
 
-## Install / Installer
+## Install
 
 The easiest way, from anywhere (also offers update / uninstall when Neuron is already there; asks for the
 language — `--lang en` or `--lang fr` to skip the question):
@@ -12,7 +11,7 @@ language — `--lang en` or `--lang fr` to skip the question):
 curl -fsSL https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh | bash
 ```
 
-By hand / à la main:
+By hand:
 
 ```bash
 sudo pacman -S --needed base-devel git rust nodejs npm mold webkit2gtk-4.1 gtk3 libayatana-appindicator
@@ -24,7 +23,7 @@ makepkg -si
 Update: `git pull` at the root of the repository, then `makepkg -si` again in `packaging/arch`.
 Builds use `packaging/linux-build-env.sh` (no LTO, incremental, `mold` linker): updates only rebuild what changed.
 
-## After installing / Après l'installation
+## After installing
 
 - Start **Neuron** from the applications menu.
 - Settings → Agents & MCP: « Install » / « Sign in » open a terminal (`$TERMINAL`, otherwise kitty, alacritty, foot,
@@ -34,7 +33,7 @@ Builds use `packaging/linux-build-env.sh` (no LTO, incremental, `mold` linker): 
   On X11, the shortcut set in Neuron works directly.
 - System tray icon on GNOME: needs the « AppIndicator and KStatusNotifierItem Support » extension.
 
-## Troubleshooting / Dépannage
+## Troubleshooting
 
 - **White or black window**: Neuron only disables WebKit's DMA-BUF renderer when NVIDIA is the only GPU. If it still
   happens, try `WEBKIT_DISABLE_DMABUF_RENDERER=1 neuron`, then `WEBKIT_DISABLE_COMPOSITING_MODE=1 neuron`.

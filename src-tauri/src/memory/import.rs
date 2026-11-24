@@ -390,7 +390,7 @@ mod tests {
         );
         assert_eq!(items[2].category, MemoryCategory::StrictRules);
 
-        let plain = "Je m'appelle Kevin\nJ'utilise Windows 11 et Arch Linux\n";
+        let plain = "Je m'appelle Alex\nJ'utilise Windows 11 et Arch Linux\n";
         let items = split_memories(plain);
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].category, MemoryCategory::Profile);

@@ -1,7 +1,5 @@
 # Neuron
 
-🇫🇷 [Version française](README.fr.md)
-
 Desktop app that drives your command-line AI agents — **Claude Code**, **Codex**, **Antigravity** and other CLIs —
 from a single interface: chats, memory shared between agents, quotas and costs, notifications and a quick prompt
 from any app.
@@ -207,5 +205,5 @@ npm run tauri dev        # full app in dev mode
 cd src-tauri && cargo test
 ```
 
-See [`CLAUDE.md`](CLAUDE.md) (conventions, architecture) and [`project.md`](project.md) (status and changelog), both
-in French.
+Stack: Tauri 2 (Rust, SQLite) + React 19 / TypeScript / Tailwind CSS 4. Interface texts live in `src/i18n`
+(`fr/` and `en/` namespaces), backend texts use the `tr!` macro (`src-tauri/src/i18n.rs`).
