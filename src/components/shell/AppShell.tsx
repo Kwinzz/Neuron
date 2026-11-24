@@ -1,5 +1,5 @@
 import { whenIdle } from "@/lib/idle";
-import { type CSSProperties, Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, Suspense, lazy, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { cn } from "cn";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { ShortcutsDialog } from "@/components/shortcuts/ShortcutsDialog";
@@ -109,6 +109,12 @@ export function AppShell() {
         : view.kind === "project"
           ? `project-${view.id}`
           : view.kind;
+
+  // One scroll container is shared by every view: a new view starts at the top (a chat then scrolls itself to
+  // its last message), otherwise Accueil opens where the previous chat was scrolled.
+  useLayoutEffect(() => {
+    if (scrollRoot && view.kind !== "thread") scrollRoot.scrollTop = 0;
+  }, [viewKey, scrollRoot, view.kind]);
 
   return (
     <TooltipProvider delayDuration={300}>

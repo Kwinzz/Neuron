@@ -263,3 +263,32 @@ html.quick-window,
 html.quick-window body {
   background: transparent;
 }
+
+/* ---- Linux (WebKitGTK) --------------------------------------------------------------------------------------
+   Blurs and animated shadows are repainted every frame there (scrolling under a blurred sticky bar, each new
+   block of a streamed answer, the "working" logo): heavy lag. Same look, without those effects. */
+html.platform-linux [class*="backdrop-blur"] {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+html.platform-linux .chat-reveal > * {
+  animation-name: chat-rise-lite;
+}
+@keyframes chat-rise-lite {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+html.platform-linux .chat-working-logo {
+  animation-name: chat-breathe-lite;
+}
+@keyframes chat-breathe-lite {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}

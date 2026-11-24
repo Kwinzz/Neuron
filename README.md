@@ -129,7 +129,8 @@ voir les [prérequis Tauri pour Linux](https://v2.tauri.app/start/prerequisites/
   `bind = CTRL ALT, Space, exec, neuron --quick`. Sous X11, le raccourci réglé dans Neuron marche directement.
 - **Icône de la zone de notification** sous GNOME : installe l'extension
   « AppIndicator and KStatusNotifierItem Support ».
-- **Fenêtre blanche ou noire** (souvent NVIDIA) : lance `WEBKIT_DISABLE_COMPOSITING_MODE=1 neuron`.
+- **Fenêtre blanche ou noire** (souvent NVIDIA) : lance `WEBKIT_DISABLE_DMABUF_RENDERER=1 neuron`, sinon
+  `WEBKIT_DISABLE_COMPOSITING_MODE=1 neuron`.
 - **Un CLI n'est pas trouvé** alors qu'il marche dans ton terminal : Neuron lit le PATH de ton shell au démarrage,
   relance-le après avoir modifié `~/.bashrc`, `~/.zshrc` ou ta config fish.
 

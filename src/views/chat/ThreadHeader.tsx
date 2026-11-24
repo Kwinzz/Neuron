@@ -1,3 +1,4 @@
+import { IS_LINUX } from "@/lib/platform";
 import { type KeyboardEvent, memo, useEffect, useRef, useState } from "react";
 import { cn } from "cn";
 import { ContextIndicator } from "@/components/context/ContextIndicator";
@@ -28,8 +29,10 @@ import { findModel, useModels } from "@/stores/models";
 import { toast } from "@/stores/toast";
 
 /** Sticky bar: full-bleed inside the scroll container, content aligned with the timeline. */
-const BAR =
-  "sticky top-0 z-20 -mx-4 border-b bg-background/75 px-4 backdrop-blur-xl md:-mx-6 md:px-6";
+const BAR = `sticky top-0 z-20 -mx-4 border-b px-4 md:-mx-6 md:px-6 ${
+  // WebKitGTK repaints the blur at every scroll frame: opaque bar on Linux.
+  IS_LINUX ? "bg-background" : "bg-background/75 backdrop-blur-xl"
+}`;
 
 function folderName(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() ?? path;

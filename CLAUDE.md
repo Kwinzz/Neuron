@@ -264,7 +264,9 @@ scripts/neon-bridge.sh -d . -f brief.md     # déléguer une tâche UI à Antigr
 - Agents dans leur propre groupe de processus (`process_group(0)`) pour que l'arrêt tue tout l'arbre.
 - Front sous WebKitGTK (≈ Safari) : pas de `requestIdleCallback` (→ `lib/idle.ts`), pas de `field-sizing`
   (hauteur en JS ou `rows`). Toute API récente côté Chromium doit avoir un repli.
-- Wayland : pas de raccourci global → `neuron --quick`. WebKitGTK : `WEBKIT_DISABLE_DMABUF_RENDERER=1` par défaut.
+- Perf WebKitGTK : pas de `backdrop-blur`, de `filter: blur` animé ni d'ombre animée sous Linux (classe
+  `html.platform-linux`, fin de `styles/index.css`). DMA-BUF désactivé uniquement avec NVIDIA propriétaire.
+- Wayland : pas de raccourci global → `neuron --quick`. WebKitGTK : `WEBKIT_DISABLE_DMABUF_RENDERER=1` seulement avec NVIDIA.
 - Code `#[cfg(unix)]` non compilable depuis Windows (WebKitGTK) : le relire avec soin, le valider sur Arch.
 
 ## Workflow par phase

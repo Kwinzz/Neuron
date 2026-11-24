@@ -5,6 +5,10 @@ import App from "./App.tsx";
 import { ErrorBoundary } from "@/components/shell/ErrorBoundary";
 import { disableBrowserShortcuts } from "@/lib/browserKeys";
 import { ipc, isTauri } from "@/lib/ipc";
+import { IS_LINUX } from "@/lib/platform";
+
+// Linux (WebKitGTK): lighter effects, see the end of styles/index.css.
+if (IS_LINUX) document.documentElement.classList.add("platform-linux");
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root element missing");

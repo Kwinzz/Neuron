@@ -88,6 +88,16 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-24 — Fluidité sous Linux, Accueil remonté en haut
+- **Linux lent / saccadé** : sous WebKitGTK, les flous et ombres animées sont repeints à chaque image. Classe
+  `platform-linux` sur `<html>` (`main.tsx`) → sans `backdrop-filter`, apparition des blocs de réponse sans flou,
+  logo « en cours » sans ombre animée ; barre d'en-tête du chat opaque (plus de flou sous le défilement).
+- `WEBKIT_DISABLE_DMABUF_RENDERER=1` seulement avec le pilote NVIDIA propriétaire (`/proc/driver/nvidia/version`) :
+  ailleurs il coupait le rendu GPU de WebKitGTK et ralentissait toute l'app.
+- **Défilement** (Windows et Linux) : toutes les vues partagent un conteneur de défilement ; en quittant un chat,
+  l'Accueil s'ouvrait au milieu. Remise en haut à chaque changement de vue (`AppShell`, sauf les chats qui
+  descendent d'eux-mêmes au dernier message).
+
 ### 2026-11-24 — Premier lancement sur Arch : compatibilité WebKitGTK
 - Écran planté au démarrage : `window.requestIdleCallback` n'existe pas dans WebKitGTK → `lib/idle.ts::whenIdle`
   (repli `setTimeout`), utilisé par le préchargement des vues (`AppShell`).
