@@ -3,6 +3,7 @@ import { SquareTerminal } from "lucide-react";
 import type { ChatItem } from "@/bindings/ChatItem";
 import { MessageAttachments } from "@/components/attachments/MessageAttachments";
 import { parseSlash } from "./slashText";
+import { t } from "@/i18n";
 
 type UserItem = Extract<ChatItem, { kind: "user" }>;
 
@@ -17,7 +18,8 @@ export const UserMessage = memo(function UserMessage({ item }: { item: UserItem 
           <div className="flex items-center gap-1.5">
             <SquareTerminal className="size-3.5 shrink-0" />
             <span>
-              Commande <span className="font-mono text-foreground">/{slash.name}</span> utilisée
+              {t("chat.commandUsedPrefix")} <span className="font-mono text-foreground">/{slash.name}</span>{" "}
+              {t("chat.commandUsedSuffix")}
             </span>
           </div>
           {slash.args && (

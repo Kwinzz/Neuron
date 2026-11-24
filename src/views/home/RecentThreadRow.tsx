@@ -4,6 +4,7 @@ import { AgentBadge } from "@/components/ui/AgentBadge";
 import { Badge } from "@/components/ui/badge";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { TableCell, TableRow } from "@/components/ui/table";
+import { t } from "@/i18n";
 import { formatTokens } from "@/lib/format";
 import { STATUS, TONE_TEXT } from "@/lib/status";
 import { useLive } from "@/stores/live";
@@ -16,11 +17,11 @@ interface RecentThreadRowProps {
 
 export const RecentThreadRow = memo(function RecentThreadRow({ thread }: RecentThreadRowProps) {
   const live = useLive((s) => s.threads[thread.id]);
-  const t = live ?? thread;
-  const meta = STATUS[t.status];
+  const th = live ?? thread;
+  const meta = STATUS[th.status];
 
   const openThread = () => {
-    useUi.getState().focusThread(t.id);
+    useUi.getState().focusThread(th.id);
     useUi.getState().setDockOpen(true);
   };
 
@@ -34,31 +35,31 @@ export const RecentThreadRow = memo(function RecentThreadRow({ thread }: RecentT
   return (
     <TableRow
       tabIndex={0}
-      aria-label={`Ouvrir ${t.title}`}
+      aria-label={t("home.openChatAria", { title: th.title })}
       onClick={openThread}
       onKeyDown={handleKeyDown}
       className="cursor-pointer duration-150 outline-none focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
     >
       <TableCell>
-        <div className="max-w-[280px] truncate font-medium">{t.title}</div>
+        <div className="max-w-[280px] truncate font-medium">{th.title}</div>
         <div className="max-w-[280px] truncate text-xs text-muted-foreground">
-          {t.projectName ?? "Sans projet"}
+          {th.projectName ?? t("home.noProject")}
         </div>
       </TableCell>
       <TableCell>
-        <AgentBadge agent={t.agent} variant="short" />
+        <AgentBadge agent={th.agent} variant="short" />
       </TableCell>
       <TableCell>
         <Badge variant="outline">
-          <StatusDot status={t.status} />
+          <StatusDot status={th.status} />
           <span className={TONE_TEXT[meta.tone]}>{meta.label}</span>
         </Badge>
       </TableCell>
       <TableCell className="text-right font-mono tabular-nums">
-        {formatTokens(t.tokens)}
+        {formatTokens(th.tokens)}
       </TableCell>
       <TableCell className="text-right">
-        <RelativeTime ts={t.updatedAt} />
+        <RelativeTime ts={th.updatedAt} />
       </TableCell>
     </TableRow>
   );

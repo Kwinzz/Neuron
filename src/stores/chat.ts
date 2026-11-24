@@ -11,6 +11,7 @@ import type { Attachment } from "@/bindings/Attachment";
 import type { ChatItem } from "@/bindings/ChatItem";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { toast } from "@/stores/toast";
+import { t } from "@/i18n";
 
 export interface ChatThread {
   items: ChatItem[];
@@ -224,7 +225,7 @@ export const useChat = create<ChatState>((set, get) => {
         await ipc.respondPermission(threadId, requestId, allow, mode, answers);
       } catch (err) {
         setState("denied");
-        toast({ tone: "danger", title: "Réponse impossible", description: ipcErrorMessage(err) });
+        toast({ tone: "danger", title: t("chat.answerFailed"), description: ipcErrorMessage(err) });
       }
     },
 
@@ -232,7 +233,7 @@ export const useChat = create<ChatState>((set, get) => {
       try {
         await ipc.stopThread(threadId);
       } catch (err) {
-        toast({ tone: "danger", title: "Arrêt impossible", description: ipcErrorMessage(err) });
+        toast({ tone: "danger", title: t("chat.stopFailed"), description: ipcErrorMessage(err) });
       }
     },
 

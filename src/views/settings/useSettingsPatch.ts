@@ -3,6 +3,7 @@ import type { AppSettings } from "@/bindings/AppSettings";
 import { ipcErrorMessage } from "@/lib/ipc";
 import { useSettings } from "@/stores/settings";
 import { toast } from "@/stores/toast";
+import { t } from "@/i18n";
 
 /*
  * Optimistic, serialized saves shared by every settings section.
@@ -38,7 +39,7 @@ export function useSettingsPatch(): SettingsPatch {
       } catch (err: unknown) {
         toast({
           tone: "danger",
-          title: "Impossible d'enregistrer les paramètres",
+          title: t("settings.saveFailed"),
           description: ipcErrorMessage(err),
         });
       }

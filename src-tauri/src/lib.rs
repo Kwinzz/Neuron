@@ -9,6 +9,7 @@ pub mod db;
 pub mod desktop;
 pub mod env_path;
 pub mod error;
+pub mod i18n;
 pub mod memory;
 pub mod notifications;
 pub mod pricing;
@@ -68,7 +69,18 @@ pub fn run() {
                 let data_dir = state.paths.data_dir.clone();
                 std::thread::spawn(move || notifications::register(&handle, &data_dir));
             }
-            let settings = tauri::async_runtime::block_on(state.db.call(|c| app_settings::load(c))).unwrap_or_default();
+            let mut settings =
+                tauri::async_runtime::block_on(state.db.call(|c| app_settings::load(c))).unwrap_or_default();
+            // First launch: language chosen in the installer, else the system's; then it is a normal setting.
+            if settings.language.is_none() {
+                settings.language = Some(i18n::detect());
+                let to_save = settings.clone();
+                if let Err(err) = tauri::async_runtime::block_on(state.db.call(move |c| app_settings::save(c, to_save)))
+                {
+                    tracing::warn!(%err, "language not saved");
+                }
+            }
+            i18n::set(settings.language.unwrap_or(i18n::Language::En));
             app.manage(state);
             // Tray, global shortcut, start with Windows; shows the main window unless started in the background.
             desktop::setup(app.handle(), &settings);

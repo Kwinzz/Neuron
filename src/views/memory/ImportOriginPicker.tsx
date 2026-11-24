@@ -9,8 +9,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CLI_ORIGINS, IMPORT_ORIGINS, WEB_ORIGINS, isMemoryImportOrigin } from "./importOrigins";
+import { CLI_ORIGINS, WEB_ORIGINS, isMemoryImportOrigin, originLabel } from "./importOrigins";
 import { ImportOriginLogo } from "./ImportOriginLogo";
+import { t } from "@/i18n";
 
 interface ImportOriginPickerProps {
   id?: string;
@@ -23,7 +24,7 @@ function OriginItem({ origin }: { origin: MemoryImportOrigin }) {
   return (
     <SelectItem value={origin}>
       <ImportOriginLogo origin={origin} className="shrink-0 text-muted-foreground" />
-      <span>{IMPORT_ORIGINS[origin].label}</span>
+      <span>{originLabel(origin)}</span>
     </SelectItem>
   );
 }
@@ -42,14 +43,14 @@ export function ImportOriginPicker({ id, value, onChange, disabled = false }: Im
       </SelectTrigger>
       <SelectContent align="start">
         <SelectGroup>
-          <SelectLabel>Assistants web</SelectLabel>
+          <SelectLabel>{t("memory.webAssistants")}</SelectLabel>
           {WEB_ORIGINS.map((origin) => (
             <OriginItem key={origin} origin={origin} />
           ))}
         </SelectGroup>
         <SelectSeparator />
         <SelectGroup>
-          <SelectLabel>Agents en ligne de commande</SelectLabel>
+          <SelectLabel>{t("memory.cliAgents")}</SelectLabel>
           {CLI_ORIGINS.map((origin) => (
             <OriginItem key={origin} origin={origin} />
           ))}

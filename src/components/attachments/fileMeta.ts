@@ -6,10 +6,9 @@ import {
   FileText,
   type LucideIcon,
 } from "lucide-react";
+import { locale, t } from "@/i18n";
 
-const FMT_INT = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
-const FMT_ONE = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });
-const UNITS = ["Ko", "Mo", "Go"] as const;
+const UNITS = ["chat.unitKB", "chat.unitMB", "chat.unitGB"] as const;
 
 const IMAGE_EXTS = new Set([
   "png",
@@ -81,11 +80,12 @@ const TEXT_EXTS = new Set([
   "rtf",
 ]);
 
-/** Format a byte count with French units and comma decimals (« 512 o », « 3,4 Ko », « 12 Mo »). */
+/** Format a byte count in the UI language (« 512 o », « 3,4 Ko », « 12 Mo » / « 512 B », « 3.4 KB »). */
 export function formatSize(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 o";
+  const fmtInt = new Intl.NumberFormat(locale(), { maximumFractionDigits: 0 });
+  if (!Number.isFinite(bytes) || bytes <= 0) return `0 ${t("chat.unitB")}`;
   const safe = Math.round(bytes);
-  if (safe < 1024) return `${FMT_INT.format(safe)} o`;
+  if (safe < 1024) return `${fmtInt.format(safe)} ${t("chat.unitB")}`;
 
   let value = safe / 1024;
   let unitIndex = 0;
@@ -97,8 +97,8 @@ export function formatSize(bytes: number): string {
     unitIndex += 1;
   }
 
-  const unit = UNITS[unitIndex] ?? "Go";
-  const formatted = (value >= 10 ? FMT_INT : FMT_ONE).format(value);
+  const unit = t(UNITS[unitIndex] ?? "chat.unitGB");
+  const formatted = (value >= 10 ? fmtInt : new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 })).format(value);
   return `${formatted} ${unit}`;
 }
 
@@ -146,7 +146,7 @@ function mimeSubtype(mime: string): string {
   return sub;
 }
 
-/** Short uppercase file type label (« PDF », « PNG », « JPG », « TSX ») or « Fichier ». */
+/** Short uppercase file type label (« PDF », « PNG », « JPG », « TSX ») or « Fichier » / « File ». */
 export function fileTypeLabel(name: string, mime: string): string {
   const ext = fileExtension(name);
   if (ext) {
@@ -158,5 +158,5 @@ export function fileTypeLabel(name: string, mime: string): string {
     if (sub === "jpeg") return "JPG";
     return sub.slice(0, 5).toUpperCase();
   }
-  return "Fichier";
+  return t("chat.fileGeneric");
 }

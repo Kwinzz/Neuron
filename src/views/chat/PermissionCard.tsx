@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/Kbd";
 import { useChat } from "@/stores/chat";
 import { ToolBody } from "./ToolBody";
+import { t } from "@/i18n";
 
 type PermissionItem = Extract<ChatItem, { kind: "permission" }>;
 
@@ -67,12 +68,12 @@ export const PermissionCard = memo(function PermissionCard({
         {allowed ? (
           <Badge variant="outline" className="shrink-0 border-ok/30 text-ok animate-in zoom-in-75 fade-in-0 duration-200">
             <Check />
-            Autorisé
+            {t("chat.allowed")}
           </Badge>
         ) : (
           <Badge variant="outline" className="shrink-0 border-destructive/30 text-destructive animate-in zoom-in-75 fade-in-0 duration-200">
             <X />
-            Refusé
+            {t("chat.denied")}
           </Badge>
         )}
       </div>
@@ -87,7 +88,7 @@ export const PermissionCard = memo(function PermissionCard({
     >
       <ShieldAlert className="text-warn" />
       <AlertTitle className="font-semibold text-foreground">
-        Autorisation requise — {item.toolName}
+        {t("chat.permissionRequired", { tool: item.toolName })}
       </AlertTitle>
       {item.description && (
         <AlertDescription className="col-start-2 min-w-0 whitespace-pre-wrap wrap-anywhere select-text">
@@ -100,18 +101,18 @@ export const PermissionCard = memo(function PermissionCard({
       <div className="col-start-2 mt-3 flex flex-wrap items-center gap-2">
         <Button ref={allowRef} size="sm" className="active:scale-[0.97]" disabled={submitted} onClick={() => respond(true)}>
           <Check />
-          Autoriser
+          {t("chat.allow")}
         </Button>
         <Button variant="outline" size="sm" className="active:scale-[0.97]" disabled={submitted} onClick={() => respond(false)}>
           <X />
-          Refuser
+          {t("chat.deny")}
         </Button>
         <div className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Kbd>Entrée</Kbd>
-          <span>autoriser</span>
+          <Kbd>{t("chat.kbdEnter")}</Kbd>
+          <span>{t("chat.allowHint")}</span>
           <span>·</span>
-          <Kbd>Échap</Kbd>
-          <span>refuser</span>
+          <Kbd>{t("chat.kbdEscape")}</Kbd>
+          <span>{t("chat.denyHint")}</span>
         </div>
       </div>
     </Alert>

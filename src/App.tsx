@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { AppShell } from "@/components/shell/AppShell";
+import { t } from "@/i18n";
 import { isTauri, windowLabel } from "@/lib/ipc";
 
 // Second window (global shortcut): only the quick prompt, none of the app shell.
@@ -9,7 +10,7 @@ export default function App() {
   if (!isTauri()) {
     return (
       <main className="flex h-full items-center justify-center p-8 text-fg-muted">
-        Neuron doit tourner dans Tauri — lancez <code className="mx-1 font-mono text-fg">npm run tauri dev</code>.
+        {t("shell.notInTauri")} <code className="mx-1 font-mono text-fg">npm run tauri dev</code>.
       </main>
     );
   }

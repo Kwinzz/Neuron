@@ -27,7 +27,7 @@
       },
       {
         "label": "quick",
-        "title": "Neuron — demande rapide",
+        "title": "Neuron — quick prompt",
         "width": 680,
         "height": 460,
         "decorations": false,
@@ -67,15 +67,16 @@
     "publisher": "Neuron",
     "copyright": "© 2026 Neuron",
     "category": "DeveloperTool",
-    "shortDescription": "Poste de pilotage de tes agents IA en ligne de commande",
-    "longDescription": "Neuron pilote Claude Code, Antigravity, Codex et d'autres CLI d'agents IA dans une interface unique : chats, mémoire partagée, quotas, notifications et demande rapide depuis n'importe quelle app.",
+    "shortDescription": "Desktop cockpit for your command-line AI agents",
+    "longDescription": "Neuron drives Claude Code, Antigravity, Codex and other AI agent CLIs from a single interface: chats, shared memory, quotas, notifications and a quick prompt from any app.",
     "windows": {
       "nsis": {
         "installMode": "perMachine",
         "languages": [
+          "English",
           "French"
         ],
-        "displayLanguageSelector": false,
+        "displayLanguageSelector": true,
         "installerIcon": "icons/icon.ico",
         "headerImage": "installer/header.bmp",
         "sidebarImage": "installer/sidebar.bmp",

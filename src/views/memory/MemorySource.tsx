@@ -1,7 +1,7 @@
 import { Bot, Download, FileText, UserRound } from "lucide-react";
 import { AgentLogo } from "@/components/ui/AgentLogo";
 import { describeSource } from "./categories";
-import { IMPORT_ORIGINS } from "./importOrigins";
+import { t } from "@/i18n";
 
 interface MemorySourceProps {
   source: string;
@@ -14,7 +14,7 @@ export function MemorySource({ source }: MemorySourceProps) {
     return (
       <span className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
         <UserRound className="size-3 shrink-0" aria-hidden />
-        <span className="truncate">Ajouté par toi</span>
+        <span className="truncate">{t("memory.addedByYou")}</span>
       </span>
     );
   }
@@ -33,8 +33,10 @@ export function MemorySource({ source }: MemorySourceProps) {
       <span className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
         <Download className="size-3 shrink-0" aria-hidden />
         <span className="truncate">
-          {/* « Importé de un import » reads badly: unknown / « Autre » origins just say « Importé ». */}
-          {described.label === IMPORT_ORIGINS.other.source ? "Importé" : `Importé de ${described.label}`}
+          {/* Unknown / « Autre » origins just say « Importé ». */}
+          {described.label === null
+            ? t("memory.imported")
+            : t("memory.importedFrom", { source: described.label })}
         </span>
       </span>
     );
@@ -47,7 +49,7 @@ export function MemorySource({ source }: MemorySourceProps) {
       ) : (
         <Bot className="size-3 shrink-0" aria-hidden />
       )}
-      <span className="truncate">Enregistré par {described.label}</span>
+      <span className="truncate">{t("memory.savedBy", { agent: described.label })}</span>
     </span>
   );
 }

@@ -9,6 +9,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { fileIcon, fileTypeLabel, formatSize } from "./fileMeta";
+import { t } from "@/i18n";
 
 interface AttachmentTrayProps {
   items: Attachment[];
@@ -55,7 +56,7 @@ const AttachmentTile = memo(function AttachmentTile({
         <button
           type="button"
           onClick={() => onRemove(item.id)}
-          aria-label={`Retirer ${item.name}`}
+          aria-label={t("chat.removeAttachment", { name: item.name })}
           className="absolute top-1 right-1 grid size-5 cursor-pointer place-items-center rounded-full border bg-background/80 text-foreground opacity-0 transition-opacity duration-150 outline-none hover:bg-background group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
         >
           <X className="size-3" aria-hidden="true" />
@@ -96,7 +97,7 @@ const AttachmentTile = memo(function AttachmentTile({
       <button
         type="button"
         onClick={() => onRemove(item.id)}
-        aria-label={`Retirer ${item.name}`}
+        aria-label={t("chat.removeAttachment", { name: item.name })}
         className="grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-muted-foreground transition-colors duration-150 outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       >
         <X className="size-3" aria-hidden="true" />
@@ -117,7 +118,7 @@ export const AttachmentTray = memo(function AttachmentTray({
     <>
       <div
         role="list"
-        aria-label="Pièces jointes"
+        aria-label={t("chat.attachments")}
         className="flex flex-wrap items-center gap-2 px-3 pt-3"
       >
         {items.map((item) => (
@@ -136,8 +137,8 @@ export const AttachmentTray = memo(function AttachmentTray({
         {pendingCount === 0
           ? ""
           : pendingCount === 1
-            ? "Import d’un fichier…"
-            : `Import de ${pendingCount} fichiers…`}
+            ? t("chat.importingOne")
+            : t("chat.importingMany", { n: pendingCount })}
       </span>
     </>
   );

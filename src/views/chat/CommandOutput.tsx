@@ -4,6 +4,7 @@ import { cn } from "cn";
 import type { ChatItem } from "@/bindings/ChatItem";
 import { Markdown } from "@/components/markdown/Markdown";
 import { type OutputBlock, looksLikeMarkdown, splitOutput } from "./slashText";
+import { t } from "@/i18n";
 
 type CommandItem = Extract<ChatItem, { kind: "command" }>;
 
@@ -18,7 +19,7 @@ const Meter = memo(function Meter({ block }: { block: Extract<OutputBlock, { kin
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-3 text-xs">
         <span className="truncate text-foreground">{block.label}</span>
-        <span className="shrink-0 font-mono tabular-nums text-foreground">{block.percent} %</span>
+        <span className="shrink-0 font-mono tabular-nums text-foreground">{t("chat.percent", { n: block.percent })}</span>
       </div>
       <div
         role="meter"
@@ -56,7 +57,7 @@ export const CommandOutput = memo(function CommandOutput({ item }: { item: Comma
       >
         <SquareTerminal className="size-3.5 shrink-0" />
         <span className="font-mono text-foreground">/{item.name}</span>
-        <span>· résultat de la commande</span>
+        <span>· {t("chat.commandResult")}</span>
         <ChevronDown
           className={cn("ml-auto size-3.5 shrink-0 opacity-60 transition-transform duration-150", !open && "-rotate-90")}
         />

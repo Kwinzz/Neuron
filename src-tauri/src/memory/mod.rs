@@ -56,13 +56,20 @@ impl MemoryCategory {
     }
 
     /// Heading used in `memory.md`.
+    /// Heading in the current language.
     pub fn label(self) -> &'static str {
+        let (fr, en) = self.labels();
+        crate::i18n::pick(fr, en)
+    }
+
+    /// (French, English) headings — both are recognized when `memory.md` is read back.
+    fn labels(self) -> (&'static str, &'static str) {
         match self {
-            MemoryCategory::Profile => "Profil",
-            MemoryCategory::TechPreferences => "Préférences techniques",
-            MemoryCategory::CodeStyle => "Style de code",
-            MemoryCategory::StrictRules => "Règles strictes",
-            MemoryCategory::Other => "Autres",
+            MemoryCategory::Profile => ("Profil", "Profile"),
+            MemoryCategory::TechPreferences => ("Préférences techniques", "Tech preferences"),
+            MemoryCategory::CodeStyle => ("Style de code", "Code style"),
+            MemoryCategory::StrictRules => ("Règles strictes", "Strict rules"),
+            MemoryCategory::Other => ("Autres", "Other"),
         }
     }
 
@@ -75,7 +82,10 @@ impl MemoryCategory {
         let norm = normalize(heading);
         Self::ALL
             .into_iter()
-            .find(|c| normalize(c.label()) == norm || normalize(c.as_db()) == norm)
+            .find(|c| {
+                let (fr, en) = c.labels();
+                normalize(fr) == norm || normalize(en) == norm || normalize(c.as_db()) == norm
+            })
             .or_else(|| {
                 // Loose prefixes: "Règles", "Style", "Préférences", "Profil".
                 let first = norm.split(' ').next().unwrap_or_default();
@@ -155,14 +165,18 @@ pub struct MemoryPaths {
     pub file_path: PathBuf,
 }
 
-const FILE_HEADER: &str = "# Mémoire Neuron\n\n\
+const FILE_HEADER_EN: &str = "# Neuron memory\n\n\
+> Global memory shared by all your agents (Claude Code, Codex, Antigravity…) through Neuron.\n\
+> Edit it here or in the app: one \"-\" bullet per memory, under the right category. Continuation\n\
+> lines are indented by 2 spaces. Neuron rewrites this file.\n";
+const FILE_HEADER_FR: &str = "# Mémoire Neuron\n\n\
 > Mémoire globale partagée par tous tes agents (Claude Code, Codex, Antigravity…) via Neuron.\n\
 > Modifiable ici ou dans l'app : une puce « - » par souvenir, sous la bonne catégorie. Les lignes\n\
 > de continuation sont indentées de 2 espaces. Ce fichier est réécrit par Neuron.\n";
 
 /// Render all memories as `memory.md`.
 pub fn render_file(items: &[Memory]) -> String {
-    let mut out = String::from(FILE_HEADER);
+    let mut out = String::from(crate::i18n::pick(FILE_HEADER_FR, FILE_HEADER_EN));
     for category in MemoryCategory::ALL {
         let in_cat: Vec<&Memory> = items.iter().filter(|m| m.category == category).collect();
         if category == MemoryCategory::Other && in_cat.is_empty() {
@@ -296,13 +310,17 @@ pub fn context_section(items: &[Memory]) -> Option<(String, ContextSource)> {
         MemoryCategory::CodeStyle,
         MemoryCategory::Other,
     ];
-    let mut md = String::from("\n## Mémoire globale de l'utilisateur\n");
+    let mut md = crate::tr!("\n## Mémoire globale de l'utilisateur\n", "\n## User's global memory\n");
     for category in order {
         let in_cat: Vec<&Memory> = items.iter().filter(|m| m.category == category).collect();
         if in_cat.is_empty() {
             continue;
         }
-        let suffix = if category == MemoryCategory::StrictRules { " (à respecter impérativement)" } else { "" };
+        let suffix = if category == MemoryCategory::StrictRules {
+            crate::i18n::pick(" (à respecter impérativement)", " (must be followed)")
+        } else {
+            ""
+        };
         md.push_str(&format!("\n### {}{suffix}\n\n", category.label()));
         for m in in_cat {
             md.push_str(&format!("- {}\n", m.content.replace('\n', "\n  ")));
@@ -310,7 +328,10 @@ pub fn context_section(items: &[Memory]) -> Option<(String, ContextSource)> {
     }
     if md.chars().count() > MAX_INJECTED_CHARS {
         md = md.chars().take(MAX_INJECTED_CHARS).collect();
-        md.push_str("\n[… tronqué — utilise neuron_memory_search pour le reste]\n");
+        md.push_str(&crate::tr!(
+            "\n[… tronqué — utilise neuron_memory_search pour le reste]\n",
+            "\n[… truncated — use neuron_memory_search for the rest]\n"
+        ));
     }
     md.push_str(
         "\nCette mémoire est aussi accessible via les outils MCP `neuron_memory_read`, `neuron_memory_search` \
@@ -319,8 +340,8 @@ pub fn context_section(items: &[Memory]) -> Option<(String, ContextSource)> {
     );
     let source = ContextSource {
         kind: ContextSourceKind::Memory,
-        label: "Mémoire globale".into(),
-        detail: Some(format!("{} souvenir(s)", items.len())),
+        label: crate::tr!("Mémoire globale", "Global memory"),
+        detail: Some(crate::tr!("{} souvenir(s)", "{} memory(ies)", items.len())),
     };
     Some((md, source))
 }

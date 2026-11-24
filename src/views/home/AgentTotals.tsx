@@ -1,5 +1,6 @@
 import { cn } from "cn";
 import type { AgentKind } from "@/bindings/AgentKind";
+import { t } from "@/i18n";
 import { AGENT_ORDER, AGENTS } from "@/lib/agents";
 import { formatPercent } from "@/lib/format";
 import { METRICS, type UsageMetric } from "./usageMetric";
@@ -15,10 +16,10 @@ interface AgentTotalsProps {
 /** Legend of the chart: one entry per agent with its total and share; a click hides / shows its bars. */
 export function AgentTotals({ totals, hidden, metric, onToggle }: AgentTotalsProps) {
   const spec = METRICS[metric];
-  const visibleCount = totals.filter((t) => !hidden.has(t.agent)).length;
+  const visibleCount = totals.filter((total) => !hidden.has(total.agent)).length;
 
   return (
-    <div className="flex flex-wrap gap-2" role="group" aria-label="Agents affichés">
+    <div className="flex flex-wrap gap-2" role="group" aria-label={t("home.agentsShown")}>
       {totals.map(({ agent, value, share }) => {
         const off = hidden.has(agent);
         const last = !off && visibleCount <= 1;
@@ -28,7 +29,7 @@ export function AgentTotals({ totals, hidden, metric, onToggle }: AgentTotalsPro
             type="button"
             aria-pressed={!off}
             disabled={last}
-            title={last ? undefined : off ? `Afficher ${AGENTS[agent].label}` : `Masquer ${AGENTS[agent].label}`}
+            title={last ? undefined : off ? t("home.showAgent", { agent: AGENTS[agent].label }) : t("home.hideAgent", { agent: AGENTS[agent].label })}
             onClick={() => onToggle(agent)}
             className={cn(
               "flex min-w-0 items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-[opacity,background-color] duration-150",

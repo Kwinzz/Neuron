@@ -1,8 +1,10 @@
 [Desktop Entry]
 Type=Application
 Name=Neuron
-GenericName=Poste de pilotage d'agents IA
-Comment=Pilote Claude Code, Codex, Antigravity et d'autres CLI d'agents IA
+GenericName=AI agents cockpit
+GenericName[fr]=Poste de pilotage d'agents IA
+Comment=Drive Claude Code, Codex, Antigravity and other AI agent CLIs
+Comment[fr]=Pilote Claude Code, Codex, Antigravity et d'autres CLI d'agents IA
 Exec=neuron %U
 Icon=neuron
 Terminal=false
@@ -12,5 +14,6 @@ StartupWMClass=neuron
 Actions=quick;
 
 [Desktop Action quick]
-Name=Demande rapide
+Name=Quick prompt
+Name[fr]=Demande rapide
 Exec=neuron --quick

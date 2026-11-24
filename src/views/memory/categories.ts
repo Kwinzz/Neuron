@@ -2,6 +2,7 @@ import { Code2, Cpu, ShieldAlert, StickyNote, User, type LucideIcon } from "luci
 import type { AgentKind } from "@/bindings/AgentKind";
 import type { MemoryCategory } from "@/bindings/MemoryCategory";
 import { AGENTS } from "@/lib/agents";
+import { t, type MessageKey } from "@/i18n";
 import { IMPORT_ORIGINS, isMemoryImportOrigin } from "./importOrigins";
 
 export const CATEGORY_ORDER: readonly MemoryCategory[] = [
@@ -21,48 +22,65 @@ export interface CategoryMeta {
   iconClass: string;
 }
 
-export const CATEGORIES: Record<MemoryCategory, CategoryMeta> = {
+/** Static part of each category; the texts are message keys, translated when read (`categoryMeta`). */
+const CATEGORY_DEFS: Record<
+  MemoryCategory,
+  { label: MessageKey; short: MessageKey; description: MessageKey; example: MessageKey; icon: LucideIcon; iconClass: string }
+> = {
   profile: {
-    label: "Profil",
-    short: "Profil",
-    description: "Qui tu es, ton contexte, ta façon de travailler.",
-    example: "Développeur full-stack, je parle français, réponses concises.",
+    label: "memory.catProfile",
+    short: "memory.catProfileShort",
+    description: "memory.catProfileDescription",
+    example: "memory.catProfileExample",
     icon: User,
     iconClass: "text-muted-foreground",
   },
   tech_preferences: {
-    label: "Préférences techniques",
-    short: "Préf. techniques",
-    description: "Langages, outils et bibliothèques que tu privilégies.",
-    example: "Préférer pnpm à npm ; TypeScript strict partout.",
+    label: "memory.catTech",
+    short: "memory.catTechShort",
+    description: "memory.catTechDescription",
+    example: "memory.catTechExample",
     icon: Cpu,
     iconClass: "text-muted-foreground",
   },
   code_style: {
-    label: "Style de code",
-    short: "Style de code",
-    description: "Conventions de nommage, formatage, structure.",
-    example: "Composants fonctionnels, un composant par fichier.",
+    label: "memory.catCodeStyle",
+    short: "memory.catCodeStyleShort",
+    description: "memory.catCodeStyleDescription",
+    example: "memory.catCodeStyleExample",
     icon: Code2,
     iconClass: "text-muted-foreground",
   },
   strict_rules: {
-    label: "Règles strictes",
-    short: "Règles strictes",
-    description: "Interdits et obligations que les agents doivent toujours respecter.",
-    example: "Ne jamais pousser sur main sans demande.",
+    label: "memory.catStrict",
+    short: "memory.catStrictShort",
+    description: "memory.catStrictDescription",
+    example: "memory.catStrictExample",
     icon: ShieldAlert,
     iconClass: "text-warn",
   },
   other: {
-    label: "Autres",
-    short: "Autres",
-    description: "Tout le reste.",
-    example: "Mon éditeur est VS Code.",
+    label: "memory.catOther",
+    short: "memory.catOtherShort",
+    description: "memory.catOtherDescription",
+    example: "memory.catOtherExample",
     icon: StickyNote,
     iconClass: "text-muted-foreground",
   },
 };
+
+/** Label, description, example and icon of a category, in the current language. */
+export function categoryMeta(category: MemoryCategory): CategoryMeta {
+  const def = CATEGORY_DEFS[category];
+  return {
+    label: t(def.label),
+    short: t(def.short),
+    description: t(def.description),
+    example: t(def.example),
+    icon: def.icon,
+    iconClass: def.iconClass,
+  };
+}
 
 export function isMemoryCategory(value: string): value is MemoryCategory {
   return (
@@ -81,7 +99,8 @@ function isNamedAgentKind(value: string): value is Exclude<AgentKind, "generic">
 export type SourceDescription =
   | { kind: "user" }
   | { kind: "file" }
-  | { kind: "import"; origin: string; label: string }
+  /** `label`: the assistant / CLI name, null for « Autre » or an unknown origin. */
+  | { kind: "import"; origin: string; label: string | null }
   | { kind: "agent"; agent: AgentKind | null; label: string };
 
 export function describeSource(source: string): SourceDescription {
@@ -89,7 +108,7 @@ export function describeSource(source: string): SourceDescription {
   if (source === "file") return { kind: "file" };
   if (source.startsWith("import:")) {
     const origin = source.slice("import:".length);
-    const label = isMemoryImportOrigin(origin) ? IMPORT_ORIGINS[origin].source : IMPORT_ORIGINS.other.source;
+    const label = isMemoryImportOrigin(origin) ? IMPORT_ORIGINS[origin].name : null;
     return { kind: "import", origin, label };
   }
   if (source.startsWith("agent:")) {

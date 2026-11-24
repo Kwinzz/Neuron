@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { formatRelative } from "@/lib/format";
 import { ipc, ipcErrorMessage, isTauri } from "@/lib/ipc";
 import { toast } from "@/stores/toast";
+import { t } from "@/i18n";
 
 /** Where model prices come from (LiteLLM list, refreshed daily) + manual refresh. */
 export function PricingCard() {
@@ -22,9 +23,13 @@ export function PricingCard() {
     try {
       const next = await ipc.refreshPrices();
       setStatus(next);
-      toast({ tone: "ok", title: "Tarifs à jour", description: `${next.modelCount} modèles` });
+      toast({
+        tone: "ok",
+        title: t("settings.pricingUpdated"),
+        description: t("settings.pricingModels", { n: next.modelCount }),
+      });
     } catch (err) {
-      toast({ tone: "danger", title: "Mise à jour impossible", description: ipcErrorMessage(err) });
+      toast({ tone: "danger", title: t("settings.pricingFailed"), description: ipcErrorMessage(err) });
       void ipc.pricingStatus().then(setStatus).catch(() => undefined);
     } finally {
       setPending(false);
@@ -36,12 +41,10 @@ export function PricingCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <CircleDollarSign className="size-4 text-muted-foreground" />
-          Tarifs des modèles
+          {t("settings.pricingTitle")}
         </CardTitle>
         <CardDescription>
-          Codex et Antigravity ne communiquent que des tokens : le coût de chaque requête est estimé au tarif API
-          public du modèle. Liste LiteLLM (tarifs officiels OpenAI, Anthropic, Google), téléchargée au plus une fois
-          par jour ; un nouveau modèle est chiffré dès qu&apos;il y apparaît.
+          {t("settings.pricingDescription")}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap items-center justify-between gap-3">
@@ -50,17 +53,18 @@ export function PricingCard() {
             "…"
           ) : status.source === "litellm" && status.fetchedAt !== null ? (
             <>
-              <span className="tabular-nums text-foreground">{status.modelCount}</span> modèles · mis à jour{" "}
+              <span className="tabular-nums text-foreground">{status.modelCount}</span>{" "}
+              {t("settings.pricingModelsUpdated")}{" "}
               {formatRelative(status.fetchedAt)}
             </>
           ) : (
-            "Table intégrée (liste en ligne pas encore téléchargée)"
+            t("settings.pricingBuiltin")
           )}
-          {status?.error && <span className="mt-1 block text-warn">Dernier essai : {status.error}</span>}
+          {status?.error && <span className="mt-1 block text-warn">{t("settings.pricingLastError", { error: status.error })}</span>}
         </p>
         <Button variant="outline" size="sm" onClick={() => void refresh()} disabled={pending || !isTauri()}>
           <RefreshCw className={pending ? "animate-spin" : undefined} />
-          Actualiser
+          {t("settings.refresh")}
         </Button>
       </CardContent>
     </Card>

@@ -11,13 +11,16 @@ import {
 import { type ChartConfig, ChartContainer } from "@/components/ui/chart";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { t } from "@/i18n";
 import { formatPercent, formatTokens } from "@/lib/format";
 import { useDashboard } from "@/stores/dashboard";
 import { RANGE_LABEL } from "./rangeLabel";
 
 const CACHE_CHART_CONFIG: ChartConfig = {
   cache: {
-    label: "Lecture cache",
+    get label() {
+      return t("home.cacheReadLabel");
+    },
     color: "var(--primary)",
   },
 };
@@ -44,7 +47,7 @@ export function CacheCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Efficacité du cache</CardTitle>
+        <CardTitle>{t("home.cacheTitle")}</CardTitle>
         <CardDescription>{RANGE_LABEL[range]}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col justify-between gap-4">
@@ -61,7 +64,7 @@ export function CacheCard() {
             <div
               role="img"
               aria-label={
-                ratio != null ? `Taux de lecture cache : ${pctText}` : "Aucune donnée de cache"
+                ratio != null ? t("home.cacheRateAria", { pct: pctText }) : t("home.cacheNoData")
               }
               // The ring fills the free height of the card (it stretches next to taller cards) and scales with it.
               className="flex flex-1 items-center justify-center animate-in fade-in-0 duration-300"
@@ -102,7 +105,7 @@ export function CacheCard() {
                                 {pctText}
                               </tspan>
                               <tspan x={cx} y={cy + 24} className="fill-muted-foreground text-xs">
-                                lecture cache
+                                {t("home.cacheReadCaption")}
                               </tspan>
                             </text>
                           );
@@ -117,14 +120,14 @@ export function CacheCard() {
 
             <div className="flex flex-col gap-3 animate-in fade-in-0 duration-300">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Cache lu</span>
+                <span className="text-muted-foreground">{t("home.cacheRead")}</span>
                 <span className="font-mono font-medium tabular-nums">
                   {usage ? formatTokens(cacheRead) : "—"}
                 </span>
               </div>
               <Separator />
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Cache écrit</span>
+                <span className="text-muted-foreground">{t("home.cacheWritten")}</span>
                 <span className="font-mono font-medium tabular-nums">
                   {usage ? formatTokens(cacheWrite) : "—"}
                 </span>

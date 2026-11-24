@@ -61,13 +61,26 @@ pub fn toggle_quick(app: &AppHandle) {
     let _ = app.emit_to(QUICK, QUICK_OPENED_EVENT, ());
 }
 
+/// Tray menu in the current language.
+fn tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
+    use crate::i18n::pick;
+    let open = MenuItem::with_id(app, "open", pick("Ouvrir Neuron", "Open Neuron"), true, None::<&str>)?;
+    let quick = MenuItem::with_id(app, "quick", pick("Demande rapide…", "Quick prompt…"), true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", pick("Quitter Neuron", "Quit Neuron"), true, None::<&str>)?;
+    let separator = PredefinedMenuItem::separator(app)?;
+    Menu::with_items(app, &[&open, &quick, &separator, &quit])
+}
+
+/// After a language change.
+pub fn refresh_tray_menu(app: &AppHandle) {
+    if let (Some(tray), Ok(menu)) = (app.tray_by_id("neuron"), tray_menu(app)) {
+        let _ = tray.set_menu(Some(menu));
+    }
+}
+
 /// Tray icon: click = open Neuron; menu = open, quick prompt, quit.
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "Ouvrir Neuron", true, None::<&str>)?;
-    let quick = MenuItem::with_id(app, "quick", "Demande rapide…", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quitter Neuron", true, None::<&str>)?;
-    let separator = PredefinedMenuItem::separator(app)?;
-    let menu = Menu::with_items(app, &[&open, &quick, &separator, &quit])?;
+    let menu = tray_menu(app)?;
 
     let mut builder = TrayIconBuilder::with_id("neuron")
         .tooltip("Neuron")
@@ -102,8 +115,10 @@ fn apply_shortcut(app: &AppHandle, settings: &AppSettings) -> Result<(), String>
     if !quick.enabled {
         return Ok(());
     }
-    let shortcut: Shortcut =
-        quick.shortcut.parse().map_err(|e| format!("raccourci « {} » invalide : {e}", quick.shortcut))?;
+    let shortcut: Shortcut = quick
+        .shortcut
+        .parse()
+        .map_err(|e| crate::tr!("raccourci « {} » invalide : {e}", "invalid shortcut “{}”: {e}", quick.shortcut))?;
     app.global_shortcut()
         .on_shortcut(shortcut, |app, _, event| {
             if event.state == ShortcutState::Pressed {
@@ -112,12 +127,19 @@ fn apply_shortcut(app: &AppHandle, settings: &AppSettings) -> Result<(), String>
         })
         .map_err(|e| {
             if cfg!(target_os = "linux") && std::env::var_os("WAYLAND_DISPLAY").is_some() {
-                format!(
-                    "raccourci global indisponible sous Wayland : lie la commande « neuron --quick » à {} dans les                      raccourcis de ton bureau",
-                    quick.shortcut
+                let shortcut = &quick.shortcut;
+                crate::tr!(
+                    "raccourci global indisponible sous Wayland : lie la commande « neuron --quick » à {shortcut} dans \
+                     les raccourcis de ton bureau",
+                    "global shortcuts are not available under Wayland: bind the command “neuron --quick” to {shortcut} \
+                     in your desktop's shortcuts"
                 )
             } else {
-                format!("raccourci « {} » indisponible (déjà pris par une autre app ?) : {e}", quick.shortcut)
+                crate::tr!(
+                    "raccourci « {} » indisponible (déjà pris par une autre app ?) : {e}",
+                    "shortcut “{}” unavailable (already taken by another app?): {e}",
+                    quick.shortcut
+                )
             }
         })?;
     *current = Some(shortcut);
@@ -136,7 +158,7 @@ fn apply_autostart(app: &AppHandle, settings: &AppSettings) -> Result<(), String
         return Ok(());
     }
     let result = if wanted { manager.enable() } else { manager.disable() };
-    result.map_err(|e| format!("démarrage avec Windows : {e}"))
+    result.map_err(|e| crate::tr!("démarrage avec Windows : {e}", "launch with Windows: {e}"))
 }
 
 /// At startup the OS entry is the truth: it may have been set by the installer (« Lancer Neuron avec Windows ? »)
@@ -209,8 +231,11 @@ pub fn on_window_event(window: &Window, event: &WindowEvent) {
                 tauri::async_runtime::spawn_blocking(move || {
                     let _ = crate::notifications::show(
                         &app,
-                        "Neuron tourne en arrière-plan",
-                        "Tes agents continuent. Rouvre Neuron depuis l'icône près de l'horloge, ou fais ta demande avec le raccourci global.",
+                        crate::i18n::pick("Neuron tourne en arrière-plan", "Neuron is running in the background"),
+                        crate::i18n::pick(
+                            "Tes agents continuent. Rouvre Neuron depuis l'icône près de l'horloge, ou fais ta demande avec le raccourci global.",
+                            "Your agents keep going. Reopen Neuron from the icon near the clock, or send a request with the global shortcut.",
+                        ),
                         None,
                     );
                 });

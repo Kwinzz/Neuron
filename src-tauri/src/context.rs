@@ -74,14 +74,21 @@ pub fn context_path(root: &Path) -> PathBuf {
 }
 
 pub fn template(project_name: &str) -> String {
-    format!(
+    crate::tr!(
         "# Contexte du projet {project_name}\n\n\
          > Ce fichier est injecté automatiquement au début de chaque nouveau chat de ce projet dans Neuron.\n\
          > Décris ici ce que tout agent doit savoir avant de travailler.\n\n\
          ## Objectif\n\n\
          ## Architecture\n\n\
          ## Conventions & règles\n\n\
-         ## Commandes utiles\n"
+         ## Commandes utiles\n",
+        "# Project context: {project_name}\n\n\
+         > This file is injected automatically at the start of every new chat of this project in Neuron.\n\
+         > Describe here what any agent must know before working.\n\n\
+         ## Goal\n\n\
+         ## Architecture\n\n\
+         ## Conventions & rules\n\n\
+         ## Useful commands\n"
     )
 }
 
@@ -91,10 +98,17 @@ fn require_dir(root: &Path) -> AppResult<()> {
         return Ok(());
     }
     let message = if root.to_string_lossy().starts_with("demo:") {
-        "projet de démonstration : il n'a pas de vrai dossier. Ajoute un vrai projet (« Ajouter un projet ») pour          utiliser le contexte."
-            .to_string()
+        crate::tr!(
+            "projet de démonstration : il n'a pas de vrai dossier. Ajoute un vrai projet (« Ajouter un projet ») pour \
+             utiliser le contexte.",
+            "demo project: it has no real folder. Add a real project (“Add a project”) to use the context."
+        )
     } else {
-        format!("dossier du projet introuvable : {} (déplacé ou supprimé ?)", root.display())
+        let dir = root.display();
+        crate::tr!(
+            "dossier du projet introuvable : {dir} (déplacé ou supprimé ?)",
+            "project folder not found: {dir} (moved or deleted?)"
+        )
     };
     Err(crate::error::AppError::NotFound(message))
 }
@@ -209,10 +223,16 @@ pub fn recent_files(root: &Path) -> Vec<RecentFile> {
 fn ago(ms: i64, now_ms: i64) -> String {
     let mins = (now_ms - ms).max(0) / 60_000;
     match mins {
-        0 => "à l'instant".into(),
-        1..=59 => format!("il y a {mins} min"),
-        60..=1439 => format!("il y a {} h", mins / 60),
-        _ => format!("il y a {} j", mins / 1440),
+        0 => crate::tr!("à l'instant", "just now"),
+        1..=59 => crate::tr!("il y a {mins} min", "{mins} min ago"),
+        60..=1439 => {
+            let h = mins / 60;
+            crate::tr!("il y a {h} h", "{h} h ago")
+        }
+        _ => {
+            let d = mins / 1440;
+            crate::tr!("il y a {d} j", "{d} d ago")
+        }
     }
 }
 
@@ -223,65 +243,71 @@ pub fn build(
     now_ms: i64,
     opts: &crate::app_settings::ContextSettings,
 ) -> AppResult<ContextBundle> {
-    let mut md = format!(
+    let dir = root.display();
+    let mut md = crate::tr!(
         "# Contexte Neuron — projet « {project_name} »\n\
-         Dossier du projet : {}\n\
+         Dossier du projet : {dir}\n\
          (Contexte fourni automatiquement par Neuron au démarrage de ce chat.)\n",
-        root.display()
+        "# Neuron context — project “{project_name}”\n\
+         Project folder: {dir}\n\
+         (Context given automatically by Neuron when this chat started.)\n"
     );
     let mut sources = Vec::new();
 
     if let Some(content) = read_context(root)?.filter(|c| !c.trim().is_empty()) {
         let mut text: String = content.chars().take(MAX_CONTEXT_CHARS).collect();
         if content.chars().count() > MAX_CONTEXT_CHARS {
-            text.push_str("\n\n[… tronqué]");
+            text.push_str(&crate::tr!("\n\n[… tronqué]", "\n\n[… truncated]"));
         }
-        md.push_str("\n## Contexte du projet (.neuron/context.md)\n\n");
+        md.push_str(&crate::tr!(
+            "\n## Contexte du projet (.neuron/context.md)\n\n",
+            "\n## Project context (.neuron/context.md)\n\n"
+        ));
         md.push_str(text.trim());
         md.push('\n');
         sources.push(ContextSource {
             kind: ContextSourceKind::File,
             label: CONTEXT_REL.into(),
-            detail: Some(format!("{} lignes", content.lines().count())),
+            detail: Some(crate::tr!("{} lignes", "{} lines", content.lines().count())),
         });
     }
 
     if let Some(snapshot) = git_snapshot(root).filter(|_| opts.git_snapshot) {
         md.push_str("\n## Git\n\n");
         if let Some(branch) = &snapshot.branch {
-            md.push_str(&format!("Branche courante : `{branch}`\n"));
+            md.push_str(&crate::tr!("Branche courante : `{branch}`\n", "Current branch: `{branch}`\n"));
         }
         if snapshot.changed.is_empty() {
-            md.push_str("Arbre de travail propre.\n");
+            md.push_str(&crate::tr!("Arbre de travail propre.\n", "Clean working tree.\n"));
         } else {
-            md.push_str("Modifications non commitées :\n");
+            md.push_str(&crate::tr!("Modifications non commitées :\n", "Uncommitted changes:\n"));
             for line in &snapshot.changed {
                 md.push_str(&format!("- `{line}`\n"));
             }
         }
         if !snapshot.recent_commits.is_empty() {
-            md.push_str("Derniers commits :\n");
+            md.push_str(&crate::tr!("Derniers commits :\n", "Latest commits:\n"));
             for line in &snapshot.recent_commits {
                 md.push_str(&format!("- {line}\n"));
             }
         }
         sources.push(ContextSource {
             kind: ContextSourceKind::Git,
-            label: snapshot.branch.clone().map_or_else(|| "Git".into(), |b| format!("branche {b}")),
-            detail: Some(format!("{} fichier(s) modifié(s)", snapshot.changed.len())),
+            label: snapshot.branch.clone().map_or_else(|| "Git".into(), |b| crate::tr!("branche {b}", "branch {b}")),
+            detail: Some(crate::tr!("{} fichier(s) modifié(s)", "{} changed file(s)", snapshot.changed.len())),
         });
     }
 
     let recent = if opts.recent_files { recent_files(root) } else { Vec::new() };
     if !recent.is_empty() {
-        md.push_str("\n## Fichiers modifiés récemment\n\n");
+        md.push_str(&crate::tr!("\n## Fichiers modifiés récemment\n\n", "\n## Recently changed files\n\n"));
         for f in &recent {
             md.push_str(&format!("- `{}` ({})\n", f.path, ago(f.modified_at, now_ms)));
         }
         sources.push(ContextSource {
             kind: ContextSourceKind::Recent,
-            label: "Fichiers récents".into(),
-            detail: Some(format!("{} fichier(s)", recent.len())),
+            label: crate::tr!("Fichiers récents", "Recent files"),
+            detail: Some(crate::tr!("{} fichier(s)", "{} file(s)", recent.len())),
         });
     }
 
@@ -299,8 +325,9 @@ pub fn with_memory(bundle: Option<ContextBundle>, memory: Option<(String, Contex
             Some(b)
         }
         (None, Some((md, source))) => Some(ContextBundle {
-            markdown: format!(
-                "# Contexte Neuron\n(Contexte fourni automatiquement par Neuron au démarrage de ce chat.)\n{md}"
+            markdown: crate::tr!(
+                "# Contexte Neuron\n(Contexte fourni automatiquement par Neuron au démarrage de ce chat.)\n{md}",
+                "# Neuron context\n(Context given automatically by Neuron when this chat started.)\n{md}"
             ),
             sources: vec![source],
         }),
@@ -310,11 +337,16 @@ pub fn with_memory(bundle: Option<ContextBundle>, memory: Option<(String, Contex
 /// What every agent is told about Neuron: where it runs, the global memory it can read and edit, and the
 /// project context file it can maintain. Given at each session start (not frozen with the chat).
 /// Appended to later messages of agents without a system prompt (they saw the intro only once).
-pub const SUMMARY_REMINDER: &str =
-    "(Neuron : termine ta réponse par la ligne `<!-- neuron: ok|partiel|échec | résumé en une phrase -->`.)";
+/// The status words `ok|partiel|échec` are the protocol read by `agents/summary.rs`: same in both languages.
+pub fn summary_reminder() -> &'static str {
+    crate::i18n::pick(
+        "(Neuron : termine ta réponse par la ligne `<!-- neuron: ok|partiel|échec | résumé en une phrase -->`.)",
+        "(Neuron: end your answer with the line `<!-- neuron: ok|partiel|échec | one-sentence summary -->`.)",
+    )
+}
 
 pub fn neuron_intro(memory_file: Option<&Path>, project: Option<&Path>) -> String {
-    let mut md = String::from(
+    let mut md = crate::tr!(
         "# Neuron\n\
          Tu es lancé par **Neuron**, l'application de bureau de l'utilisateur qui pilote ses agents IA (Claude Code, \
          Codex, Antigravity…) dans une interface graphique. Il lit tes réponses dans le chat de Neuron : Markdown \
@@ -336,24 +368,52 @@ pub fn neuron_intro(memory_file: Option<&Path>, project: Option<&Path>) -> Strin
          Quand l'utilisateur te demande de retenir, corriger ou oublier quelque chose, fais-le avec ces outils et \
          dis-le-lui en une phrase. Enregistre aussi de toi-même une préférence ou une règle permanente qu'il exprime \
          clairement ; jamais d'information passagère ni de secret.\n",
+        "# Neuron\n\
+         You are run by **Neuron**, the user's desktop app that drives their AI agents (Claude Code, Codex, \
+         Antigravity…) in a graphical interface. They read your answers in Neuron's chat: Markdown is rendered, \
+         and the files you change show up there automatically as diffs. To show an image (png, jpg, webp, gif, \
+         svg…) you created or found, mention its path in your answer (absolute, or relative to the chat's folder): \
+         Neuron displays it under your message.\n\n\
+         ## End-of-answer summary\n\
+         End **every** answer with one last line on its own, invisible in the chat: \
+         `<!-- neuron: ok | summary -->`. Status (keep these exact words): `ok` (request done), `partiel` \
+         (partly done) or `échec` (not done, blocked, error); summary: one sentence under 120 characters, in \
+         English, saying what you did or why it failed. Neuron uses it for the notification sent to the user.\n\n\
+         ## Global memory\n\
+         Neuron keeps a memory shared by all the user's agents — profile, tech preferences, code style, strict \
+         rules —, like a web assistant's memory. It is given to you when the chat starts if it isn't empty, and \
+         you reach it with the MCP tools of the `neuron` server:\n\
+         - `neuron_memory_read` / `neuron_memory_search` to look it up (each memory has an id);\n\
+         - `neuron_memory_save` to add a lasting memory;\n\
+         - `neuron_memory_update` / `neuron_memory_delete` to fix or remove a memory that became wrong.\n\
+         When the user asks you to remember, correct or forget something, do it with these tools and tell them in \
+         one sentence. Also save on your own a lasting preference or rule they state clearly; never passing \
+         information nor secrets.\n"
     );
     if let Some(file) = memory_file {
-        md.push_str(&format!(
-            "Si ces outils ne sont pas disponibles, modifie directement le fichier `{}` (une puce par souvenir sous \
+        let file = file.display();
+        md.push_str(&crate::tr!(
+            "Si ces outils ne sont pas disponibles, modifie directement le fichier `{file}` (une puce par souvenir sous \
              la bonne section) : Neuron reprend ses modifications.\n",
-            file.display()
+            "If these tools are not available, edit the file `{file}` directly (one bullet per memory under the \
+             right section): Neuron picks up the changes.\n"
         ));
     }
     if let Some(root) = project {
-        md.push_str(&format!(
+        let root = root.display();
+        md.push_str(&crate::tr!(
             "\n## Contexte du projet\n\
-             Ce chat appartient à un projet Neuron. Son fichier de contexte `{}` (dans `{}`) est injecté dans chaque \
-             nouveau chat du projet. Tiens-le à jour quand tu apprends ou décides quelque chose de durable : \
+             Ce chat appartient à un projet Neuron. Son fichier de contexte `{CONTEXT_REL}` (dans `{root}`) est injecté \
+             dans chaque nouveau chat du projet. Tiens-le à jour quand tu apprends ou décides quelque chose de durable : \
              objectif, architecture, décisions, conventions, commandes utiles. Utilise \
              `neuron_project_context_read` / `neuron_project_context_update` (ou tes outils de fichiers). Lis-le \
              avant de le modifier, garde ce qui reste vrai et reste concis.\n",
-            CONTEXT_REL,
-            root.display()
+            "\n## Project context\n\
+             This chat belongs to a Neuron project. Its context file `{CONTEXT_REL}` (in `{root}`) is injected into \
+             every new chat of the project. Keep it up to date when you learn or decide something lasting: goal, \
+             architecture, decisions, conventions, useful commands. Use `neuron_project_context_read` / \
+             `neuron_project_context_update` (or your file tools). Read it before changing it, keep what is still \
+             true and stay concise.\n"
         ));
     }
     md
@@ -369,7 +429,10 @@ pub fn session_instructions(intro: &str, frozen: Option<&str>) -> String {
 
 /// Preamble for agents without a system-prompt option (Codex, Antigravity): sent before the first message.
 pub fn as_preamble(context: &str, prompt: &str) -> String {
-    format!("<contexte_neuron>\n{context}\n</contexte_neuron>\n\n{prompt}")
+    crate::tr!(
+        "<contexte_neuron>\n{context}\n</contexte_neuron>\n\n{prompt}",
+        "<neuron_context>\n{context}\n</neuron_context>\n\n{prompt}"
+    )
 }
 
 #[cfg(test)]

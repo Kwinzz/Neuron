@@ -42,7 +42,10 @@ pub async fn create_thread(
     input: NewThreadInput,
 ) -> AppResult<ThreadSummary> {
     if !state.agents.supports(input.agent) {
-        return Err(AppError::Invalid("cet agent arrive dans une prochaine phase".into()));
+        return Err(AppError::Invalid(crate::tr!(
+            "cet agent arrive dans une prochaine phase",
+            "this agent comes in a later phase"
+        )));
     }
     let cwd = resolve_cwd(&state, input.cwd.as_deref(), input.project_id.as_deref()).await?;
     let mode = input.permission_mode.clone().unwrap_or_else(|| "manual".into());
@@ -207,7 +210,7 @@ pub async fn get_thread_history(state: State<'_, AppState>, thread_id: String) -
 pub async fn rename_thread(state: State<'_, AppState>, thread_id: String, title: String) -> AppResult<()> {
     let title = title.trim().to_string();
     if title.is_empty() {
-        return Err(AppError::Invalid("le titre est vide".into()));
+        return Err(AppError::Invalid(crate::tr!("le titre est vide", "the title is empty")));
     }
     state.db.call(move |c| threads::rename(c, &thread_id, &title)).await
 }
@@ -237,12 +240,18 @@ pub async fn default_cwd(state: State<'_, AppState>) -> AppResult<String> {
 
 fn validate_settings(mode: &str, effort: Option<&str>) -> AppResult<()> {
     if !PERMISSION_MODES.contains(&mode) {
-        return Err(AppError::Invalid(format!("mode de permission inconnu : {mode}")));
+        return Err(AppError::Invalid(crate::tr!(
+            "mode de permission inconnu : {mode}",
+            "unknown permission mode: {mode}"
+        )));
     }
     if let Some(e) = effort.filter(|e| !e.is_empty()) {
         // Union of the levels supported by the adapters; each adapter ignores levels it doesn't know.
         if !crate::agents::codex::EFFORT_LEVELS.contains(&e) {
-            return Err(AppError::Invalid(format!("niveau de raisonnement inconnu : {e}")));
+            return Err(AppError::Invalid(crate::tr!(
+                "niveau de raisonnement inconnu : {e}",
+                "unknown reasoning level: {e}"
+            )));
         }
     }
     Ok(())
@@ -262,7 +271,10 @@ async fn resolve_cwd(state: &AppState, cwd: Option<&str>, project_id: Option<&st
         None => default_cwd_inner(state).await?,
     };
     if !std::path::Path::new(&dir).is_dir() {
-        return Err(AppError::Invalid(format!("dossier de travail introuvable : {dir}")));
+        return Err(AppError::Invalid(crate::tr!(
+            "dossier de travail introuvable : {dir}",
+            "working folder not found: {dir}"
+        )));
     }
     Ok(dir)
 }
@@ -329,7 +341,7 @@ pub async fn create_project(
     let path = path.trim().to_string();
     let dir = std::path::Path::new(&path);
     if !dir.is_dir() {
-        return Err(AppError::Invalid(format!("dossier introuvable : {path}")));
+        return Err(AppError::Invalid(crate::tr!("dossier introuvable : {path}", "folder not found: {path}")));
     }
     let name = name
         .map(|n| n.trim().to_string())

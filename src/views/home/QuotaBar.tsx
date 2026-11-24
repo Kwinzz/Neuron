@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { cn } from "cn";
 import { useNow } from "@/hooks/useNow";
+import { locale, t } from "@/i18n";
 import { formatCountdown, formatPercent } from "@/lib/format";
 import type { QuotaLevel } from "./quotaFormat";
 
@@ -49,8 +50,8 @@ export const QuotaBar = memo(function QuotaBar({ ratio, resetsAt, level, label, 
       <div className="relative flex h-full items-center justify-between gap-2 px-2 font-mono text-xs tabular-nums">
         <span className="font-medium text-foreground">{formatPercent(ratio)}</span>
         {resetsAt != null && (
-          <span className="truncate text-muted-foreground" title={new Date(resetsAt).toLocaleString("fr-FR")}>
-            reset dans <span className="text-foreground">{formatCountdown(resetsAt - now)}</span>
+          <span className="truncate text-muted-foreground" title={new Date(resetsAt).toLocaleString(locale())}>
+            {t("home.resetIn")} <span className="text-foreground">{formatCountdown(resetsAt - now)}</span>
           </span>
         )}
       </div>

@@ -1,5 +1,6 @@
 import { cn } from "cn";
 import type { ContextSource } from "@/bindings/ContextSource";
+import { t } from "@/i18n";
 import { SourceBadge } from "./SourceBadge";
 
 interface SourceListProps {
@@ -9,7 +10,7 @@ interface SourceListProps {
 
 export function SourceList({ sources, className }: SourceListProps) {
   if (sources.length === 0) {
-    return <p className="text-xs text-muted-foreground">Aucune source.</p>;
+    return <p className="text-xs text-muted-foreground">{t("project.ctxNoSource")}</p>;
   }
 
   return (

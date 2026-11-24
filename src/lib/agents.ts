@@ -1,4 +1,5 @@
 import type { AgentKind } from "@/bindings/AgentKind";
+import { t } from "@/i18n";
 
 export interface AgentMeta {
   label: string;
@@ -14,6 +15,7 @@ export interface AgentMeta {
 /** FIXED order — charts stack and legends list agents in this order, never by rank. */
 export const AGENT_ORDER: readonly AgentKind[] = ["claude_code", "antigravity", "codex", "generic"];
 
+/** Brand names are never translated; `label` of the generic CLI is a getter so it follows the language. */
 export const AGENTS: Record<AgentKind, AgentMeta> = {
   claude_code: {
     label: "Claude Code",
@@ -40,7 +42,9 @@ export const AGENTS: Record<AgentKind, AgentMeta> = {
     color: "var(--color-agent-codex)",
   },
   generic: {
-    label: "CLI générique",
+    get label() {
+      return t("shell.agentGeneric");
+    },
     short: "CLI",
     text: "text-agent-generic",
     bg: "bg-agent-generic",

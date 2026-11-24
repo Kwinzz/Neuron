@@ -325,7 +325,8 @@ pub fn split_memories(text: &str) -> Vec<ImportedMemory> {
 
 /// Prompt asking an agent to rewrite raw memories into clean, categorized ones (JSON only).
 pub fn reformulation_prompt(text: &str) -> String {
-    format!(
+    let text = text.trim();
+    crate::tr!(
         "Tu reçois des souvenirs bruts sur un utilisateur (copiés depuis un assistant IA ou un fichier d'instructions). \
 Réécris-les en souvenirs durables pour sa mémoire globale :\n\
 - un fait ou une règle par souvenir, phrase courte et autonome, en français, à la 2e personne évitée \
@@ -336,8 +337,18 @@ Réécris-les en souvenirs durables pour sa mémoire globale :\n\
 \"code_style\" (façon d'écrire le code), \"strict_rules\" (règles à toujours respecter), \"other\".\n\
 N'utilise aucun outil. Réponds UNIQUEMENT avec un tableau JSON, sans texte autour : \
 [{{\"category\": \"...\", \"content\": \"...\"}}]\n\n\
-Souvenirs bruts :\n<<<\n{}\n>>>",
-        text.trim()
+Souvenirs bruts :\n<<<\n{text}\n>>>",
+        "You receive raw memories about a user (copied from an AI assistant or an instructions file). \
+Rewrite them as lasting memories for their global memory:\n\
+- one fact or rule per memory, short and self-contained sentence, in English, avoiding the second person \
+(e.g. “Prefers strict TypeScript”, “Never push without being asked”);\n\
+- merge duplicates, drop what is temporary, vague or of no interest;\n\
+- keep the exact meaning, invent nothing;\n\
+- category among: \"profile\" (who they are), \"tech_preferences\" (tools, languages, environment), \
+\"code_style\" (how they write code), \"strict_rules\" (rules to always follow), \"other\".\n\
+Use no tool. Answer ONLY with a JSON array, no text around it: \
+[{{\"category\": \"...\", \"content\": \"...\"}}]\n\n\
+Raw memories:\n<<<\n{text}\n>>>"
     )
 }
 

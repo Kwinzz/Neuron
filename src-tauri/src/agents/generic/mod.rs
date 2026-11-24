@@ -27,10 +27,17 @@ impl AgentAdapter for GenericAdapter {
 
     fn start(&self, spec: &SessionSpec) -> AppResult<SessionHandle> {
         let profile = spec.generic.clone().ok_or_else(|| {
-            AppError::Invalid("CLI générique introuvable : vérifie-le dans Paramètres › CLI génériques".into())
+            AppError::Invalid(crate::tr!(
+                "CLI générique introuvable : vérifie-le dans Paramètres › CLI génériques",
+                "generic CLI not found: check it in Settings › Generic CLIs"
+            ))
         })?;
         if !spec.cwd.is_dir() {
-            return Err(AppError::Invalid(format!("dossier de travail introuvable : {}", spec.cwd.display())));
+            return Err(AppError::Invalid(crate::tr!(
+                "dossier de travail introuvable : {}",
+                "working folder not found: {}",
+                spec.cwd.display()
+            )));
         }
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<SessionCommand>();
         let (ev_tx, ev_rx) = mpsc::unbounded_channel::<AdapterEvent>();
@@ -113,7 +120,8 @@ fn start_pipe(profile: &GenericCliProfile, spec: &SessionSpec, prompt: &str) -> 
         });
     }
     let stderr = child.stderr.take().map(spawn_tail);
-    let mut stdout = child.stdout.take().ok_or_else(|| AppError::Other("stdout indisponible".into()))?;
+    let mut stdout =
+        child.stdout.take().ok_or_else(|| AppError::Other(crate::tr!("stdout indisponible", "stdout unavailable")))?;
     let (tx, rx) = mpsc::unbounded_channel();
     tokio::spawn(async move {
         let mut buf = vec![0u8; 8192];
@@ -142,7 +150,8 @@ fn start_pipe(profile: &GenericCliProfile, spec: &SessionSpec, prompt: &str) -> 
 
 fn start_pty(profile: &GenericCliProfile, spec: &SessionSpec, prompt: &str) -> AppResult<Turn> {
     use portable_pty::{CommandBuilder, PtySize, native_pty_system};
-    let pty_err = |e: &dyn std::fmt::Display| AppError::Other(format!("pseudo-terminal : {e}"));
+    let pty_err =
+        |e: &dyn std::fmt::Display| AppError::Other(crate::tr!("pseudo-terminal : {e}", "pseudo-terminal: {e}"));
     let (args, via_stdin) = turn_args(profile, prompt);
     let pair = native_pty_system()
         .openpty(PtySize { rows: 40, cols: 160, pixel_width: 0, pixel_height: 0 })
@@ -319,8 +328,9 @@ async fn session_loop(
             };
             let detail = tail.lines().rev().find(|l| !l.trim().is_empty()).map(str::trim).unwrap_or("").to_string();
             let code_s = code.map_or("?".into(), |c| c.to_string());
+            let name = &profile.name;
             Some(if detail.is_empty() {
-                format!("{} s'est arrêté (code {code_s}).", profile.name)
+                crate::tr!("{name} s'est arrêté (code {code_s}).", "{name} stopped (code {code_s}).")
             } else {
                 format!("{} : {detail}", profile.name)
             })
@@ -348,7 +358,7 @@ pub async fn test_profile(profile: GenericCliProfile, cwd: std::path::PathBuf) -
     };
     let handle = GenericAdapter.start(&spec)?;
     let mut events = handle.events;
-    handle.commands.send(SessionCommand::Prompt("Réponds simplement : OK".into())).ok();
+    handle.commands.send(SessionCommand::Prompt(crate::tr!("Réponds simplement : OK", "Just answer: OK").into())).ok();
     let mut out = String::new();
     let result = tokio::time::timeout(std::time::Duration::from_secs(60), async {
         while let Some(ev) = events.recv().await {
@@ -369,7 +379,7 @@ pub async fn test_profile(profile: GenericCliProfile, cwd: std::path::PathBuf) -
         Ok(Some(err)) => Err(AppError::Other(err)),
         Err(_) => {
             let _ = handle.commands.send(SessionCommand::Shutdown);
-            Err(AppError::Other("pas de réponse en 60 s".into()))
+            Err(AppError::Other(crate::tr!("pas de réponse en 60 s", "no answer within 60 s")))
         }
     }
 }

@@ -23,11 +23,15 @@ use crate::util::now_ms;
 /// Emitted when an agent's subscription windows were refreshed outside a chat turn.
 pub const QUOTAS_CHANGED_EVENT: &str = "quotas://changed";
 
-/// Commands Neuron runs on its own for Antigravity chats: (name, description for the « / » menu).
-pub const LOCAL_COMMANDS: &[(&str, &str)] = &[
-    ("quota", "Quotas restants de l'abonnement (5 h et hebdomadaire, par groupe de modèles)"),
-    ("usage", "Alias de /quota"),
-    ("credits", "Crédits Antigravity restants"),
+/// Commands Neuron runs on its own for Antigravity chats: (name, French / English description for the « / » menu).
+pub const LOCAL_COMMANDS: &[(&str, &str, &str)] = &[
+    (
+        "quota",
+        "Quotas restants de l'abonnement (5 h et hebdomadaire, par groupe de modèles)",
+        "Remaining subscription quotas (5-hour and weekly, per model group)",
+    ),
+    ("usage", "Alias de /quota", "Alias of /quota"),
+    ("credits", "Crédits Antigravity restants", "Remaining Antigravity credits"),
 ];
 
 const RUN_TIMEOUT: Duration = Duration::from_secs(30);
@@ -41,7 +45,7 @@ pub fn binary() -> String {
 /// `/quota`, `/usage`, `/credits` typed alone (arguments are not supported by agy for these).
 pub fn local_command(text: &str) -> Option<&'static str> {
     let name = text.trim().strip_prefix('/')?;
-    LOCAL_COMMANDS.iter().map(|(n, _)| *n).find(|n| *n == name)
+    LOCAL_COMMANDS.iter().map(|(n, _, _)| *n).find(|n| *n == name)
 }
 
 /// `agy --print /<name> --output-format json` → its JSON result.
@@ -55,20 +59,31 @@ pub async fn run(name: &str, cwd: &Path) -> AppResult<Value> {
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| spawn_error(&bin, e))?;
-    let output = tokio::time::timeout(RUN_TIMEOUT, child.wait_with_output())
-        .await
-        .map_err(|_| AppError::Other(format!("agy /{name} n'a pas répondu en {} s", RUN_TIMEOUT.as_secs())))??;
+    let output = tokio::time::timeout(RUN_TIMEOUT, child.wait_with_output()).await.map_err(|_| {
+        let secs = RUN_TIMEOUT.as_secs();
+        AppError::Other(crate::tr!(
+            "agy /{name} n'a pas répondu en {secs} s",
+            "agy /{name} did not answer within {secs} s"
+        ))
+    })??;
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json = stdout.lines().rev().find_map(|l| serde_json::from_str::<Value>(l.trim()).ok());
     match json {
         Some(v) if v.get("status").and_then(Value::as_str) == Some("SUCCESS") => Ok(v),
         Some(v) => Err(AppError::Other(
-            v.get("error").and_then(Value::as_str).unwrap_or("agy a renvoyé une erreur").to_string(),
+            v.get("error")
+                .and_then(Value::as_str)
+                .unwrap_or(crate::i18n::pick("agy a renvoyé une erreur", "agy returned an error"))
+                .to_string(),
         )),
         None => {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            let detail = stderr.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("réponse illisible");
-            Err(AppError::Other(format!("agy /{name} : {}", detail.trim())))
+            let detail = stderr
+                .lines()
+                .rev()
+                .find(|l| !l.trim().is_empty())
+                .unwrap_or(crate::i18n::pick("réponse illisible", "unreadable answer"));
+            Err(AppError::Other(crate::tr!("agy /{name} : {}", "agy /{name}: {}", detail.trim())))
         }
     }
 }
@@ -124,9 +139,9 @@ pub fn windows(result: &Value) -> Vec<RateLimitWindow> {
 
 fn window_label(window: &str) -> &str {
     match window {
-        "five_hour" => "Limite 5 h",
-        "seven_day" => "Limite hebdomadaire",
-        "one_day" => "Limite quotidienne",
+        "five_hour" => crate::i18n::pick("Limite 5 h", "5-hour limit"),
+        "seven_day" => crate::i18n::pick("Limite hebdomadaire", "Weekly limit"),
+        "one_day" => crate::i18n::pick("Limite quotidienne", "Daily limit"),
         other => other,
     }
 }
@@ -138,7 +153,7 @@ fn countdown(ms: i64) -> String {
     match (d, h) {
         (0, 0) => format!("{m} min"),
         (0, _) => format!("{h} h {m:02} min"),
-        _ => format!("{d} j {h} h"),
+        _ => crate::tr!("{d} j {h} h", "{d} d {h} h"),
     }
 }
 
@@ -148,10 +163,10 @@ pub fn render(name: &str, result: &Value, now: i64) -> String {
         if let Some(data) = result.pointer("/command/data") {
             let mut lines = Vec::new();
             if let Some(n) = data.get("remaining_credits") {
-                lines.push(format!("Crédits restants : {n}"));
+                lines.push(crate::tr!("Crédits restants : {n}", "Remaining credits: {n}"));
             }
             if let Some(uri) = data.get("upgrade_uri").and_then(Value::as_str) {
-                lines.push(format!("Obtenir plus de crédits : {uri}"));
+                lines.push(crate::tr!("Obtenir plus de crédits : {uri}", "Get more credits: {uri}"));
             }
             if !lines.is_empty() {
                 return lines.join("\n");
@@ -171,11 +186,18 @@ pub fn render(name: &str, result: &Value, now: i64) -> String {
             out.push(String::new());
         }
         previous = Some(group);
-        let reset = w.resets_at.map(|at| format!(" · reset dans {}", countdown(at - now))).unwrap_or_default();
-        out.push(format!(
-            "{group} · {}: {}% utilisé{reset}",
-            window_label(&w.window),
-            (w.utilization * 100.0).round() as i64
+        let reset = w
+            .resets_at
+            .map(|at| {
+                let left = countdown(at - now);
+                crate::tr!(" · reset dans {left}", " · resets in {left}")
+            })
+            .unwrap_or_default();
+        let (label, percent) = (window_label(&w.window), (w.utilization * 100.0).round() as i64);
+        // « N% utilisé » / « N% used »: both are read as meters by the chat (`slashText.ts`).
+        out.push(crate::tr!(
+            "{group} · {label}: {percent}% utilisé{reset}",
+            "{group} · {label}: {percent}% used{reset}"
         ));
     }
     out.join("\n")

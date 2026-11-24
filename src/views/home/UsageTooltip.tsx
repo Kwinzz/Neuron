@@ -1,6 +1,7 @@
 import type { AgentKind } from "@/bindings/AgentKind";
 import type { UsageRange } from "@/bindings/UsageRange";
 import type { ChartConfig } from "@/components/ui/chart";
+import { t } from "@/i18n";
 import { bucketTitle } from "@/lib/format";
 import { METRICS, type UsageMetric } from "./usageMetric";
 import type { UsageRow } from "./useUsageChartData";
@@ -27,7 +28,7 @@ export function UsageTooltip({ byKey, visibleAgents, config, range, metric, acti
     <div className="grid min-w-44 gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl animate-in fade-in-0 zoom-in-95 duration-150">
       <div className="font-medium text-foreground">{bucketTitle(row.key, range)}</div>
       {agents.length === 0 ? (
-        <div className="text-muted-foreground">Aucune activité</div>
+        <div className="text-muted-foreground">{t("home.tooltipNoActivity")}</div>
       ) : (
         <div className="grid gap-1">
           {agents.map((agent) => (
@@ -45,7 +46,7 @@ export function UsageTooltip({ byKey, visibleAgents, config, range, metric, acti
             <div className="mt-0.5 flex items-center gap-2 border-t border-border/50 pt-1">
               <span className="w-2.5 shrink-0" aria-hidden />
               <span className="font-mono font-semibold tabular-nums text-foreground">{spec.format(row.total)}</span>
-              <span className="ml-auto pl-3 text-muted-foreground">Total</span>
+              <span className="ml-auto pl-3 text-muted-foreground">{t("home.total")}</span>
             </div>
           )}
         </div>

@@ -1,3 +1,5 @@
+import { locale } from "@/i18n";
+
 export interface GenericCliPreset {
   label: string;
   name: string;
@@ -56,14 +58,10 @@ export function parseArgsText(text: string): string[] {
     .filter((line) => line.length > 0);
 }
 
-const FR_SECONDS = new Intl.NumberFormat("fr-FR", {
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
-});
-
 export function formatTestDuration(durationMs: number): string {
   if (durationMs < 1000) {
     return `${Math.round(durationMs)} ms`;
   }
-  return `${FR_SECONDS.format(durationMs / 1000)} s`;
+  const seconds = new Intl.NumberFormat(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  return `${seconds.format(durationMs / 1000)} s`;
 }

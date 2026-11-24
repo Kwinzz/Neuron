@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { t } from "@/i18n";
 import { useUi } from "@/stores/ui";
 
 interface ProjectHeaderProps {
@@ -52,7 +53,7 @@ export function ProjectHeader({
             ) : (
               <>
                 <h1 className="truncate text-lg leading-tight font-semibold text-foreground">
-                  {name ?? "Projet"}
+                  {name ?? t("shell.project")}
                 </h1>
                 {path && (
                   <Tooltip>
@@ -77,13 +78,13 @@ export function ProjectHeader({
                 <>
                   <Badge variant="outline" className="max-w-52 min-w-0 gap-1.5">
                     <GitBranch className="shrink-0 text-muted-foreground" aria-hidden />
-                    <span className="truncate font-mono">{git.branch ?? "HEAD détachée"}</span>
+                    <span className="truncate font-mono">{git.branch ?? t("project.detachedHead")}</span>
                   </Badge>
                   {changedCount > 0 && (
                     <Badge variant="outline" className="gap-1.5 text-warn">
                       <span className="size-1.5 shrink-0 rounded-full bg-warn" aria-hidden />
                       <span className="font-mono tabular-nums">{changedCount}</span>
-                      <span>{changedCount === 1 ? "modifié" : "modifiés"}</span>
+                      <span>{t("project.changedWord", { n: changedCount })}</span>
                     </Badge>
                   )}
                 </>
@@ -91,7 +92,7 @@ export function ProjectHeader({
                 !loadingOverview &&
                 overview !== null && (
                   <Badge variant="outline" className="text-muted-foreground">
-                    Pas de dépôt git
+                    {t("project.noRepo")}
                   </Badge>
                 )
               )}
@@ -102,12 +103,12 @@ export function ProjectHeader({
                   <span className="font-mono tabular-nums text-foreground">
                     {project.threadCount}
                   </span>
-                  <span>{project.threadCount <= 1 ? "chat" : "chats"}</span>
+                  <span>{t("project.chatWord", { n: project.threadCount })}</span>
                   {project.activeCount > 0 && (
                     <>
                       <span aria-hidden>·</span>
                       <span className="font-mono tabular-nums text-live">
-                        {project.activeCount} {project.activeCount === 1 ? "actif" : "actifs"}
+                        {t("project.activeCount", { n: project.activeCount })}
                       </span>
                     </>
                   )}
@@ -125,11 +126,11 @@ export function ProjectHeader({
             disabled={refreshing || loadingOverview}
           >
             <RefreshCw className={cn(refreshing && "animate-spin")} aria-hidden />
-            <span>Actualiser</span>
+            <span>{t("project.refresh")}</span>
           </Button>
           <Button size="sm" onClick={() => useUi.getState().startChat(projectId)}>
             <Plus aria-hidden />
-            <span>Nouveau chat</span>
+            <span>{t("shell.navNewChat")}</span>
           </Button>
         </div>
       </CardContent>

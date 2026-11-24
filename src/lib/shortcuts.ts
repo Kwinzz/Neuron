@@ -1,43 +1,79 @@
+import { type MessageKey, t } from "@/i18n";
+
 /** Every global keyboard shortcut, for the help dialog and the palette hints. `mod` = Ctrl (⌘ on macOS). */
 export interface Shortcut {
   id: string;
   /** useHotkey combo, e.g. "mod+k". */
   combo: string;
-  label: string;
-  group: "Navigation" | "Chat" | "Fenêtre";
+  /** Translated on access (getter): always in the current interface language. */
+  readonly label: string;
+  group: "navigation" | "chat" | "window";
+}
+
+function shortcut(id: string, combo: string, key: MessageKey, group: Shortcut["group"]): Shortcut {
+  return {
+    id,
+    combo,
+    get label() {
+      return t(key);
+    },
+    group,
+  };
 }
 
 export const SHORTCUTS: readonly Shortcut[] = [
-  { id: "palette", combo: "mod+k", label: "Palette de commandes / rechercher", group: "Navigation" },
-  { id: "new-chat", combo: "mod+n", label: "Nouveau chat", group: "Navigation" },
-  { id: "home", combo: "mod+shift+h", label: "Accueil", group: "Navigation" },
-  { id: "memory", combo: "mod+shift+m", label: "Mémoire", group: "Navigation" },
-  { id: "settings", combo: "mod+,", label: "Paramètres", group: "Navigation" },
-  { id: "prev-chat", combo: "alt+arrowup", label: "Chat précédent (récents)", group: "Navigation" },
-  { id: "next-chat", combo: "alt+arrowdown", label: "Chat suivant (récents)", group: "Navigation" },
-  { id: "dock", combo: "mod+j", label: "Afficher / masquer les threads live", group: "Fenêtre" },
-  { id: "sidebar", combo: "mod+b", label: "Afficher / masquer la barre latérale", group: "Fenêtre" },
-  { id: "shortcuts", combo: "mod+/", label: "Aide des raccourcis", group: "Fenêtre" },
-  { id: "send", combo: "enter", label: "Envoyer le message (Maj+Entrée : nouvelle ligne)", group: "Chat" },
-  { id: "history", combo: "arrowup", label: "Message précédent (zone de saisie vide)", group: "Chat" },
-  { id: "plan-mode", combo: "shift+tab", label: "Basculer Exécuter / Planifier (zone de saisie)", group: "Chat" },
-  { id: "stop", combo: "escape", label: "Arrêter l'agent en cours (dans un chat)", group: "Chat" },
+  shortcut("palette", "mod+k", "shell.scPalette", "navigation"),
+  shortcut("new-chat", "mod+n", "shell.navNewChat", "navigation"),
+  shortcut("home", "mod+shift+h", "shell.navHome", "navigation"),
+  shortcut("memory", "mod+shift+m", "shell.navMemory", "navigation"),
+  shortcut("settings", "mod+,", "shell.navSettings", "navigation"),
+  shortcut("prev-chat", "alt+arrowup", "shell.scPrevChat", "navigation"),
+  shortcut("next-chat", "alt+arrowdown", "shell.scNextChat", "navigation"),
+  shortcut("dock", "mod+j", "shell.scDock", "window"),
+  shortcut("sidebar", "mod+b", "shell.scSidebar", "window"),
+  shortcut("shortcuts", "mod+/", "shell.scHelp", "window"),
+  shortcut("send", "enter", "shell.scSend", "chat"),
+  shortcut("history", "arrowup", "shell.scHistory", "chat"),
+  shortcut("plan-mode", "shift+tab", "shell.scPlanMode", "chat"),
+  shortcut("stop", "escape", "shell.scStop", "chat"),
 ];
+
+const GROUP_LABEL: Record<Shortcut["group"], MessageKey> = {
+  navigation: "shell.scGroupNavigation",
+  window: "shell.scGroupWindow",
+  chat: "shell.scGroupChat",
+};
+
+export function shortcutGroupLabel(group: Shortcut["group"]): string {
+  return t(GROUP_LABEL[group]);
+}
 
 const IS_MAC = typeof navigator !== "undefined" && navigator.platform.toLowerCase().includes("mac");
 
-const KEY_LABEL: Record<string, string> = {
-  mod: IS_MAC ? "⌘" : "Ctrl",
-  shift: IS_MAC ? "⇧" : "Maj",
-  alt: IS_MAC ? "⌥" : "Alt",
-  enter: "Entrée",
-  escape: "Échap",
-  tab: "Tab",
-  arrowup: "↑",
-  arrowdown: "↓",
-};
+function keyLabel(k: string): string | undefined {
+  switch (k) {
+    case "mod":
+      return IS_MAC ? "⌘" : "Ctrl";
+    case "shift":
+      return IS_MAC ? "⇧" : t("shell.keyShift");
+    case "alt":
+      return IS_MAC ? "⌥" : "Alt";
+    case "enter":
+      return t("shell.keyEnter");
+    case "escape":
+      return t("shell.keyEscape");
+    case "tab":
+      return "Tab";
+    case "arrowup":
+      return "↑";
+    case "arrowdown":
+      return "↓";
+    default:
+      return undefined;
+  }
+}
 
-/** "mod+shift+m" → ["Ctrl", "Maj", "M"]. */
+/** "mod+shift+m" → ["Ctrl", "Maj", "M"] (key names in the interface language). */
 export function comboKeys(combo: string): string[] {
-  return combo.split("+").map((k) => KEY_LABEL[k] ?? k.toUpperCase());
+  return combo.split("+").map((k) => keyLabel(k) ?? k.toUpperCase());
 }

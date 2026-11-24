@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AGENTS } from "@/lib/agents";
 import { useAccess } from "@/stores/access";
 import { REFORMULATE_MAX_CHARS } from "./importOrigins";
+import { locale, t } from "@/i18n";
 
 /** Preferred agents for a rewrite, in this order. */
 export const REFORMULATE_AGENTS: readonly AgentKind[] = ["claude_code", "codex", "antigravity"];
@@ -59,20 +60,20 @@ export function ImportReformulate({
 
   return (
     <section
-      aria-label="Reformuler avec l'IA"
+      aria-label={t("memory.rewriteWithAi")}
       className="flex min-w-0 flex-col gap-2.5 rounded-lg border bg-muted/30 p-3"
     >
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
           <Sparkles className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          <span>Reformuler avec l'IA</span>
+          <span>{t("memory.rewriteWithAi")}</span>
         </div>
 
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           {reformulated && !running && (
             <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={onRevert}>
               <RotateCcw aria-hidden />
-              <span>Revenir au texte brut</span>
+              <span>{t("memory.revertRaw")}</span>
             </Button>
           )}
           {installed.length > 0 && selected !== null && (
@@ -83,7 +84,7 @@ export function ImportReformulate({
                 if (isReformulateAgent(next)) onAgentChange(next);
               }}
             >
-              <SelectTrigger size="sm" aria-label="Agent qui reformule" className="min-w-36">
+              <SelectTrigger size="sm" aria-label={t("memory.rewriteAgentAria")} className="min-w-36">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent align="end">
@@ -92,7 +93,7 @@ export function ImportReformulate({
                     <AgentLogo agent={a} size={14} className="shrink-0" />
                     <span>{AGENTS[a].label}</span>
                     {byAgent[a]?.loggedIn === false && (
-                      <span className="text-xs text-muted-foreground">non connecté</span>
+                      <span className="text-xs text-muted-foreground">{t("memory.notSignedIn")}</span>
                     )}
                   </SelectItem>
                 ))}
@@ -109,7 +110,7 @@ export function ImportReformulate({
             }}
           >
             {running ? <Loader2 className="animate-spin" aria-hidden /> : <Sparkles aria-hidden />}
-            <span>Reformuler</span>
+            <span>{t("memory.rewrite")}</span>
           </Button>
         </div>
       </div>
@@ -117,25 +118,24 @@ export function ImportReformulate({
       <p className="text-xs text-muted-foreground" aria-live="polite">
         {runningSince !== null && selected !== null ? (
           <>
-            Reformulation par {AGENTS[selected].label}…{" "}
+            {t("memory.rewritingBy", { agent: AGENTS[selected].label })}{" "}
             <LiveTimer startedAt={runningSince} className="text-xs" />
           </>
         ) : tooLong ? (
           <span className="text-warn">
-            Texte trop long pour une reformulation ({REFORMULATE_MAX_CHARS.toLocaleString("fr-FR")} caractères max) :
-            importe-le en plusieurs fois.
+            {t("memory.tooLongForRewrite", { max: REFORMULATE_MAX_CHARS.toLocaleString(locale()) })}
           </span>
         ) : loaded && installed.length === 0 ? (
-          "Aucun agent installé pour reformuler : installe Claude Code, Codex ou Antigravity dans Paramètres → Agents & MCP."
+          t("memory.noAgentToRewrite")
         ) : (
-          "Optionnel : l'agent fusionne les doublons et réécrit chaque souvenir proprement (quelques tokens)."
+          t("memory.rewriteOptional")
         )}
       </p>
 
       {error !== null && !running && (
         <Alert variant="destructive" className="animate-in fade-in-0 duration-150">
           <AlertCircle aria-hidden />
-          <AlertTitle>Reformulation impossible</AlertTitle>
+          <AlertTitle>{t("memory.rewriteFailed")}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}

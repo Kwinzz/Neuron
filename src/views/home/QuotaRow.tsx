@@ -5,6 +5,7 @@ import type { ProviderUsage } from "@/bindings/ProviderUsage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { t } from "@/i18n";
 import { AGENT_ORDER, AGENTS } from "@/lib/agents";
 import { QuotaEditor } from "./QuotaEditor";
 import {
@@ -68,7 +69,7 @@ export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
               variant="ghost"
               size="icon-sm"
               className="active:scale-95"
-              aria-label={`Configurer ${provider.label}`}
+              aria-label={t("home.quotaConfigure", { name: provider.label })}
             >
               <Settings2 className="size-4" />
             </Button>
@@ -80,29 +81,33 @@ export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
       </div>
 
       {ratio != null && (
-        <QuotaBar ratio={ratio} resetsAt={resetsAt} level={level} label={`Quota ${provider.label}`} className="mt-3" />
+        <QuotaBar ratio={ratio} resetsAt={resetsAt} level={level} label={t("home.quotaBarAria", { name: provider.label })} className="mt-3" />
       )}
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
         {isAlert ? (
           <span className={cn("inline-flex items-center gap-1 font-medium animate-in fade-in-0 duration-200", LEVEL_TEXT[level])}>
             <AlertTriangle className="size-3.5 shrink-0" aria-hidden />
-            <span>{level === "danger" ? "Quota dépassé" : "Seuil d'alerte atteint"}</span>
+            <span>{level === "danger" ? t("home.quotaExceeded") : t("home.quotaAlertReached")}</span>
           </span>
         ) : live ? (
           <span
             className="inline-flex min-w-0 items-center gap-1.5 text-muted-foreground"
-            title={`Utilisation rapportée par ${AGENTS[provider.agent].label}${live.group ? ` (groupe le plus utilisé : ${live.group})` : ""}`}
+            title={
+              live.group
+                ? t("home.quotaReportedByGroup", { agent: AGENTS[provider.agent].label, group: live.group })
+                : t("home.quotaReportedBy", { agent: AGENTS[provider.agent].label })
+            }
           >
             <span className="size-1.5 shrink-0 rounded-full bg-live" aria-hidden />
             <span className="truncate">
-              Abonnement · source {AGENTS[provider.agent].label}
+              {t("home.quotaSubscriptionSource", { agent: AGENTS[provider.agent].label })}
               {live.group ? ` · ${live.group}` : ""}
             </span>
           </span>
         ) : provider.limitValue == null ? (
           <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-            <span>Aucune limite définie ·</span>
+            <span>{t("home.quotaNoLimit")}</span>
             <Button
               type="button"
               variant="link"
@@ -110,7 +115,7 @@ export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
               className="h-auto p-0"
               onClick={() => setOpen(true)}
             >
-              Configurer
+              {t("home.quotaConfigureShort")}
             </Button>
           </span>
         ) : (

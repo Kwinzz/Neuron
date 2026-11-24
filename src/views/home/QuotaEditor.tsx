@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { t } from "@/i18n";
 import { ipcErrorMessage } from "@/lib/ipc";
 import { useDashboard } from "@/stores/dashboard";
 import { QUOTA_UNITS, UNIT_LABEL, WINDOW_KINDS, WINDOW_LABEL } from "./quotaFormat";
@@ -49,7 +50,7 @@ export function QuotaEditor({ provider, onDone }: QuotaEditorProps) {
     e.preventDefault();
     const trimmedLabel = label.trim();
     if (!trimmedLabel) {
-      setError("Le libellé est requis.");
+      setError(t("home.quotaErrLabel"));
       return;
     }
 
@@ -58,7 +59,7 @@ export function QuotaEditor({ provider, onDone }: QuotaEditorProps) {
     if (trimmedLimit !== "") {
       const n = Number(trimmedLimit);
       if (!Number.isFinite(n) || n < 0) {
-        setError("La limite doit être un nombre positif ou nul.");
+        setError(t("home.quotaErrLimit"));
         return;
       }
       parsedLimit = n;
@@ -66,7 +67,7 @@ export function QuotaEditor({ provider, onDone }: QuotaEditorProps) {
 
     const parsedPct = Number(pct);
     if (!Number.isFinite(parsedPct) || parsedPct < 1 || parsedPct > 100) {
-      setError("Le seuil d'alerte doit être compris entre 1 et 100 %.");
+      setError(t("home.quotaErrPct"));
       return;
     }
 
@@ -98,11 +99,11 @@ export function QuotaEditor({ provider, onDone }: QuotaEditorProps) {
       className="flex flex-col gap-3 p-1"
     >
       <PopoverHeader>
-        <PopoverTitle>Configurer {provider.label}</PopoverTitle>
+        <PopoverTitle>{t("home.quotaConfigure", { name: provider.label })}</PopoverTitle>
       </PopoverHeader>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor={`${id}-label`}>Libellé</Label>
+        <Label htmlFor={`${id}-label`}>{t("home.quotaLabel")}</Label>
         <Input
           ref={firstInputRef}
           id={`${id}-label`}
@@ -114,19 +115,19 @@ export function QuotaEditor({ provider, onDone }: QuotaEditorProps) {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor={`${id}-plan`}>Abonnement</Label>
+        <Label htmlFor={`${id}-plan`}>{t("home.quotaPlan")}</Label>
         <Input
           id={`${id}-plan`}
           type="text"
           value={plan}
-          placeholder="Max, Pro, API…"
+          placeholder={t("home.quotaPlanPlaceholder")}
           onChange={(e) => setPlan(e.target.value)}
         />
       </div>
 
       <div className="grid grid-cols-2 gap-2.5">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor={`${id}-window`}>Fenêtre</Label>
+          <Label htmlFor={`${id}-window`}>{t("home.quotaWindow")}</Label>
           <Select
             value={windowKind}
             onValueChange={(v) => {
@@ -148,7 +149,7 @@ export function QuotaEditor({ provider, onDone }: QuotaEditorProps) {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor={`${id}-unit`}>Unité</Label>
+          <Label htmlFor={`${id}-unit`}>{t("home.quotaUnit")}</Label>
           <Select
             value={unit}
             onValueChange={(v) => {
@@ -172,13 +173,13 @@ export function QuotaEditor({ provider, onDone }: QuotaEditorProps) {
 
       <div className="grid grid-cols-2 gap-2.5">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor={`${id}-limit`}>Limite</Label>
+          <Label htmlFor={`${id}-limit`}>{t("home.quotaLimit")}</Label>
           <Input
             id={`${id}-limit`}
             type="number"
             min={0}
             step="any"
-            placeholder="Aucune"
+            placeholder={t("home.quotaLimitNone")}
             value={limit}
             onChange={(e) => setLimit(e.target.value)}
             className="tabular-nums"
@@ -186,7 +187,7 @@ export function QuotaEditor({ provider, onDone }: QuotaEditorProps) {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor={`${id}-pct`}>Seuil d&apos;alerte (%)</Label>
+          <Label htmlFor={`${id}-pct`}>{t("home.quotaAlertPct")}</Label>
           <Input
             id={`${id}-pct`}
             type="number"
@@ -209,10 +210,10 @@ export function QuotaEditor({ provider, onDone }: QuotaEditorProps) {
 
       <div className="mt-1 flex items-center justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={onDone}>
-          Annuler
+          {t("common.cancel")}
         </Button>
         <Button type="submit" size="sm" disabled={saving}>
-          {saving ? "Enregistrement…" : "Enregistrer"}
+          {saving ? t("home.saving") : t("common.save")}
         </Button>
       </div>
     </form>

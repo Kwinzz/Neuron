@@ -15,6 +15,7 @@ import { MemoryImportDialog } from "./MemoryImportDialog";
 import { MemorySearchBar } from "./MemorySearchBar";
 import { MemorySearchResults } from "./MemorySearchResults";
 import { useMemorySearch } from "./useMemorySearch";
+import { t } from "@/i18n";
 
 const HIGHLIGHT_MS = 1600;
 
@@ -182,7 +183,7 @@ export function MemoryView() {
             className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 has-data-[slot=alert-action]:pr-28"
           >
             <AlertCircle aria-hidden />
-            <AlertTitle>Mémoire indisponible</AlertTitle>
+            <AlertTitle>{t("memory.unavailable")}</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
             <AlertAction>
               <Button
@@ -191,7 +192,7 @@ export function MemoryView() {
                 variant="outline"
                 onClick={handleRetry}
               >
-                Réessayer
+                {t("common.retry")}
               </Button>
             </AlertAction>
           </Alert>

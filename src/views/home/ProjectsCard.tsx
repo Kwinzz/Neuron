@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { t } from "@/i18n";
 import { formatCost, formatTokens } from "@/lib/format";
 import { useDashboard } from "@/stores/dashboard";
 import { RANGE_LABEL } from "./rangeLabel";
@@ -40,7 +41,7 @@ export function ProjectsCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Par projet</CardTitle>
+        <CardTitle>{t("home.byProjectTitle")}</CardTitle>
         <CardDescription>{RANGE_LABEL[range]}</CardDescription>
       </CardHeader>
       <CardContent>
@@ -54,7 +55,7 @@ export function ProjectsCard() {
             ))}
           </div>
         ) : rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground animate-in fade-in-0 duration-300">Aucune donnée par projet</p>
+          <p className="text-sm text-muted-foreground animate-in fade-in-0 duration-300">{t("home.byProjectEmpty")}</p>
         ) : (
           <div className="flex flex-col gap-4 animate-in fade-in-0 duration-300">
             {rows.map((r) => (
@@ -71,7 +72,7 @@ export function ProjectsCard() {
                 <Progress
                   value={Math.min(100, r.share * 100)}
                   className="mt-2 h-1"
-                  aria-label={`Part du projet ${r.name}`}
+                  aria-label={t("home.projectShareAria", { name: r.name })}
                 />
               </div>
             ))}

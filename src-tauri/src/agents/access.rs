@@ -144,7 +144,7 @@ pub fn binary_for(agent: AgentKind) -> Option<String> {
 
 /// Display name of a managed agent.
 pub fn label(agent: AgentKind) -> &'static str {
-    spec(agent).map_or("CLI générique", |s| s.label)
+    spec(agent).map_or(crate::i18n::pick("CLI générique", "Generic CLI"), |s| s.label)
 }
 
 enum Probe {
@@ -196,8 +196,8 @@ pub fn parse_claude_auth(out: &str) -> (Option<bool>, Option<String>) {
     let plan = v.get("subscriptionType").or_else(|| v.get("planTier")).and_then(Value::as_str);
     let account = match (logged_in, plan, v.get("authMethod").and_then(Value::as_str)) {
         (Some(true), Some(plan), _) if !plan.is_empty() => Some(format!("Claude {}", capitalize(plan))),
-        (Some(true), _, Some("claude.ai")) => Some("Compte Claude".into()),
-        (Some(true), _, Some(_)) => Some("Clé API".into()),
+        (Some(true), _, Some("claude.ai")) => Some(crate::i18n::pick("Compte Claude", "Claude account").into()),
+        (Some(true), _, Some(_)) => Some(crate::i18n::pick("Clé API", "API key").into()),
         _ => None,
     };
     (logged_in, account)
@@ -211,7 +211,7 @@ pub fn parse_codex_login(out: &str, ok: bool) -> (Option<bool>, Option<String>) 
     } else if lower.contains("logged in using chatgpt") {
         (Some(true), Some("ChatGPT".into()))
     } else if lower.contains("api key") && lower.contains("logged in") {
-        (Some(true), Some("Clé API".into()))
+        (Some(true), Some(crate::i18n::pick("Clé API", "API key").into()))
     } else if lower.contains("logged in") {
         (Some(true), None)
     } else if !ok {
@@ -246,12 +246,13 @@ pub fn is_auth_error(text: &str) -> bool {
     PATTERNS.iter().any(|p| lower.contains(p))
 }
 
-/// Fragment of [`AppError::AgentNotInstalled`]'s message (Codex reports spawn failures as a turn error).
-const NOT_INSTALLED_MARK: &str = "le CLI n'est pas installé";
+/// Fragments of [`AppError::AgentNotInstalled`]'s message, in both languages (Codex reports spawn failures as a
+/// turn error, and a chat may hold errors written before a language change).
+const NOT_INSTALLED_MARKS: [&str; 2] = ["le CLI n'est pas installé", "the CLI is not installed"];
 
 /// The fixable problem behind an agent error message, if any.
 pub fn classify_error(text: &str) -> Option<AccessIssue> {
-    if text.contains(NOT_INSTALLED_MARK) {
+    if NOT_INSTALLED_MARKS.iter().any(|m| text.contains(m)) {
         Some(AccessIssue::NotInstalled)
     } else {
         is_auth_error(text).then_some(AccessIssue::NotLoggedIn)
@@ -360,11 +361,32 @@ pub async fn list(refresh: bool) -> Vec<AgentAccess> {
 /// One agent, always fresh (after « Installer » / « Se connecter »).
 pub async fn check(agent: AgentKind) -> AppResult<AgentAccess> {
     crate::env_path::refresh_path();
-    let access = check_uncached(agent)
-        .await
-        .ok_or_else(|| AppError::Invalid("les CLI génériques se configurent dans Paramètres".into()))?;
+    let access = check_uncached(agent).await.ok_or_else(|| {
+        AppError::Invalid(crate::tr!(
+            "les CLI génériques se configurent dans Paramètres",
+            "generic CLIs are set up in Settings"
+        ))
+    })?;
     store(std::slice::from_ref(&access));
     Ok(access)
+}
+
+fn nothing_to_install() -> String {
+    crate::tr!("rien à installer pour ce fournisseur", "nothing to install for this provider")
+}
+
+fn no_sign_in() -> String {
+    crate::tr!("pas de connexion pour ce fournisseur", "no sign-in for this provider")
+}
+
+/// Window title of the install terminal.
+fn install_title(label: &str) -> String {
+    crate::tr!("Neuron - installation de {label}", "Neuron - installing {label}")
+}
+
+/// Window title of the sign-in terminal.
+fn login_title(label: &str) -> String {
+    crate::tr!("Neuron - connexion à {label}", "Neuron - signing in to {label}")
 }
 
 /// Opens a terminal running the official installer.
@@ -385,44 +407,56 @@ use {bash_install_script as install_script, bash_login_script as login_script};
 /// (window title, PowerShell script) of the installer.
 #[cfg(windows)]
 fn install_script(agent: AgentKind) -> AppResult<(String, String)> {
-    let spec = spec(agent).ok_or_else(|| AppError::Invalid("rien à installer pour ce fournisseur".into()))?;
-    let script = format!(
+    let spec = spec(agent).ok_or_else(|| AppError::Invalid(nothing_to_install()))?;
+    let (label, cmd) = (spec.label, spec.install);
+    let script = crate::tr!(
         "$ErrorActionPreference = 'Stop'; \
          Write-Host 'Installation de {label} ({cmd})' -ForegroundColor Cyan; Write-Host ''; \
          try {{ {cmd}; Write-Host ''; \
          Write-Host '{label} est installé. Retourne dans Neuron : la fenêtre se ferme toute seule.' -ForegroundColor Green; \
          Start-Sleep -Seconds 4; exit }} \
          catch {{ Write-Host ''; Write-Host ('Échec : ' + $_) -ForegroundColor Red }}",
-        label = spec.label,
-        cmd = spec.install,
+        "$ErrorActionPreference = 'Stop'; \
+         Write-Host 'Installing {label} ({cmd})' -ForegroundColor Cyan; Write-Host ''; \
+         try {{ {cmd}; Write-Host ''; \
+         Write-Host '{label} is installed. Go back to Neuron: this window closes by itself.' -ForegroundColor Green; \
+         Start-Sleep -Seconds 4; exit }} \
+         catch {{ Write-Host ''; Write-Host ('Failed: ' + $_) -ForegroundColor Red }}"
     );
-    Ok((format!("Neuron - installation de {}", spec.label), script))
+    Ok((install_title(spec.label), script))
 }
 
 /// (window title, PowerShell script) of the sign-in.
 #[cfg(windows)]
 fn login_script(agent: AgentKind) -> AppResult<(String, String)> {
-    let spec = spec(agent).ok_or_else(|| AppError::Invalid("pas de connexion pour ce fournisseur".into()))?;
+    let spec = spec(agent).ok_or_else(|| AppError::Invalid(no_sign_in()))?;
     let bin = binary(&spec);
     let script = match agent {
         // agy has no sign-in subcommand: its interactive session asks for it (or `/login`).
-        AgentKind::Antigravity => format!(
+        AgentKind::Antigravity => crate::tr!(
             "Write-Host 'Connecte-toi à Antigravity dans la session qui s''ouvre (commande /login si rien ne s''affiche),' -ForegroundColor Cyan; \
-             Write-Host 'puis quitte avec /exit et retourne dans Neuron.' -ForegroundColor Cyan; Write-Host ''; & '{bin}'"
+             Write-Host 'puis quitte avec /exit et retourne dans Neuron.' -ForegroundColor Cyan; Write-Host ''; & '{bin}'",
+            "Write-Host 'Sign in to Antigravity in the session that opens (type /login if nothing shows up),' -ForegroundColor Cyan; \
+             Write-Host 'then quit with /exit and go back to Neuron.' -ForegroundColor Cyan; Write-Host ''; & '{bin}'"
         ),
         _ => {
             let args = spec.login.split_once(' ').map_or("", |(_, a)| a);
-            format!(
+            let label = spec.label;
+            crate::tr!(
                 "Write-Host 'Connexion à {label} : suis les instructions (une page de connexion peut s''ouvrir dans le navigateur).' -ForegroundColor Cyan; \
                  Write-Host ''; & '{bin}' {args}; \
                  if ($LASTEXITCODE -eq 0) {{ Write-Host ''; \
                  Write-Host 'Connecté. Retourne dans Neuron : la fenêtre se ferme toute seule.' -ForegroundColor Green; \
                  Start-Sleep -Seconds 3; exit }}",
-                label = spec.label,
+                "Write-Host 'Signing in to {label}: follow the instructions (a sign-in page may open in your browser).' -ForegroundColor Cyan; \
+                 Write-Host ''; & '{bin}' {args}; \
+                 if ($LASTEXITCODE -eq 0) {{ Write-Host ''; \
+                 Write-Host 'Signed in. Go back to Neuron: this window closes by itself.' -ForegroundColor Green; \
+                 Start-Sleep -Seconds 3; exit }}"
             )
         }
     };
-    Ok((format!("Neuron - connexion à {}", spec.label), script))
+    Ok((login_title(spec.label), script))
 }
 
 #[cfg(windows)]
@@ -438,47 +472,57 @@ fn open_terminal(title: &str, script: &str) -> AppResult<()> {
         .current_dir(home)
         .creation_flags(CREATE_NEW_CONSOLE)
         .spawn()
-        .map_err(|e| AppError::Other(format!("impossible d'ouvrir PowerShell ({e})")))?;
+        .map_err(|e| {
+            AppError::Other(crate::tr!("impossible d'ouvrir PowerShell ({e})", "could not open PowerShell ({e})"))
+        })?;
     Ok(())
 }
 
 /// (window title, bash script) of the installer (Linux; compiled everywhere so the tests check it).
 #[cfg_attr(windows, allow(dead_code))]
 fn bash_install_script(agent: AgentKind) -> AppResult<(String, String)> {
-    let spec = spec(agent).ok_or_else(|| AppError::Invalid("rien à installer pour ce fournisseur".into()))?;
-    let script = format!(
+    let spec = spec(agent).ok_or_else(|| AppError::Invalid(nothing_to_install()))?;
+    let (label, cmd) = (spec.label, spec.install);
+    let script = crate::tr!(
         "set -o pipefail; printf '\\033[36m%s\\033[0m\\n\\n' 'Installation de {label} ({cmd})'; \
          if {cmd}; then printf '\\n\\033[32m%s\\033[0m\\n' '{label} est installé. Retourne dans Neuron : la fenêtre se ferme toute seule.'; \
          sleep 4; exit 0; fi; \
          printf '\\n\\033[31m%s\\033[0m\\n' 'Échec de l’installation.'; read -r -p 'Entrée pour fermer… ' _",
-        label = spec.label,
-        cmd = spec.install,
+        "set -o pipefail; printf '\\033[36m%s\\033[0m\\n\\n' 'Installing {label} ({cmd})'; \
+         if {cmd}; then printf '\\n\\033[32m%s\\033[0m\\n' '{label} is installed. Go back to Neuron: this window closes by itself.'; \
+         sleep 4; exit 0; fi; \
+         printf '\\n\\033[31m%s\\033[0m\\n' 'Installation failed.'; read -r -p 'Press Enter to close… ' _"
     );
-    Ok((format!("Neuron - installation de {}", spec.label), script))
+    Ok((install_title(spec.label), script))
 }
 
 /// (window title, bash script) of the sign-in (Linux; compiled everywhere so the tests check it).
 #[cfg_attr(windows, allow(dead_code))]
 fn bash_login_script(agent: AgentKind) -> AppResult<(String, String)> {
-    let spec = spec(agent).ok_or_else(|| AppError::Invalid("pas de connexion pour ce fournisseur".into()))?;
+    let spec = spec(agent).ok_or_else(|| AppError::Invalid(no_sign_in()))?;
     let bin = binary(&spec).replace('\'', "");
     let script = match agent {
         // agy has no sign-in subcommand: its interactive session asks for it (or `/login`).
-        AgentKind::Antigravity => format!(
+        AgentKind::Antigravity => crate::tr!(
             "printf '\\033[36m%s\\033[0m\\n\\n' 'Connecte-toi à Antigravity dans la session qui s’ouvre (commande /login si rien ne s’affiche), puis quitte avec /exit.'; \
+             '{bin}'; exit 0",
+            "printf '\\033[36m%s\\033[0m\\n\\n' 'Sign in to Antigravity in the session that opens (type /login if nothing shows up), then quit with /exit.'; \
              '{bin}'; exit 0"
         ),
         _ => {
             let args = spec.login.split_once(' ').map_or("", |(_, a)| a);
-            format!(
+            let label = spec.label;
+            crate::tr!(
                 "printf '\\033[36m%s\\033[0m\\n\\n' 'Connexion à {label} : suis les instructions (une page de connexion peut s’ouvrir dans le navigateur).'; \
                  '{bin}' {args} && {{ printf '\\n\\033[32m%s\\033[0m\\n' 'Connecté. Retourne dans Neuron : la fenêtre se ferme toute seule.'; sleep 3; exit 0; }}; \
                  read -r -p 'Entrée pour fermer… ' _",
-                label = spec.label,
+                "printf '\\033[36m%s\\033[0m\\n\\n' 'Signing in to {label}: follow the instructions (a sign-in page may open in your browser).'; \
+                 '{bin}' {args} && {{ printf '\\n\\033[32m%s\\033[0m\\n' 'Signed in. Go back to Neuron: this window closes by itself.'; sleep 3; exit 0; }}; \
+                 read -r -p 'Press Enter to close… ' _"
             )
         }
     };
-    Ok((format!("Neuron - connexion à {}", spec.label), script))
+    Ok((login_title(spec.label), script))
 }
 /// Terminals tried in order (after `$TERMINAL`), with the arguments that precede the command to run.
 #[cfg(not(windows))]
@@ -518,9 +562,10 @@ fn open_terminal(title: &str, script: &str) -> AppResult<()> {
     use std::process::Stdio;
     crate::env_path::refresh_path();
     let (terminal, args) = pick_terminal().ok_or_else(|| {
-        AppError::Invalid(
-            "aucun terminal trouvé (kitty, alacritty, konsole, gnome-terminal…) : lance la commande affichée".into(),
-        )
+        AppError::Invalid(crate::tr!(
+            "aucun terminal trouvé (kitty, alacritty, konsole, gnome-terminal…) : lance la commande affichée",
+            "no terminal found (kitty, alacritty, konsole, gnome-terminal…): run the command shown"
+        ))
     })?;
     let full = format!("printf '\\033]0;%s\\007' '{title}'; {script}");
     let home = std::env::var_os("HOME").map(std::path::PathBuf::from).unwrap_or_else(std::env::temp_dir);
@@ -530,8 +575,10 @@ fn open_terminal(title: &str, script: &str) -> AppResult<()> {
     if let Some(path) = crate::env_path::path() {
         cmd.env("PATH", path);
     }
-    let mut child =
-        cmd.spawn().map_err(|e| AppError::Other(format!("impossible d'ouvrir {} ({e})", terminal.display())))?;
+    let mut child = cmd.spawn().map_err(|e| {
+        let terminal = terminal.display();
+        AppError::Other(crate::tr!("impossible d'ouvrir {terminal} ({e})", "could not open {terminal} ({e})"))
+    })?;
     // Reap it when the window closes (no zombie).
     std::thread::spawn(move || {
         let _ = child.wait();
@@ -557,6 +604,10 @@ mod tests {
     #[ignore]
     fn dump_terminal_scripts() {
         let dir = std::env::var("NEURON_SCRIPT_DUMP").expect("NEURON_SCRIPT_DUMP");
+        // Ignored test, run alone on demand: it may switch the global language (`NEURON_SCRIPT_LANG=en`).
+        if std::env::var("NEURON_SCRIPT_LANG").as_deref() == Ok("en") {
+            crate::i18n::set(crate::i18n::Language::En);
+        }
         for agent in MANAGED {
             for (kind, (title, script)) in
                 [("install", install_script(agent).unwrap()), ("login", login_script(agent).unwrap())]
@@ -613,5 +664,10 @@ mod tests {
         assert_eq!(classify_error("rate limit exceeded"), None);
         let missing = AppError::AgentNotInstalled("codex".into()).to_string();
         assert_eq!(classify_error(&missing), Some(AccessIssue::NotInstalled));
+        assert_eq!(
+            classify_error("“codex” was not found: the CLI is not installed (or not in the PATH)."),
+            Some(AccessIssue::NotInstalled),
+            "English message too"
+        );
     }
 }

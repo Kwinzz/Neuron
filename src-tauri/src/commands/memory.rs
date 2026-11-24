@@ -191,7 +191,7 @@ pub async fn connect_antigravity_mcp(state: State<'_, AppState>) -> AppResult<Ag
     let mut args: Vec<&str> = vec!["mcp", "add", memory::mcp::SERVER_NAME, "--", &exe];
     args.extend(launch.args.iter().map(String::as_str));
     if crate::agents::catalog::run_cli("agy", &args).await.is_none() {
-        return Err(crate::error::AppError::Other("« agy mcp add » a échoué".into()));
+        return Err(crate::error::AppError::Other(crate::tr!("« agy mcp add » a échoué", "“agy mcp add” failed")));
     }
     tracing::info!("memory MCP server registered in Antigravity");
     agy_status(&state).await
@@ -219,7 +219,10 @@ pub async fn read_memory_import_file(path: String) -> AppResult<String> {
     tokio::task::spawn_blocking(move || {
         let meta = std::fs::metadata(&path)?;
         if meta.len() > import::MAX_IMPORT_BYTES {
-            return Err(AppError::Invalid("fichier trop gros pour un import de mémoire (200 Ko max)".into()));
+            return Err(AppError::Invalid(crate::tr!(
+                "fichier trop gros pour un import de mémoire (200 Ko max)",
+                "file too large for a memory import (200 KB max)"
+            )));
         }
         Ok(String::from_utf8_lossy(&std::fs::read(&path)?).into_owned())
     })
@@ -237,16 +240,20 @@ pub async fn split_memory_import(text: String) -> AppResult<Vec<ImportedMemory>>
 pub async fn reformulate_memory_import(agent: AgentKind, text: String) -> AppResult<Vec<ImportedMemory>> {
     let text = text.trim();
     if text.is_empty() {
-        return Err(AppError::Invalid("rien à reformuler".into()));
+        return Err(AppError::Invalid(crate::tr!("rien à reformuler", "nothing to rewrite")));
     }
     if text.chars().count() > MAX_REFORMULATE_CHARS {
-        return Err(AppError::Invalid(format!(
-            "texte trop long pour une reformulation ({MAX_REFORMULATE_CHARS} caractères max) : importe-le en plusieurs fois"
+        return Err(AppError::Invalid(crate::tr!(
+            "texte trop long pour une reformulation ({MAX_REFORMULATE_CHARS} caractères max) : importe-le en plusieurs fois",
+            "text too long to rewrite ({MAX_REFORMULATE_CHARS} characters max): import it in several parts"
         )));
     }
     let answer = crate::agents::oneshot::run(agent, &import::reformulation_prompt(text)).await?;
     import::parse_reformulated(&answer).ok_or_else(|| {
-        AppError::Other("l'agent n'a pas renvoyé de souvenirs lisibles : réessaie ou importe sans reformuler".into())
+        AppError::Other(crate::tr!(
+            "l'agent n'a pas renvoyé de souvenirs lisibles : réessaie ou importe sans reformuler",
+            "the agent returned no readable memories: try again or import without rewriting"
+        ))
     })
 }
 

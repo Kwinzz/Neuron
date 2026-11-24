@@ -7,6 +7,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { LiveTimer } from "@/components/ui/LiveTimer";
 import { ToolBody } from "./ToolBody";
 import { TOOL_STATUS, toolIcon } from "./toolMeta";
+import { t } from "@/i18n";
 
 type ToolItem = Extract<ChatItem, { kind: "tool" }>;
 
@@ -55,7 +56,7 @@ export const ToolBlock = memo(function ToolBlock({ item, defaultOpen = false }: 
             {item.status === "running" && (
               <span className="size-1.5 rounded-full bg-live animate-pulse" aria-hidden />
             )}
-            {statusMeta.label}
+            {t(statusMeta.label)}
           </Badge>
           <ChevronRight
             className={cn(

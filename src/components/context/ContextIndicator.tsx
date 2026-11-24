@@ -11,6 +11,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { t } from "@/i18n";
 import { ipc } from "@/lib/ipc";
 import { useUi } from "@/stores/ui";
 import { ContextBundleView } from "./ContextBundleView";
@@ -53,7 +54,6 @@ export function ContextIndicator({ threadId, projectId }: ContextIndicatorProps)
   }
 
   const count = bundle.sources.length;
-  const sourceWord = count <= 1 ? "source" : "sources";
 
   const handleEdit = () => {
     if (projectId == null) return;
@@ -69,26 +69,26 @@ export function ContextIndicator({ threadId, projectId }: ContextIndicatorProps)
             <Button
               variant="ghost"
               size="sm"
-              aria-label={`Contexte injecté (${count} ${sourceWord})`}
+              aria-label={t("project.ctxIndicatorAria", { n: count })}
               className="animate-in fade-in-0 duration-150"
             >
               <Layers aria-hidden />
-              <span>Contexte</span>
+              <span>{t("project.ctxButton")}</span>
               <span className="rounded-full bg-muted px-1.5 font-mono text-[10px] tabular-nums text-muted-foreground">
                 {count}
               </span>
             </Button>
           </PopoverTrigger>
         </TooltipTrigger>
-        <TooltipContent>Contexte injecté dans ce chat</TooltipContent>
+        <TooltipContent>{t("project.ctxTooltip")}</TooltipContent>
       </Tooltip>
 
       <PopoverContent align="end" className="w-[460px] max-w-[calc(100vw-2rem)] gap-0 p-0">
         <PopoverHeader className="border-b p-3">
-          <PopoverTitle>Contexte injecté</PopoverTitle>
+          <PopoverTitle>{t("project.ctxTitle")}</PopoverTitle>
           <PopoverDescription className="flex items-center gap-1.5 text-xs">
             <Clock className="size-3 shrink-0" aria-hidden />
-            <span>Contexte figé à la création du chat</span>
+            <span>{t("project.ctxFrozen")}</span>
           </PopoverDescription>
         </PopoverHeader>
 
@@ -100,7 +100,7 @@ export function ContextIndicator({ threadId, projectId }: ContextIndicatorProps)
           <div className="flex justify-end border-t p-2">
             <Button variant="ghost" size="sm" onClick={handleEdit}>
               <Pencil aria-hidden />
-              <span>Modifier context.md</span>
+              <span>{t("project.ctxEdit")}</span>
             </Button>
           </div>
         )}

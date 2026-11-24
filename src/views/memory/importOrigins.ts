@@ -2,25 +2,24 @@ import type { MemoryImportOrigin } from "@/bindings/MemoryImportOrigin";
 import type { ImportedMemory } from "@/bindings/ImportedMemory";
 import type { MemoryCategory } from "@/bindings/MemoryCategory";
 import type { Vendor } from "@/components/ui/AgentLogo";
+import { t } from "@/i18n";
 
 export interface ImportOriginMeta {
-  /** Picker label. */
-  label: string;
-  /** Used in « Importé de <source> ». */
-  source: string;
+  /** Assistant / CLI name (picker label, « Importé de <name> »); null for « Autre » (see `originLabel`). */
+  name: string | null;
   vendor: Vendor;
   /** Web assistant with no export file: the user pastes the assistant's answer. */
   web: boolean;
 }
 
 export const IMPORT_ORIGINS: Record<MemoryImportOrigin, ImportOriginMeta> = {
-  claude_ai: { label: "claude.ai", source: "claude.ai", vendor: "anthropic", web: true },
-  chatgpt: { label: "ChatGPT", source: "ChatGPT", vendor: "openai", web: true },
-  gemini: { label: "Gemini", source: "Gemini", vendor: "google", web: true },
-  claude_code: { label: "Claude Code", source: "Claude Code", vendor: "anthropic", web: false },
-  codex: { label: "Codex", source: "Codex", vendor: "openai", web: false },
-  gemini_cli: { label: "Gemini CLI", source: "Gemini CLI", vendor: "google", web: false },
-  other: { label: "Autre", source: "un import", vendor: "other", web: false },
+  claude_ai: { name: "claude.ai", vendor: "anthropic", web: true },
+  chatgpt: { name: "ChatGPT", vendor: "openai", web: true },
+  gemini: { name: "Gemini", vendor: "google", web: true },
+  claude_code: { name: "Claude Code", vendor: "anthropic", web: false },
+  codex: { name: "Codex", vendor: "openai", web: false },
+  gemini_cli: { name: "Gemini CLI", vendor: "google", web: false },
+  other: { name: null, vendor: "other", web: false },
 };
 
 export const WEB_ORIGINS: readonly MemoryImportOrigin[] = ["claude_ai", "chatgpt", "gemini"];
@@ -30,8 +29,15 @@ export function isMemoryImportOrigin(value: string): value is MemoryImportOrigin
   return Object.prototype.hasOwnProperty.call(IMPORT_ORIGINS, value);
 }
 
+/** Picker label of an origin (« Autre » translated). */
+export function originLabel(origin: MemoryImportOrigin): string {
+  return IMPORT_ORIGINS[origin].name ?? t("memory.originOther");
+}
+
 /** The prompt to give a web assistant so it lists what it knows. */
-export const WEB_EXPORT_PROMPT = "Liste tous les souvenirs que tu as sur moi, un par ligne, sans commentaire.";
+export function webExportPrompt(): string {
+  return t("memory.webExportPrompt");
+}
 
 /**
  * Same normalisation as the backend duplicate check (`memory::import::normalize`): lowercase, accents and
@@ -53,10 +59,10 @@ export function normalizeMemory(content: string): string {
 }
 
 export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} o`;
+  if (bytes < 1024) return t("memory.sizeBytes", { n: bytes });
   const kb = bytes / 1024;
-  if (kb < 1024) return `${kb < 10 ? kb.toFixed(1) : Math.round(kb)} Ko`;
-  return `${(kb / 1024).toFixed(1)} Mo`;
+  if (kb < 1024) return t("memory.sizeKb", { n: kb < 10 ? kb.toFixed(1) : Math.round(kb) });
+  return t("memory.sizeMb", { n: (kb / 1024).toFixed(1) });
 }
 
 /** One editable row of the import preview. */

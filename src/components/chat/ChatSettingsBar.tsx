@@ -15,6 +15,7 @@ import { type ChatSettings, DEFAULT_EFFORTS, PERMISSION_MODES, effortLabel, perm
 import { findModel, resolveModelId, useModels } from "@/stores/models";
 import { ModeSwitch, TOGGLE_PLAN_EVENT } from "./ModeSwitch";
 import { ModelPicker } from "./ModelPicker";
+import { t } from "@/i18n";
 
 interface ChatSettingsBarProps {
   value: ChatSettings;
@@ -95,7 +96,7 @@ export const ChatSettingsBar = memo(function ChatSettingsBar({
                 size="sm"
                 className={TRIGGER}
                 disabled={disabled}
-                aria-label="Niveau de raisonnement"
+                aria-label={t("chat.reasoningLevel")}
               >
                 <Brain className="size-3.5" />
                 {effortLabel(shownEffort)}
@@ -103,7 +104,7 @@ export const ChatSettingsBar = memo(function ChatSettingsBar({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-48">
-              <DropdownMenuLabel className="text-xs text-muted-foreground">Raisonnement</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-xs text-muted-foreground">{t("chat.reasoning")}</DropdownMenuLabel>
               <DropdownMenuRadioGroup
                 value={shownEffort ?? DEFAULT}
                 onValueChange={(v) => {
@@ -117,7 +118,7 @@ export const ChatSettingsBar = memo(function ChatSettingsBar({
                 {!family && (
                   <>
                     <DropdownMenuRadioItem value={DEFAULT}>
-                      Par défaut{model?.defaultEffort ? ` (${effortLabel(model.defaultEffort)})` : ""}
+                      {t("chat.byDefault")}{model?.defaultEffort ? ` (${effortLabel(model.defaultEffort)})` : ""}
                     </DropdownMenuRadioItem>
                     <DropdownMenuSeparator />
                   </>
@@ -164,7 +165,7 @@ export const ChatSettingsBar = memo(function ChatSettingsBar({
                 <>
                   <DropdownMenuSeparator />
                   <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                    Mode Plan actif : ce choix s'applique quand tu repasses en Exécuter.
+                    {t("chat.planModeActiveNote")}
                   </p>
                 </>
               )}

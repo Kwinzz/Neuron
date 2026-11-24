@@ -18,6 +18,7 @@ import { MarkdownFileCard } from "./MarkdownFileCard";
 import { baseName, documentText, isDocument, isPlanName } from "./planDocs";
 import { TurnMarker } from "./TurnMarker";
 import { UserMessage } from "./UserMessage";
+import { t } from "@/i18n";
 
 type ToolItem = Extract<ChatItem, { kind: "tool" }>;
 
@@ -42,8 +43,8 @@ function ToolItemView({ item }: { item: ToolItem }) {
               name={baseName(change.path)}
               path={change.path}
               content={doc}
-              badge={isPlanName(change.path) ? "Plan" : undefined}
-              note={change.kind === "update" ? "mis à jour" : undefined}
+              badge={isPlanName(change.path) ? t("chat.planBadge") : undefined}
+              note={change.kind === "update" ? t("chat.updated") : undefined}
             />
           ) : (
             <FileEditBlock key={change.path} change={change} />

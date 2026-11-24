@@ -116,7 +116,7 @@ pub fn encode_command(command: &SessionCommand) -> Option<Value> {
             } else {
                 json!({
                     "behavior": "deny",
-                    "message": d.message.clone().unwrap_or_else(|| "Refusé par l'utilisateur dans Neuron.".into()),
+                    "message": d.message.clone().unwrap_or_else(|| crate::tr!("Refusé par l'utilisateur dans Neuron.", "Denied by the user in Neuron.")),
                 })
             };
             Some(json!({

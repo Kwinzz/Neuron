@@ -6,6 +6,7 @@ import { AgentAccessButton } from "@/components/agents/AgentAccessButton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AGENTS } from "@/lib/agents";
 import { accessIssue, MANAGED_AGENTS, useAccess } from "@/stores/access";
+import { t } from "@/i18n";
 
 type ErrorChatItem = Extract<ChatItem, { kind: "error" }>;
 
@@ -59,10 +60,10 @@ function AccessErrorItem({
       {fixed ? <CircleCheck className="text-ok" /> : <XCircle />}
       <AlertTitle className={fixed ? "text-foreground" : undefined}>
         {fixed
-          ? `${label} est prêt : renvoie ton message.`
+          ? t("chat.agentReady", { agent: label })
           : issue === "not_installed"
-            ? `${label} n'est pas installé`
-            : `${label} n'est pas connecté à ton compte`}
+            ? t("chat.agentNotInstalled", { agent: label })
+            : t("chat.agentSignedOut", { agent: label })}
       </AlertTitle>
       <AlertDescription className="col-start-2 min-w-0 select-text">
         <span className="whitespace-pre-wrap wrap-anywhere text-muted-foreground">
@@ -73,8 +74,8 @@ function AccessErrorItem({
             <AgentAccessButton agent={agent} issue={issue} size="sm" />
             <span className="text-xs text-muted-foreground">
               {issue === "not_installed"
-                ? "Un terminal s'ouvre avec l'installateur officiel."
-                : "Un terminal s'ouvre pour la connexion."}
+                ? t("chat.terminalInstaller")
+                : t("chat.terminalLogin")}
             </span>
           </div>
         )}

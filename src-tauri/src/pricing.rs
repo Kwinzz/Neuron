@@ -121,7 +121,10 @@ pub fn parse_litellm(json: &str, fetched_at: i64) -> AppResult<RemotePrices> {
         }
     }
     if best.is_empty() {
-        return Err(AppError::Other("liste de prix LiteLLM vide ou illisible".into()));
+        return Err(AppError::Other(crate::tr!(
+            "liste de prix LiteLLM vide ou illisible",
+            "LiteLLM price list empty or unreadable"
+        )));
     }
     Ok(RemotePrices { fetched_at, models: best.into_iter().map(|(k, (_, p))| (k, p)).collect() })
 }
@@ -217,14 +220,18 @@ pub async fn refresh(data_dir: &Path, now_ms: i64) -> AppResult<PricingStatus> {
             .timeout(FETCH_TIMEOUT)
             .user_agent("neuron-desktop")
             .build()
-            .map_err(|e| AppError::Other(format!("client HTTP : {e}")))?;
-        let response = client
-            .get(LITELLM_URL)
-            .send()
+            .map_err(|e| AppError::Other(crate::tr!("client HTTP : {e}", "HTTP client: {e}")))?;
+        let response =
+            client.get(LITELLM_URL).send().await.and_then(reqwest::Response::error_for_status).map_err(|e| {
+                AppError::Other(crate::tr!(
+                    "téléchargement des tarifs impossible : {e}",
+                    "could not download prices: {e}"
+                ))
+            })?;
+        let body = response
+            .text()
             .await
-            .and_then(reqwest::Response::error_for_status)
-            .map_err(|e| AppError::Other(format!("téléchargement des tarifs impossible : {e}")))?;
-        let body = response.text().await.map_err(|e| AppError::Other(format!("lecture des tarifs : {e}")))?;
+            .map_err(|e| AppError::Other(crate::tr!("lecture des tarifs : {e}", "reading prices: {e}")))?;
         let prices = tokio::task::spawn_blocking(move || parse_litellm(&body, now_ms)).await??;
         let json = serde_json::to_string(&prices)?;
         let path = cache_path(data_dir);

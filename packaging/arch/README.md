@@ -1,40 +1,44 @@
-# Neuron sur Arch Linux
+# Neuron on Arch Linux / Neuron sur Arch Linux
 
-Paquet construit depuis les sources de ce dépôt (binaire `/usr/bin/neuron`, entrée de menu, icônes).
+Package built from the sources of this repository (`/usr/bin/neuron` binary, menu entry, icons).
+*Paquet construit depuis les sources du dépôt (binaire `/usr/bin/neuron`, entrée de menu, icônes).*
 
-## Installer
+## Install / Installer
 
-Le plus simple, depuis n'importe où (propose aussi mise à jour / désinstallation si Neuron est déjà là) :
+The easiest way, from anywhere (also offers update / uninstall when Neuron is already there; asks for the
+language — `--lang en` or `--lang fr` to skip the question):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh | bash
 ```
 
-À la main :
+By hand / à la main:
 
 ```bash
-sudo pacman -S --needed base-devel git rust nodejs npm webkit2gtk-4.1 gtk3 libayatana-appindicator
+sudo pacman -S --needed base-devel git rust nodejs npm mold webkit2gtk-4.1 gtk3 libayatana-appindicator
 git clone https://github.com/Kwinzz/Neuron
 cd Neuron/packaging/arch
 makepkg -si
 ```
 
-Mettre à jour : `git pull` à la racine du dépôt, puis `makepkg -si` à nouveau dans `packaging/arch`.
+Update: `git pull` at the root of the repository, then `makepkg -si` again in `packaging/arch`.
+Builds use `packaging/linux-build-env.sh` (no LTO, incremental, `mold` linker): updates only rebuild what changed.
 
-## Après l'installation
+## After installing / Après l'installation
 
-- Lance **Neuron** depuis le menu des applications.
-- Paramètres → Agents & MCP : « Installer » / « Se connecter » ouvrent un terminal (`$TERMINAL`, sinon kitty,
-  alacritty, foot, wezterm, ghostty, konsole, gnome-terminal, kgx, ptyxis, xfce4-terminal, xterm).
-- **Demande rapide sous Wayland** (Hyprland, KDE, GNOME…) : les raccourcis globaux n'existent pas, lie la commande
-  `neuron --quick` à un raccourci de ton bureau, par exemple pour Hyprland :
-  `bind = CTRL ALT, Space, exec, neuron --quick`. Sous X11, le raccourci réglé dans Neuron fonctionne directement.
-- Icône de la zone de notification : sous GNOME, il faut l'extension « AppIndicator and KStatusNotifierItem Support ».
+- Start **Neuron** from the applications menu.
+- Settings → Agents & MCP: « Install » / « Sign in » open a terminal (`$TERMINAL`, otherwise kitty, alacritty, foot,
+  wezterm, ghostty, konsole, gnome-terminal, kgx, ptyxis, xfce4-terminal, xterm).
+- **Quick prompt on Wayland** (Hyprland, KDE, GNOME…): global shortcuts don't exist there, bind the command
+  `neuron --quick` to a shortcut of your desktop, e.g. for Hyprland: `bind = CTRL ALT, Space, exec, neuron --quick`.
+  On X11, the shortcut set in Neuron works directly.
+- System tray icon on GNOME: needs the « AppIndicator and KStatusNotifierItem Support » extension.
 
-## Dépannage
+## Troubleshooting / Dépannage
 
-- **Fenêtre blanche ou noire** : Neuron met déjà `WEBKIT_DISABLE_DMABUF_RENDERER=1` ; si ça persiste (NVIDIA),
-  essaie `WEBKIT_DISABLE_COMPOSITING_MODE=1 neuron`.
-- **CLI introuvable alors qu'il marche dans le terminal** : Neuron lit le PATH de ton shell de connexion
-  (`$SHELL -ilc`) au démarrage ; relance Neuron après avoir modifié ton `~/.bashrc` / `~/.zshrc` / config fish.
-- Journaux : lance `RUST_LOG=info neuron` depuis un terminal.
+- **White or black window**: Neuron only disables WebKit's DMA-BUF renderer when NVIDIA is the only GPU. If it still
+  happens, try `WEBKIT_DISABLE_DMABUF_RENDERER=1 neuron`, then `WEBKIT_DISABLE_COMPOSITING_MODE=1 neuron`.
+- **Laggy UI on a hybrid laptop**: make sure GPU rendering is on: `WEBKIT_DISABLE_DMABUF_RENDERER=0 neuron`.
+- **CLI not found although it works in your terminal**: Neuron reads your login shell's PATH (`$SHELL -ilc`) at
+  startup; restart Neuron after editing `~/.bashrc` / `~/.zshrc` / your fish config.
+- Logs: run `RUST_LOG=info neuron` from a terminal.

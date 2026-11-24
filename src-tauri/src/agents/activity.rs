@@ -66,7 +66,10 @@ pub fn tool_activity(tool: &str, input: &Value) -> (ThreadStatus, Option<String>
         ),
         "task" | "agent" => (
             ThreadStatus::Running,
-            str_field(input, &["description", "prompt"]).map(|d| format!("Sous-agent : {}", truncate(d, 48))),
+            str_field(input, &["description", "prompt"]).map(|d| {
+                let d = truncate(d, 48);
+                crate::tr!("Sous-agent : {d}", "Sub-agent: {d}")
+            }),
         ),
         _ => (ThreadStatus::Running, Some(tool.to_string())),
     }

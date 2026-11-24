@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { GenericCliCommandPreview } from "./GenericCliCommandPreview";
+import { t } from "@/i18n";
 
 interface GenericCliDeleteDialogProps {
   profile: GenericCliProfile | null;
@@ -33,9 +34,9 @@ export function GenericCliDeleteDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Supprimer ce CLI ?</DialogTitle>
+          <DialogTitle>{t("settings.deleteCliTitle")}</DialogTitle>
           <DialogDescription>
-            Les chats existants qui l&apos;utilisent ne pourront plus envoyer de message.
+            {t("settings.deleteCliDescription")}
           </DialogDescription>
         </DialogHeader>
 
@@ -53,7 +54,7 @@ export function GenericCliDeleteDialog({
             disabled={pending}
             onClick={() => onOpenChange(false)}
           >
-            Annuler
+            {t("common.cancel")}
           </Button>
           <Button
             type="button"
@@ -62,7 +63,7 @@ export function GenericCliDeleteDialog({
             onClick={onConfirm}
           >
             {pending && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
-            <span>Supprimer</span>
+            <span>{t("common.delete")}</span>
           </Button>
         </DialogFooter>
       </DialogContent>

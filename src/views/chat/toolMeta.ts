@@ -8,6 +8,7 @@ import {
   Wrench,
 } from "lucide-react";
 import type { ToolStatus } from "@/bindings/ToolStatus";
+import type { MessageKey } from "@/i18n";
 
 /** Extract the base tool name (handles MCP-prefixed names like `mcp__server__Tool`). */
 export function baseToolName(name: string): string {
@@ -42,10 +43,10 @@ export function toolIcon(name: string): LucideIcon {
 
 export const TOOL_STATUS: Record<
   ToolStatus,
-  { label: string; text: string; border: string }
+  { label: MessageKey; text: string; border: string }
 > = {
-  running: { label: "En cours", text: "text-live", border: "border-live/30" },
-  ok: { label: "Terminé", text: "text-muted-foreground", border: "border-border" },
-  error: { label: "Erreur", text: "text-destructive", border: "border-destructive/40" },
-  denied: { label: "Refusé", text: "text-warn", border: "border-warn/40" },
+  running: { label: "chat.toolRunning", text: "text-live", border: "border-live/30" },
+  ok: { label: "chat.toolDone", text: "text-muted-foreground", border: "border-border" },
+  error: { label: "common.error", text: "text-destructive", border: "border-destructive/40" },
+  denied: { label: "chat.denied", text: "text-warn", border: "border-warn/40" },
 };

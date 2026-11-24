@@ -182,7 +182,7 @@ impl AgentRegistry {
     ) -> AppResult<()> {
         let text = text.trim().to_string();
         if text.is_empty() && attachments.is_empty() {
-            return Err(AppError::Invalid("message vide".into()));
+            return Err(AppError::Invalid(crate::tr!("message vide", "empty message")));
         }
 
         let runtime = {
@@ -244,7 +244,7 @@ impl AgentRegistry {
             }
         } else if !supports_system && runtime.agent != AgentKind::Generic {
             // They only saw the intro once: keep the end-of-answer summary line alive.
-            format!("{text}\n\n{}", crate::context::SUMMARY_REMINDER)
+            format!("{text}\n\n{}", crate::context::summary_reminder())
         } else {
             text
         };
@@ -293,7 +293,10 @@ impl AgentRegistry {
             self.lock().remove(thread_id);
             tracing::warn!(thread = %thread_id, attempt, "session gone, respawning");
         }
-        Err(AppError::Other("la session de l'agent s'est arrêtée immédiatement".into()))
+        Err(AppError::Other(crate::tr!(
+            "la session de l'agent s'est arrêtée immédiatement",
+            "the agent session stopped right away"
+        )))
     }
 
     async fn ensure_session(
@@ -314,16 +317,12 @@ impl AgentRegistry {
             Some(true) => self.shutdown(&runtime.id),
             None => {}
         }
-        let adapter = self
-            .adapters
-            .get(&runtime.agent)
-            .cloned()
-            .ok_or_else(|| AppError::Invalid("cet agent n'est pas encore disponible".into()))?;
-        let cwd = runtime
-            .cwd
-            .clone()
-            .map(PathBuf::from)
-            .ok_or_else(|| AppError::Invalid("aucun dossier de travail pour ce thread".into()))?;
+        let adapter = self.adapters.get(&runtime.agent).cloned().ok_or_else(|| {
+            AppError::Invalid(crate::tr!("cet agent n'est pas encore disponible", "this agent is not available yet"))
+        })?;
+        let cwd = runtime.cwd.clone().map(PathBuf::from).ok_or_else(|| {
+            AppError::Invalid(crate::tr!("aucun dossier de travail pour ce thread", "no working folder for this chat"))
+        })?;
         // Generic CLIs: the chat's model is the profile id, resolved from Paramètres at each spawn.
         let generic = if runtime.agent == AgentKind::Generic {
             let wanted = runtime.model.clone().unwrap_or_default();
@@ -403,13 +402,12 @@ impl AgentRegistry {
         answers: Option<HashMap<String, String>>,
     ) -> AppResult<()> {
         let mut sessions = self.lock();
-        let session = sessions
-            .get_mut(thread_id)
-            .ok_or_else(|| AppError::NotFound("aucune session active pour ce thread".into()))?;
-        let mut input = session
-            .pending
-            .remove(request_id)
-            .ok_or_else(|| AppError::NotFound("demande de permission expirée".into()))?;
+        let session = sessions.get_mut(thread_id).ok_or_else(|| {
+            AppError::NotFound(crate::tr!("aucune session active pour ce thread", "no active session for this chat"))
+        })?;
+        let mut input = session.pending.remove(request_id).ok_or_else(|| {
+            AppError::NotFound(crate::tr!("demande de permission expirée", "permission request expired"))
+        })?;
         if let (true, Some(answers), Some(obj)) = (allow, answers, input.as_object_mut()) {
             obj.insert("answers".into(), json!(answers));
         }
@@ -421,11 +419,16 @@ impl AgentRegistry {
                 input,
                 // Plan refused from the plan card (a mode was offered): keep planning.
                 message: (!allow && mode.is_some()).then(|| {
-                    "L'utilisateur veut continuer à planifier : reste en mode Plan et attends ses précisions.".into()
+                    crate::tr!(
+                        "L'utilisateur veut continuer à planifier : reste en mode Plan et attends ses précisions.",
+                        "The user wants to keep planning: stay in Plan mode and wait for their details."
+                    )
                 }),
                 mode: mode.filter(|_| allow),
             }))
-            .map_err(|_| AppError::Other("la session de l'agent est arrêtée".into()))
+            .map_err(|_| {
+                AppError::Other(crate::tr!("la session de l'agent est arrêtée", "the agent session is stopped"))
+            })
     }
 
     /// Switch a running Claude Code session's permission mode without restarting it. False when there is no
@@ -453,7 +456,7 @@ impl AgentRegistry {
                     request_id,
                     allow: false,
                     input,
-                    message: Some("Arrêt demandé par l'utilisateur.".into()),
+                    message: Some(crate::tr!("Arrêt demandé par l'utilisateur.", "Stop requested by the user.")),
                     mode: None,
                 }));
             }
@@ -827,12 +830,17 @@ impl AgentRegistry {
                         let tail = stderr_tail.trim();
                         let issue = access::classify_error(tail);
                         let message = if tail.is_empty() {
-                            format!(
-                                "Le processus de l'agent s'est arrêté (code {}).",
-                                code.map_or("?".into(), |c| c.to_string())
+                            let code = code.map_or("?".into(), |c| c.to_string());
+                            crate::tr!(
+                                "Le processus de l'agent s'est arrêté (code {code}).",
+                                "The agent process stopped (code {code})."
                             )
                         } else {
-                            format!("Le processus de l'agent s'est arrêté : {}", tail.lines().last().unwrap_or(tail))
+                            crate::tr!(
+                                "Le processus de l'agent s'est arrêté : {}",
+                                "The agent process stopped: {}",
+                                tail.lines().last().unwrap_or(tail)
+                            )
                         };
                         {
                             let (tid, m) = (id.clone(), message.clone());

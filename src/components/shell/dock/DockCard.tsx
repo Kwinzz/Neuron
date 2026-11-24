@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { LiveTimer } from "@/components/ui/LiveTimer";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { useNow } from "@/hooks/useNow";
+import { type MessageKey, t } from "@/i18n";
 import { AGENTS } from "@/lib/agents";
 import { formatRelative, formatTokens } from "@/lib/format";
 import { STATUS, TONE_TEXT } from "@/lib/status";
@@ -16,10 +17,10 @@ import { type Attention, useLive } from "@/stores/live";
 import { useUi } from "@/stores/ui";
 import { DockTerminal } from "./DockTerminal";
 
-const ATTENTION_LABEL: Record<Attention, { text: string; className: string }> = {
-  done: { text: "Terminé", className: "border-ok/40 text-ok" },
-  approval: { text: "À valider", className: "border-warn/40 text-warn" },
-  error: { text: "Erreur", className: "border-destructive/40 text-destructive" },
+const ATTENTION_LABEL: Record<Attention, { text: MessageKey; className: string }> = {
+  done: { text: "shell.attentionDone", className: "border-ok/40 text-ok" },
+  approval: { text: "shell.attentionApproval", className: "border-warn/40 text-warn" },
+  error: { text: "common.error", className: "border-destructive/40 text-destructive" },
 };
 
 /** Compact live card for a single chat in the dock, with its embedded mini terminal. */
@@ -41,7 +42,7 @@ export const DockCard = memo(function DockCard({ id }: { id: string }) {
 
   const meta = STATUS[thread.status];
   const attn = attention ? ATTENTION_LABEL[attention] : null;
-  const title = thread.title || "Chat sans titre";
+  const title = thread.title || t("common.untitledChat");
   const agentLabel = AGENTS[thread.agent].label;
 
   const openChat = () => {
@@ -55,7 +56,7 @@ export const DockCard = memo(function DockCard({ id }: { id: string }) {
     <div
       role="group"
       tabIndex={0}
-      aria-label={`${title} — ${agentLabel}, ${meta.label}. Entrée pour ouvrir le chat`}
+      aria-label={t("shell.dockCardAria", { title, agent: agentLabel, status: meta.label })}
       aria-current={focused ? "true" : undefined}
       onClick={openChat}
       onKeyDown={(e) => {
@@ -88,13 +89,13 @@ export const DockCard = memo(function DockCard({ id }: { id: string }) {
               attn.className,
             )}
           >
-            {attn.text}
+            {t(attn.text)}
           </Badge>
         )}
         {runningSubagents > 0 && (
           <Badge variant="secondary" className="shrink-0 gap-1 px-1.5 text-[10px] tabular-nums animate-in fade-in-0 duration-150">
             <GitFork className="size-3" aria-hidden />
-            {runningSubagents} {runningSubagents === 1 ? "sous-agent" : "sous-agents"}
+            {t("shell.subagentCount", { n: runningSubagents })}
           </Badge>
         )}
         <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
@@ -103,8 +104,8 @@ export const DockCard = memo(function DockCard({ id }: { id: string }) {
             variant="ghost"
             size="icon"
             className="size-6"
-            aria-label="Ouvrir le chat"
-            title="Ouvrir le chat"
+            aria-label={t("shell.openChat")}
+            title={t("shell.openChat")}
             onClick={(e) => {
               e.stopPropagation();
               openChat();
@@ -119,8 +120,8 @@ export const DockCard = memo(function DockCard({ id }: { id: string }) {
               variant="ghost"
               size="icon"
               className="size-6 hover:text-destructive"
-              aria-label="Arrêter"
-              title="Arrêter"
+              aria-label={t("shell.stop")}
+              title={t("shell.stop")}
               onClick={(e) => {
                 e.stopPropagation();
                 void useChat.getState().stop(id).catch(() => undefined);
@@ -151,7 +152,7 @@ export const DockCard = memo(function DockCard({ id }: { id: string }) {
             <EndedAgo ts={thread.endedAt ?? thread.updatedAt} />
           )}
           <span aria-hidden>·</span>
-          <span title="Tokens (entrée + sortie)">{formatTokens(thread.tokens)} tok</span>
+          <span title={t("shell.tokensInOut")}>{formatTokens(thread.tokens)} tok</span>
         </span>
       </div>
 

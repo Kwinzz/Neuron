@@ -41,7 +41,7 @@ async fn project(state: &AppState, project_id: &str) -> AppResult<projects::Proj
         .db
         .call(move |c| projects::get(c, &id))
         .await?
-        .ok_or_else(|| AppError::NotFound(format!("projet {project_id}")))
+        .ok_or_else(|| AppError::NotFound(crate::tr!("projet {project_id}", "project {project_id}")))
 }
 
 /// Read `.neuron/context.md` (created from the template when missing).

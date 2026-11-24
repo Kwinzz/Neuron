@@ -6,9 +6,20 @@ import { useNow } from "@/hooks/useNow";
 import { formatCountdown, formatPercent } from "@/lib/format";
 import { useDashboard } from "@/stores/dashboard";
 import { findModel, useModels } from "@/stores/models";
+import { t } from "@/i18n";
 
-const SHORT: Record<string, string> = { five_hour: "5 h", seven_day: "7 j", thirty_day: "30 j" };
-const LONG: Record<string, string> = { five_hour: "Quota 5 h", seven_day: "Quota hebdomadaire", thirty_day: "Quota 30 jours" };
+function shortLabel(window: string): string {
+  if (window === "five_hour") return t("chat.quotaShort5h");
+  if (window === "seven_day") return t("chat.quotaShort7d");
+  if (window === "thirty_day") return t("chat.quotaShort30d");
+  return window;
+}
+function longLabel(window: string): string {
+  if (window === "five_hour") return t("chat.quota5h");
+  if (window === "seven_day") return t("chat.quotaWeekly");
+  if (window === "thirty_day") return t("chat.quota30d");
+  return window;
+}
 /** Shown first, in this order: the 5 h and weekly windows (30 days when the plan only has that one). */
 const ORDER = ["five_hour", "seven_day", "thirty_day"];
 
@@ -33,14 +44,14 @@ function groupFor(windows: LiveWindow[], modelLabel: string | null): string | nu
 }
 
 const QuotaChip = memo(function QuotaChip({ window: w, now }: { window: LiveWindow; now: number }) {
-  const reset = w.resetsAt != null ? ` · reset dans ${formatCountdown(w.resetsAt - now)}` : "";
+  const reset = w.resetsAt != null ? t("chat.quotaReset", { time: formatCountdown(w.resetsAt - now) }) : "";
   const group = w.group ? ` (${w.group})` : "";
   return (
     <span
       className="inline-flex items-center gap-1.5 font-mono text-[11px] tabular-nums text-muted-foreground"
-      title={`${LONG[w.window] ?? w.window}${group} : ${formatPercent(w.utilization)} utilisé${reset}`}
+      title={t("chat.quotaTitle", { name: longLabel(w.window), group, percent: formatPercent(w.utilization), reset })}
     >
-      <span className="font-sans">{SHORT[w.window] ?? w.window}</span>
+      <span className="font-sans">{shortLabel(w.window)}</span>
       <span className="relative h-1.5 w-8 overflow-hidden rounded-full bg-muted" aria-hidden>
         <span
           className={cn("absolute inset-y-0 left-0 rounded-full transition-[width] duration-500", tone(w.utilization))}
@@ -70,7 +81,7 @@ export const HeaderQuotas = memo(function HeaderQuotas({ agent, model }: { agent
   );
   if (shown.length === 0) return null;
   return (
-    <span className="hidden items-center gap-3 xl:inline-flex" aria-label="Quotas de l'abonnement">
+    <span className="hidden items-center gap-3 xl:inline-flex" aria-label={t("chat.subscriptionQuotas")}>
       {shown.map((w) => (
         <QuotaChip key={w.window} window={w} now={now} />
       ))}

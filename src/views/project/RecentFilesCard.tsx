@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { t } from "@/i18n";
 import { CardEmpty } from "./CardEmpty";
 import { fileIcon } from "./fileIcon";
 import { RelativeTime } from "./RelativeTime";
@@ -42,9 +43,9 @@ export function RecentFilesCard({ files, loading, error }: RecentFilesCardProps)
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <History className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          <span>Fichiers récents</span>
+          <span>{t("project.recentFilesTitle")}</span>
         </CardTitle>
-        <CardDescription className="text-xs">Modifiés dans le dossier du projet</CardDescription>
+        <CardDescription className="text-xs">{t("project.recentFilesDescription")}</CardDescription>
         {files.length > 0 && (
           <CardAction>
             <Badge variant="outline" className="font-mono tabular-nums">
@@ -62,9 +63,9 @@ export function RecentFilesCard({ files, loading, error }: RecentFilesCardProps)
             ))}
           </div>
         ) : error && visible.length === 0 ? (
-          <CardEmpty icon={AlertCircle}>Liste des fichiers indisponible.</CardEmpty>
+          <CardEmpty icon={AlertCircle}>{t("project.recentFilesUnavailable")}</CardEmpty>
         ) : visible.length === 0 ? (
-          <CardEmpty icon={History}>Aucun fichier modifié récemment</CardEmpty>
+          <CardEmpty icon={History}>{t("project.recentFilesEmpty")}</CardEmpty>
         ) : (
           <ul className="flex min-w-0 flex-col gap-2">
             {visible.map((file) => {

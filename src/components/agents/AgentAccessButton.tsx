@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/tooltip";
 import { AGENTS } from "@/lib/agents";
 import { useAccess } from "@/stores/access";
+import { t } from "@/i18n";
 
 interface AgentAccessButtonProps {
   agent: AgentKind;
@@ -35,8 +36,8 @@ export function AgentAccessButton({
           <Loader2 className="animate-spin" aria-hidden />
           <span>
             {pending === "install"
-              ? "Installation en cours…"
-              : "Connexion en cours…"}
+              ? t("settings.installing")
+              : t("settings.signingIn")}
           </span>
         </Button>
         <Tooltip>
@@ -45,13 +46,13 @@ export function AgentAccessButton({
               type="button"
               size={size === "xs" ? "icon-xs" : "icon-sm"}
               variant="ghost"
-              aria-label="Arrêter d'attendre"
+              aria-label={t("settings.stopWaiting")}
               onClick={() => useAccess.getState().cancel(agent)}
             >
               <X aria-hidden />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Arrêter d'attendre</TooltipContent>
+          <TooltipContent>{t("settings.stopWaiting")}</TooltipContent>
         </Tooltip>
       </span>
     );
@@ -64,11 +65,13 @@ export function AgentAccessButton({
       variant={variant}
       onClick={() => void useAccess.getState().start(agent, action)}
       aria-label={
-        action === "install" ? `Installer ${label}` : `Se connecter à ${label}`
+        action === "install"
+          ? t("settings.installAgent", { agent: label })
+          : t("settings.signInAgent", { agent: label })
       }
     >
       {action === "install" ? <Download aria-hidden /> : <LogIn aria-hidden />}
-      <span>{action === "install" ? "Installer" : "Se connecter"}</span>
+      <span>{action === "install" ? t("settings.install") : t("settings.signIn")}</span>
     </Button>
   );
 }

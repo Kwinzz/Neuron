@@ -2,6 +2,7 @@ import { isValidElement, type ReactElement, type ReactNode, useEffect, useRef, u
 import { cn } from "cn";
 import { Check, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { t } from "@/i18n";
 
 type CodeChildProps = { className?: string; children?: ReactNode };
 
@@ -67,12 +68,12 @@ export function CodeBlock({ children }: { children?: ReactNode }) {
           {copied ? (
             <>
               <Check className="animate-in zoom-in-75 fade-in-0 duration-150" />
-              Copié
+              {t("common.copied")}
             </>
           ) : (
             <>
               <Copy />
-              Copier
+              {t("common.copy")}
             </>
           )}
         </Button>

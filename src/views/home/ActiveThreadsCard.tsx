@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { t } from "@/i18n";
 import { useDashboard } from "@/stores/dashboard";
 import { useUi } from "@/stores/ui";
 import { ActiveThreadRow } from "./ActiveThreadRow";
@@ -22,10 +23,10 @@ export function ActiveThreadsCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>En cours</CardTitle>
+        <CardTitle>{t("home.activeTitle")}</CardTitle>
         {!isLoading && (
           <CardDescription>
-            {count} {count <= 1 ? "chat actif" : "chats actifs"}
+            {t("home.activeCount", { n: count })}
           </CardDescription>
         )}
       </CardHeader>
@@ -44,9 +45,9 @@ export function ActiveThreadsCard() {
             >
               <Coffee className="size-5" />
             </div>
-            <p className="font-medium">Aucun agent en cours</p>
+            <p className="font-medium">{t("home.activeEmptyTitle")}</p>
             <p className="text-xs text-muted-foreground">
-              Lance un chat pour le suivre ici.
+              {t("home.activeEmptyBody")}
             </p>
             <Button
               type="button"
@@ -56,13 +57,13 @@ export function ActiveThreadsCard() {
               onClick={() => useUi.getState().startChat(null)}
             >
               <Plus />
-              Nouveau chat
+              {t("shell.navNewChat")}
             </Button>
           </div>
         ) : (
           <div className="flex max-h-[360px] flex-col gap-1 overflow-y-auto animate-in fade-in-0 duration-300">
-            {activeThreads.map((t) => (
-              <ActiveThreadRow key={t.id} id={t.id} fallback={t} />
+            {activeThreads.map((th) => (
+              <ActiveThreadRow key={th.id} id={th.id} fallback={th} />
             ))}
           </div>
         )}

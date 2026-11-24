@@ -27,6 +27,7 @@ import { useLive } from "@/stores/live";
 import { effortLabel } from "@/lib/models";
 import { findModel, useModels } from "@/stores/models";
 import { toast } from "@/stores/toast";
+import { t } from "@/i18n";
 
 /** Sticky bar: full-bleed inside the scroll container, content aligned with the timeline. */
 const BAR = `sticky top-0 z-20 -mx-4 border-b px-4 md:-mx-6 md:px-6 ${
@@ -99,7 +100,7 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
       setPending((cur) => (cur?.threadId === threadId && cur.title === trimmed ? null : cur));
       toast({
         tone: "danger",
-        title: "Renommage impossible",
+        title: t("chat.renameFailed"),
         description: ipcErrorMessage(err),
       });
     }
@@ -138,17 +139,17 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={onInputKeyDown}
               onBlur={() => void commit()}
-              aria-label="Nom du chat"
+              aria-label={t("chat.chatName")}
               className="h-7 max-w-[480px] rounded-md bg-transparent px-1.5 text-sm font-semibold md:text-sm dark:bg-transparent"
             />
           ) : (
             <button
               type="button"
-              title="Renommer"
+              title={t("chat.rename")}
               onClick={startEdit}
               className="group flex min-w-0 max-w-full items-center gap-1.5 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
             >
-              <span className="truncate text-sm font-semibold text-foreground">{displayTitle || "Chat sans titre"}</span>
+              <span className="truncate text-sm font-semibold text-foreground">{displayTitle || t("common.untitledChat")}</span>
               <Pencil className="size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
             </button>
           )}
@@ -166,7 +167,7 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
             {statusMeta.active && <LiveTimer startedAt={live.runStartedAt} className="font-sans text-muted-foreground" />}
           </Badge>
           <span className="hidden text-xs text-muted-foreground tabular-nums lg:inline">
-            {formatTokens(live.tokens)} tokens ·{" "}
+            {t("chat.tokens", { n: formatTokens(live.tokens) })} ·{" "}
             <CostLabel agent={live.agent} costUsd={live.costUsd} tokens={live.tokens} />
           </span>
           {live.hasContext && <ContextIndicator threadId={threadId} projectId={live.projectId} />}
@@ -178,7 +179,7 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
               onClick={() => void useChat.getState().stop(threadId)}
             >
               <Square className="fill-current" />
-              Arrêter
+              {t("chat.stop")}
             </Button>
           )}
         </div>
@@ -206,7 +207,7 @@ const HeaderMeta = memo(function HeaderMeta({
   const level =
     (modelInfo?.effortModels ? Object.entries(modelInfo.effortModels).find(([, id]) => id === model)?.[0] : undefined) ??
     effort;
-  const parts = [agentLabel, modelInfo?.label ?? model ?? "modèle par défaut", level ? effortLabel(level) : null].filter(
+  const parts = [agentLabel, modelInfo?.label ?? model ?? t("chat.defaultModel"), level ? effortLabel(level) : null].filter(
     (p): p is string => Boolean(p),
   );
   return (

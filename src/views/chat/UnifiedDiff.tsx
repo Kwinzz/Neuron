@@ -2,6 +2,7 @@ import { memo, useMemo, useState } from "react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { parseUnifiedDiff } from "./diffRows";
+import { t } from "@/i18n";
 
 /** Rows shown before « Afficher tout ». */
 const VISIBLE_ROWS = 300;
@@ -29,7 +30,7 @@ export const UnifiedDiff = memo(function UnifiedDiff({ diff, truncated }: { diff
               row.kind === "gap" ? (
                 <tr key={i} className="bg-muted/40 text-muted-foreground select-none">
                   <td colSpan={4} className="px-3 py-0.5 text-[11px]">
-                    ⋯ {row.count != null ? `${row.count} ligne${row.count > 1 ? "s" : ""} inchangée${row.count > 1 ? "s" : ""}` : ""}
+                    ⋯ {row.count != null ? t("chat.unchangedLines", { n: row.count }) : ""}
                   </td>
                 </tr>
               ) : (
@@ -57,10 +58,10 @@ export const UnifiedDiff = memo(function UnifiedDiff({ diff, truncated }: { diff
               onClick={() => setExpanded((v) => !v)}
               className="h-auto px-0 text-muted-foreground hover:text-foreground"
             >
-              {expanded ? "Réduire" : `Afficher tout (${rows.length} lignes)`}
+              {expanded ? t("chat.collapse") : t("chat.showAllLines", { n: rows.length })}
             </Button>
           )}
-          {truncated && <span>Diff tronqué (fichier très modifié).</span>}
+          {truncated && <span>{t("chat.diffTruncated")}</span>}
         </div>
       )}
     </div>

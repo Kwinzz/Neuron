@@ -4,6 +4,7 @@ import type { ChatSettings } from "@/lib/models";
 import { useLive } from "@/stores/live";
 import { toast } from "@/stores/toast";
 import { ChatSettingsBar } from "./ChatSettingsBar";
+import { t } from "@/i18n";
 
 /**
  * Settings of an existing chat. Changes apply to the next message: a running agent restarts and
@@ -23,7 +24,7 @@ export const ThreadSettingsBar = memo(function ThreadSettingsBar({ threadId }: {
         .updateThreadSettings(threadId, { model: next.model, effort: next.effort, permissionMode: next.permissionMode })
         .then((summary) => useLive.getState().hydrate([summary]))
         .catch((err: unknown) =>
-          toast({ tone: "danger", title: "Réglage non appliqué", description: ipcErrorMessage(err) }),
+          toast({ tone: "danger", title: t("chat.settingNotApplied"), description: ipcErrorMessage(err) }),
         );
     },
     [threadId],

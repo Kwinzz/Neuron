@@ -19,6 +19,7 @@ import { type ImportRow, normalizeMemory, toImportRows } from "./importOrigins";
 import { ImportPreviewStep } from "./ImportPreviewStep";
 import { ImportReformulate } from "./ImportReformulate";
 import { ImportSourceStep, type ImportSourceTab } from "./ImportSourceStep";
+import { locale, t } from "@/i18n";
 
 interface MemoryImportDialogProps {
   open: boolean;
@@ -29,8 +30,9 @@ interface MemoryImportDialogProps {
 
 type Step = "source" | "preview";
 
-function souvenirs(n: number): string {
-  return `${n.toLocaleString("fr-FR")} ${n > 1 ? "souvenirs" : "souvenir"}`;
+/** Vars of the « N souvenir(s) » messages: raw number for the plural, formatted one for display. */
+function countVars(n: number): { n: number; count: string } {
+  return { n, count: n.toLocaleString(locale()) };
 }
 
 export function MemoryImportDialog({ open, onOpenChange, onImported }: MemoryImportDialogProps) {
@@ -75,7 +77,7 @@ export function MemoryImportDialog({ open, onOpenChange, onImported }: MemoryImp
     try {
       const split = await ipc.splitMemoryImport(text);
       if (split.length === 0) {
-        toast({ tone: "warn", title: "Aucun souvenir trouvé dans ce texte" });
+        toast({ tone: "warn", title: t("memory.noneFound") });
         return;
       }
       requestRef.current += 1;
@@ -87,7 +89,7 @@ export function MemoryImportDialog({ open, onOpenChange, onImported }: MemoryImp
       setReformulateError(null);
       setStep("preview");
     } catch (err: unknown) {
-      toast({ tone: "danger", title: "Impossible de découper le texte", description: ipcErrorMessage(err) });
+      toast({ tone: "danger", title: t("memory.splitFailed"), description: ipcErrorMessage(err) });
     } finally {
       setSplitting(false);
     }
@@ -103,7 +105,7 @@ export function MemoryImportDialog({ open, onOpenChange, onImported }: MemoryImp
       const rewritten = await ipc.reformulateMemoryImport(chosen, previewText);
       if (request !== requestRef.current) return;
       if (rewritten.length === 0) {
-        setReformulateError("L'agent n'a renvoyé aucun souvenir.");
+        setReformulateError(t("memory.agentReturnedNone"));
         return;
       }
       setRows(toImportRows(rewritten, existing));
@@ -131,14 +133,14 @@ export function MemoryImportDialog({ open, onOpenChange, onImported }: MemoryImp
         origin,
       );
       if (added === 0) {
-        toast({ tone: "info", title: "Rien de nouveau : tout était déjà en mémoire" });
+        toast({ tone: "info", title: t("memory.nothingNew") });
       } else {
-        toast({ tone: "ok", title: `${souvenirs(added)} ${added > 1 ? "importés" : "importé"}` });
+        toast({ tone: "ok", title: t("memory.importedToast", countVars(added)) });
       }
       void useMemory.getState().load();
       onImported();
     } catch (err: unknown) {
-      toast({ tone: "danger", title: "Impossible d'importer les souvenirs", description: ipcErrorMessage(err) });
+      toast({ tone: "danger", title: t("memory.importFailed"), description: ipcErrorMessage(err) });
     } finally {
       setImporting(false);
     }
@@ -185,12 +187,12 @@ export function MemoryImportDialog({ open, onOpenChange, onImported }: MemoryImp
         <DialogHeader className="pr-8">
           <DialogTitle className="flex items-center gap-2">
             <Download className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-            Importer une mémoire
+            {t("memory.importTitle")}
           </DialogTitle>
           <DialogDescription>
             {step === "source"
-              ? "Récupère ce que tes autres assistants savent de toi : colle leur réponse ou un fichier d'instructions."
-              : "Vérifie, corrige et choisis les souvenirs à ajouter à ta mémoire globale."}
+              ? t("memory.importSourceDescription")
+              : t("memory.importPreviewDescription")}
           </DialogDescription>
         </DialogHeader>
 
@@ -234,10 +236,10 @@ export function MemoryImportDialog({ open, onOpenChange, onImported }: MemoryImp
           {step === "source" ? (
             <>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Annuler
+                {t("common.cancel")}
               </Button>
               <Button type="button" disabled={!canNext} onClick={() => void goToPreview()}>
-                <span>Suivant</span>
+                <span>{t("common.next")}</span>
                 <ArrowRight data-icon="inline-end" aria-hidden />
               </Button>
             </>
@@ -245,11 +247,15 @@ export function MemoryImportDialog({ open, onOpenChange, onImported }: MemoryImp
             <>
               <Button type="button" variant="outline" disabled={importing} onClick={() => setStep("source")}>
                 <ArrowLeft data-icon="inline-start" aria-hidden />
-                <span>Retour</span>
+                <span>{t("common.back")}</span>
               </Button>
               <Button type="button" disabled={!canImport} onClick={() => void handleImport()}>
                 <Download data-icon="inline-start" aria-hidden />
-                <span>{toImport.length === 0 ? "Importer" : `Importer ${souvenirs(toImport.length)}`}</span>
+                <span>
+                  {toImport.length === 0
+                    ? t("memory.import")
+                    : t("memory.importCount", countVars(toImport.length))}
+                </span>
               </Button>
             </>
           )}

@@ -34,7 +34,7 @@ pub fn get(conn: &Connection, id: &str) -> AppResult<Option<Memory>> {
 pub fn insert(conn: &Connection, category: MemoryCategory, content: &str, source: &str, now: i64) -> AppResult<Memory> {
     let content = content.trim();
     if content.is_empty() {
-        return Err(AppError::Invalid("souvenir vide".into()));
+        return Err(AppError::Invalid(crate::tr!("souvenir vide", "empty memory")));
     }
     let id = uuid::Uuid::new_v4().to_string();
     conn.execute(
@@ -47,14 +47,14 @@ pub fn insert(conn: &Connection, category: MemoryCategory, content: &str, source
 pub fn update(conn: &Connection, id: &str, category: MemoryCategory, content: &str, now: i64) -> AppResult<Memory> {
     let content = content.trim();
     if content.is_empty() {
-        return Err(AppError::Invalid("souvenir vide".into()));
+        return Err(AppError::Invalid(crate::tr!("souvenir vide", "empty memory")));
     }
     let changed = conn.execute(
         "UPDATE memories SET category = ?2, content = ?3, updated_at = ?4 WHERE id = ?1",
         params![id, category.as_db(), content, now],
     )?;
     if changed == 0 {
-        return Err(AppError::NotFound(format!("souvenir {id}")));
+        return Err(AppError::NotFound(crate::tr!("souvenir {id}", "memory {id}")));
     }
     get(conn, id)?.ok_or_else(|| AppError::NotFound(id.to_string()))
 }

@@ -14,8 +14,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { ipcErrorMessage } from "@/lib/ipc";
 import { useMemory } from "@/stores/memory";
 import { toast } from "@/stores/toast";
-import { CATEGORIES } from "./categories";
+import { categoryMeta } from "./categories";
 import { CategoryPicker } from "./CategoryPicker";
+import { t } from "@/i18n";
 
 interface MemoryComposerProps {
   textareaRef: RefObject<HTMLTextAreaElement | null>;
@@ -40,7 +41,7 @@ export function MemoryComposer({ textareaRef, onCreated }: MemoryComposerProps) 
     } catch (err: unknown) {
       toast({
         tone: "danger",
-        title: "Impossible d'ajouter le souvenir",
+        title: t("memory.addFailed"),
         description: ipcErrorMessage(err),
       });
     } finally {
@@ -70,10 +71,10 @@ export function MemoryComposer({ textareaRef, onCreated }: MemoryComposerProps) 
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Plus className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          <span>Nouveau souvenir</span>
+          <span>{t("memory.newMemory")}</span>
         </CardTitle>
         <CardDescription>
-          Une information durable que tous tes agents doivent connaître.
+          {t("memory.newMemoryDescription")}
         </CardDescription>
       </CardHeader>
 
@@ -85,8 +86,8 @@ export function MemoryComposer({ textareaRef, onCreated }: MemoryComposerProps) 
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={pending}
-          aria-label="Contenu du nouveau souvenir"
-          placeholder={`Ex. : ${CATEGORIES[category].example}`}
+          aria-label={t("memory.newMemoryAria")}
+          placeholder={t("memory.examplePlaceholder", { example: categoryMeta(category).example })}
           className="min-h-20 resize-none"
         />
 
@@ -100,13 +101,13 @@ export function MemoryComposer({ textareaRef, onCreated }: MemoryComposerProps) 
 
           <div className="flex min-w-0 items-center gap-3">
             <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:inline-flex">
-              <Kbd>Entrée</Kbd>
-              <span>pour ajouter</span>
+              <Kbd>{t("memory.keyEnter")}</Kbd>
+              <span>{t("memory.hintAdd")}</span>
               <span aria-hidden>·</span>
-              <Kbd>Maj</Kbd>
+              <Kbd>{t("memory.keyShift")}</Kbd>
               <span>+</span>
-              <Kbd>Entrée</Kbd>
-              <span>nouvelle ligne</span>
+              <Kbd>{t("memory.keyEnter")}</Kbd>
+              <span>{t("memory.hintNewLine")}</span>
             </span>
 
             <Button
@@ -120,7 +121,7 @@ export function MemoryComposer({ textareaRef, onCreated }: MemoryComposerProps) 
               ) : (
                 <Plus aria-hidden />
               )}
-              <span>Ajouter</span>
+              <span>{t("common.add")}</span>
             </Button>
           </div>
         </div>

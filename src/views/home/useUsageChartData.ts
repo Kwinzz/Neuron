@@ -26,7 +26,10 @@ const AGENT_CHART_CONFIG: ChartConfig = Object.fromEntries(
   AGENT_ORDER.map((agent, i) => [
     agent,
     {
-      label: AGENTS[agent].label,
+      // Getter: the generic CLI label follows the interface language.
+      get label() {
+        return AGENTS[agent].label;
+      },
       color: `var(--chart-${i + 1})`,
     },
   ]),

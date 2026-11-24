@@ -4,6 +4,7 @@ import { Brain, ChevronRight } from "lucide-react";
 import type { ChatItem } from "@/bindings/ChatItem";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { t } from "@/i18n";
 
 type ThinkingItem = Extract<ChatItem, { kind: "thinking" }>;
 
@@ -23,7 +24,7 @@ export const ThinkingBlock = memo(function ThinkingBlock({ item }: { item: Think
           className="-ml-2 w-fit text-muted-foreground hover:text-foreground"
         >
           <Brain />
-          <span>Réflexion{item.streaming ? "…" : ""}</span>
+          <span>{t("chat.thinking")}{item.streaming ? "…" : ""}</span>
           <ChevronRight className={cn("transition-transform duration-200 ease-snappy", open && "rotate-90")} />
         </Button>
       </CollapsibleTrigger>

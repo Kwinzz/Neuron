@@ -5,6 +5,7 @@ import type { AgentKind } from "@/bindings/AgentKind";
 import { AgentAccessButton } from "@/components/agents/AgentAccessButton";
 import { AGENTS } from "@/lib/agents";
 import { accessIssue, MANAGED_AGENTS, useAccess } from "@/stores/access";
+import { t } from "@/i18n";
 
 /** Above the composer: the chat's agent is not installed or signed out — fix it before sending. */
 export function AgentAccessNotice({
@@ -43,8 +44,8 @@ export function AgentAccessNotice({
         <p className="min-w-0 flex-1 text-sm text-muted-foreground">
           <span className="font-medium text-foreground">{label}</span>{" "}
           {issue === "not_installed"
-            ? "n'est pas installé sur cet ordinateur."
-            : "n'est pas connecté à ton compte : l'agent ne pourra pas répondre."}
+            ? t("chat.noticeNotInstalled")
+            : t("chat.noticeSignedOut")}
         </p>
         <AgentAccessButton agent={agent} issue={issue} />
       </div>

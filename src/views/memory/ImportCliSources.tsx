@@ -10,6 +10,7 @@ import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { toast } from "@/stores/toast";
 import { formatFileSize } from "./importOrigins";
 import { ImportOriginLogo } from "./ImportOriginLogo";
+import { t } from "@/i18n";
 
 interface ImportCliSourcesProps {
   /** A file was read: fill the text area with it. */
@@ -44,7 +45,7 @@ export function ImportCliSources({ onUse }: ImportCliSourcesProps) {
     } catch (err: unknown) {
       toast({
         tone: "danger",
-        title: `Impossible de lire le fichier de ${source.label}`,
+        title: t("memory.readFileOfFailed", { label: source.label }),
         description: ipcErrorMessage(err),
       });
     } finally {
@@ -56,11 +57,11 @@ export function ImportCliSources({ onUse }: ImportCliSourcesProps) {
     return (
       <Alert variant="destructive">
         <AlertCircle aria-hidden />
-        <AlertTitle>Fichiers introuvables</AlertTitle>
+        <AlertTitle>{t("memory.filesNotFound")}</AlertTitle>
         <AlertDescription>{error}</AlertDescription>
         <AlertAction>
           <Button type="button" size="xs" variant="outline" onClick={() => void load()}>
-            Réessayer
+            {t("common.retry")}
           </Button>
         </AlertAction>
       </Alert>
@@ -70,7 +71,7 @@ export function ImportCliSources({ onUse }: ImportCliSourcesProps) {
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <p className="text-xs text-muted-foreground">
-        Les instructions globales que tu as données à tes agents en ligne de commande sur cet ordinateur.
+        {t("memory.cliSourcesIntro")}
       </p>
       <ul className="flex min-w-0 flex-col divide-y rounded-lg border">
         {sources === null
@@ -107,11 +108,11 @@ export function ImportCliSources({ onUse }: ImportCliSourcesProps) {
                     disabled={readingPath !== null || source.bytes === 0}
                     onClick={() => void handleUse(source)}
                   >
-                    {source.bytes === 0 ? "Vide" : "Utiliser"}
+                    {source.bytes === 0 ? t("memory.fileEmpty") : t("memory.useFile")}
                   </Button>
                 ) : (
                   <Badge variant="outline" className="text-muted-foreground">
-                    Introuvable
+                    {t("memory.fileMissing")}
                   </Badge>
                 )}
               </li>

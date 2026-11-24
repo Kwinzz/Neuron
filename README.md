@@ -1,50 +1,52 @@
 # Neuron
 
-Application de bureau qui pilote tes agents IA en ligne de commande — **Claude Code**, **Codex**, **Antigravity**
-et d'autres CLI — dans une seule interface : chats, mémoire partagée entre les agents, quotas et coûts,
-notifications et demande rapide depuis n'importe quelle app.
+🇫🇷 [Version française](README.fr.md)
 
-Neuron ne contient pas d'IA : il lance les CLI installés sur ton ordinateur, avec ton propre abonnement.
+Desktop app that drives your command-line AI agents — **Claude Code**, **Codex**, **Antigravity** and other CLIs —
+from a single interface: chats, memory shared between agents, quotas and costs, notifications and a quick prompt
+from any app.
 
-**Installer :** [Windows](#installation-sous-windows) · [Linux en une commande](#en-une-commande-arch-debian--ubuntu-fedora)
-· [Premier lancement](#premier-lancement--les-agents)
+Neuron contains no AI of its own: it runs the CLIs installed on your computer, with your own subscriptions.
 
-## Fonctionnalités
+**Install:** [Windows](#install-on-windows) · [Linux in one command](#one-command-arch-debian--ubuntu-fedora)
+· [First launch](#first-launch-the-agents)
 
-- **Chats multi-agents** : Claude Code, Codex, Antigravity et tes propres CLI, avec streaming, blocs de code, diffs
-  des fichiers modifiés, demandes d'autorisation, mode Plan, choix du modèle et du niveau de raisonnement.
-- **Plusieurs agents en parallèle** : chaque chat tourne en arrière-plan, suivi en direct dans « Threads live ».
-- **Projets** : un dossier = un projet, avec son contexte (`.neuron/context.md`, état git) donné à chaque agent.
-- **Mémoire globale** partagée par tous les agents (serveur MCP intégré), importable depuis claude.ai, ChatGPT,
-  Gemini ou les fichiers de tes CLI, avec reformulation optionnelle par une IA.
-- **Quotas et coûts** : utilisation de tes abonnements (fenêtres 5 h / semaine), tokens et coût estimé par agent
-  et par projet.
-- **Fournisseurs IA** : installe et connecte chaque CLI en un clic ; le chat te prévient si un agent n'est pas
-  connecté.
-- **Demande rapide** depuis n'importe quelle app (raccourci global), notifications de fin de tour, zone de
-  notification, démarrage avec la session.
+## Features
+
+- **Multi-agent chats**: Claude Code, Codex, Antigravity and your own CLIs, with streaming, code blocks, diffs of the
+  changed files, approval requests, Plan mode, model and reasoning level picker.
+- **Several agents in parallel**: each chat runs in the background, followed live in « Live threads ».
+- **Projects**: a folder = a project, with its context (`.neuron/context.md`, git status) given to every agent.
+- **Global memory** shared by every agent (built-in MCP server), importable from claude.ai, ChatGPT, Gemini or your
+  CLIs' instruction files, with an optional AI rewrite.
+- **Quotas and costs**: usage of your subscriptions (5-hour / weekly windows), tokens and estimated cost per agent
+  and per project.
+- **AI providers**: install and sign in to each CLI in one click; the chat tells you when an agent isn't signed in.
+- **Quick prompt** from any app (global shortcut), end-of-turn notifications, system tray, launch at login.
+- **English and French** interface.
 
 ---
 
-## Installation sous Windows
+## Install on Windows
 
-1. Télécharge l'installateur `Neuron_<version>_x64-setup.exe` depuis la
-   [dernière release](https://github.com/Kwinzz/Neuron/releases/latest).
-2. Lance-le et accepte la demande de droits administrateur (installation dans *Program Files*).
-3. Choisis si Neuron doit démarrer avec Windows, puis lance-le depuis le menu Démarrer.
+1. Download the `Neuron_<version>_x64-setup.exe` installer from the
+   [latest release](https://github.com/Kwinzz/Neuron/releases/latest).
+2. Run it and accept the administrator prompt (installs into *Program Files*).
+3. Pick the language (English or French) at the start of the installer, then whether Neuron starts with Windows,
+   and launch it from the Start menu.
 
-> Windows SmartScreen peut afficher « Windows a protégé votre ordinateur » (l'installateur n'est pas signé) :
-> clique sur **Informations complémentaires** → **Exécuter quand même**.
+> Windows SmartScreen may say « Windows protected your PC » (the installer isn't signed): click
+> **More info** → **Run anyway**.
 
-Mise à jour : télécharge la nouvelle version et lance-la, elle remplace l'ancienne (tes données sont gardées).
+Update: download the new version and run it, it replaces the old one (your data is kept).
 
-> La release peut avoir un peu de retard sur le code du dépôt : pour la toute dernière version, compile-la
-> (ci-dessous).
+> The release may lag a little behind the code in this repository: to get the very latest version, build it
+> (below).
 
-### Compiler soi-même (Windows)
+### Build it yourself (Windows)
 
-Prérequis : [Rust](https://rustup.rs), [Node.js](https://nodejs.org) 20.19+, les
-[prérequis Tauri](https://v2.tauri.app/start/prerequisites/) (Microsoft C++ Build Tools, WebView2).
+Requirements: [Rust](https://rustup.rs), [Node.js](https://nodejs.org) 20.19+, the
+[Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) (Microsoft C++ Build Tools, WebView2).
 
 ```powershell
 git clone https://github.com/Kwinzz/Neuron
@@ -53,111 +55,113 @@ npm ci
 npm run tauri build
 ```
 
-L'installateur est créé dans `src-tauri\target\release\bundle\nsis\`.
+The installer is created in `src-tauri\target\release\bundle\nsis\`.
 
 ---
 
-## Installation sous Linux
+## Install on Linux
 
-### En une commande (Arch, Debian / Ubuntu, Fedora)
+### One command (Arch, Debian / Ubuntu, Fedora)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh | bash
 ```
 
-Le script installe les dépendances (sudo est demandé), récupère les sources, compile Neuron (quelques minutes la
-première fois) et l'installe avec le gestionnaire de paquets de ta distribution : `pacman` sur Arch et dérivées
-(EndeavourOS, Manjaro, CachyOS…), `.deb` sur Debian / Ubuntu, `.rpm` sur Fedora.
+The script first asks for the language (English or French, the system's by default; `--lang en` to skip the
+question), installs the dependencies (sudo is asked for), fetches the sources, builds Neuron (a few minutes the first
+time) and installs it with your distribution's package manager: `pacman` on Arch and derivatives (EndeavourOS,
+Manjaro, CachyOS…), `.deb` on Debian / Ubuntu, `.rpm` on Fedora.
 
-**Déjà installé ?** Relance la même commande : elle propose de **mettre à jour**, **réinstaller** ou
-**désinstaller** (tes chats et ta mémoire sont gardés, sauf si tu demandes de les supprimer).
+**Already installed?** Run the same command again: it offers to **update**, **reinstall** or **uninstall** (your
+chats and memory are kept unless you ask to delete them).
 
-Sans question :
+Without questions:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh | bash -s -- --update      # ou --install, --reinstall
+curl -fsSL https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh | bash -s -- --update      # or --install, --reinstall
 curl -fsSL https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh | bash -s -- --uninstall
 ```
 
-(`--yes` répond oui aux questions ; la suppression des données n'est jamais automatique.)
-Les sources compilées restent dans `~/.local/share/neuron-src` pour accélérer les mises à jour.
+(`--yes` answers yes to the questions; deleting your data is never automatic.)
+The built sources stay in `~/.local/share/neuron-src` so updates are faster.
 
-### Arch Linux à la main
+> Debian 12 and Ubuntu 24.04 ship Node.js 18, too old for the build: install Node 20.19+ first (for example from
+> [NodeSource](https://github.com/nodesource/distributions)).
 
-Le paquet est construit depuis les sources avec `makepkg` (compter quelques minutes pour la première compilation) :
+### Arch Linux by hand
+
+The package is built from source with `makepkg` (a few minutes for the first build):
 
 ```bash
-sudo pacman -S --needed base-devel git rust nodejs npm webkit2gtk-4.1 gtk3 libayatana-appindicator
+sudo pacman -S --needed base-devel git rust nodejs npm mold webkit2gtk-4.1 gtk3 libayatana-appindicator
 git clone https://github.com/Kwinzz/Neuron
 cd Neuron/packaging/arch
 makepkg -si
 ```
 
-Neuron apparaît ensuite dans le menu des applications (commande `neuron`).
+Neuron then shows up in your applications menu (command `neuron`).
 
-Mise à jour :
+Update:
 
 ```bash
 cd Neuron && git pull
 cd packaging/arch && makepkg -si
 ```
 
-Désinstallation : `sudo pacman -R neuron`.
+Uninstall: `sudo pacman -R neuron`.
 
-### Autres distributions, à la main
+### Other distributions, by hand
 
-Compile avec Tauri, qui produit un `.deb`, un `.rpm` ou un AppImage.
+Build with Tauri, which produces a `.deb`, a `.rpm` or an AppImage.
 
 ```bash
-# Debian / Ubuntu : dépendances de compilation
+# Debian / Ubuntu: build dependencies
 sudo apt install build-essential curl git libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev
-# Rust (https://rustup.rs) et Node.js 20.19+ requis
+# Rust (https://rustup.rs) and Node.js 20.19+ required
 git clone https://github.com/Kwinzz/Neuron
 cd Neuron
 npm ci
 npm run tauri build
 ```
 
-Les paquets sont dans `src-tauri/target/release/bundle/` (`deb/`, `appimage/` ; `npm run tauri build -- --bundles rpm`
-pour un `.rpm`). Pour les autres distributions,
-voir les [prérequis Tauri pour Linux](https://v2.tauri.app/start/prerequisites/#linux).
+The packages are in `src-tauri/target/release/bundle/` (`deb/`, `appimage/`; `npm run tauri build -- --bundles rpm`
+for a `.rpm`). For other distributions, see the [Tauri prerequisites for Linux](https://v2.tauri.app/start/prerequisites/#linux).
 
-### Spécificités Linux
+### Linux specifics
 
-- **Demande rapide sous Wayland** (Hyprland, KDE Plasma, GNOME, Sway…) : les raccourcis globaux n'y existent pas.
-  Lie la commande `neuron --quick` à un raccourci de ton bureau. Exemple Hyprland :
-  `bind = CTRL ALT, Space, exec, neuron --quick`. Sous X11, le raccourci réglé dans Neuron marche directement.
-- **Icône de la zone de notification** sous GNOME : installe l'extension
-  « AppIndicator and KStatusNotifierItem Support ».
-- **Fenêtre blanche ou noire** (souvent NVIDIA) : lance `WEBKIT_DISABLE_DMABUF_RENDERER=1 neuron`, sinon
+- **Quick prompt on Wayland** (Hyprland, KDE Plasma, GNOME, Sway…): global shortcuts don't exist there. Bind the
+  command `neuron --quick` to a shortcut of your desktop. Hyprland example:
+  `bind = CTRL ALT, Space, exec, neuron --quick`. On X11, the shortcut set in Neuron works directly.
+- **System tray icon** on GNOME: install the « AppIndicator and KStatusNotifierItem Support » extension.
+- **White or black window** (often NVIDIA): run `WEBKIT_DISABLE_DMABUF_RENDERER=1 neuron`, otherwise
   `WEBKIT_DISABLE_COMPOSITING_MODE=1 neuron`.
-- **Un CLI n'est pas trouvé** alors qu'il marche dans ton terminal : Neuron lit le PATH de ton shell au démarrage,
-  relance-le après avoir modifié `~/.bashrc`, `~/.zshrc` ou ta config fish.
+- **A CLI isn't found** although it works in your terminal: Neuron reads your shell's PATH at startup; restart it
+  after editing `~/.bashrc`, `~/.zshrc` or your fish config.
 
-Plus de détails : [`packaging/arch/README.md`](packaging/arch/README.md).
+More details: [`packaging/arch/README.md`](packaging/arch/README.md).
 
 ---
 
-## Premier lancement : les agents
+## First launch: the agents
 
-Neuron a besoin d'au moins un des CLI suivants, installé **et connecté à ton compte** :
+Neuron needs at least one of these CLIs, installed **and signed in to your account**:
 
-| Agent | Abonnement / compte |
+| Agent | Subscription / account |
 |---|---|
-| Claude Code | Claude Pro / Max ou clé API Anthropic |
-| Codex | ChatGPT Plus / Pro ou clé API OpenAI |
-| Antigravity (`agy`) | Compte Google |
+| Claude Code | Claude Pro / Max or an Anthropic API key |
+| Codex | ChatGPT Plus / Pro or an OpenAI API key |
+| Antigravity (`agy`) | Google account |
 
-Le plus simple : **Paramètres → Agents & MCP → Fournisseurs IA**. Pour chaque agent, Neuron indique s'il est
-installé et connecté, et propose :
+The easiest way: **Settings → Agents & MCP → AI providers**. For each agent, Neuron shows whether it is installed
+and signed in, and offers:
 
-- **Installer** : ouvre un terminal avec l'installateur officiel ;
-- **Se connecter** : ouvre un terminal avec la connexion du CLI (une page peut s'ouvrir dans le navigateur).
+- **Install**: opens a terminal with the official installer;
+- **Sign in**: opens a terminal with the CLI's sign-in (a page may open in your browser).
 
-Neuron détecte tout seul la fin de l'installation ou de la connexion. Si un agent n'est pas connecté, le chat le
-signale aussi, avec le bouton pour régler ça.
+Neuron notices on its own when the install or sign-in is done. If an agent isn't signed in, the chat tells you too,
+with the button to fix it.
 
-Commandes officielles, si tu préfères les lancer toi-même :
+Official commands, if you prefer to run them yourself:
 
 | Agent | Windows (PowerShell) | Linux |
 |---|---|---|
@@ -165,36 +169,41 @@ Commandes officielles, si tu préfères les lancer toi-même :
 | Codex | `irm https://chatgpt.com/codex/install.ps1 \| iex` | `curl -fsSL https://chatgpt.com/codex/install.sh \| sh` |
 | Antigravity | `irm https://antigravity.google/cli/install.ps1 \| iex` | `curl -fsSL https://antigravity.google/cli/install.sh \| bash` |
 
-Connexion : `claude auth login`, `codex login`, ou `agy` puis `/login`.
+Sign in: `claude auth login`, `codex login`, or `agy` then `/login`.
 
 ---
 
-## Importer ta mémoire
+## Import your memory
 
-Vue **Mémoire → Importer** : récupère ce que claude.ai, ChatGPT ou Gemini savent de toi (colle la liste de leurs
-souvenirs) ou les fichiers d'instructions de tes CLI (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`,
-`~/.gemini/GEMINI.md`). Tu vérifies l'aperçu, et tu peux demander à un agent de tout reformuler proprement.
-La mémoire est partagée avec tous tes agents et reste éditable dans `~/.neuron/memory.md`.
+**Memory → Import**: bring in what claude.ai, ChatGPT or Gemini know about you (paste the list of their memories)
+or your CLIs' instruction files (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`). You check
+the preview, and you can ask an agent to rewrite everything cleanly. The memory is shared with all your agents and
+stays editable in `~/.neuron/memory.md`.
 
 ---
 
-## Où sont les données ?
+## Language
+
+Neuron is available in English and French. The language picked at install time is used at first launch (otherwise
+the system's); change it any time in **Settings → General → Language**.
+
+## Where is my data?
 
 | | Windows | Linux |
 |---|---|---|
-| Base de données | `%APPDATA%\dev.neuron.app\` | `~/.local/share/dev.neuron.app/` |
-| Mémoire | `%USERPROFILE%\.neuron\memory.md` | `~/.neuron/memory.md` |
+| Database | `%APPDATA%\dev.neuron.app\` | `~/.local/share/dev.neuron.app/` |
+| Memory | `%USERPROFILE%\.neuron\memory.md` | `~/.neuron/memory.md` |
 
-Neuron ne fait qu'un seul appel réseau à lui : la liste des prix publics des modèles (au plus une fois par jour),
-pour estimer les coûts. Tout le reste reste sur ton ordinateur ; seuls les agents que tu lances parlent à leur
-fournisseur, comme dans ton terminal.
+Neuron makes a single network call of its own: the public model price list (at most once a day), to estimate costs.
+Everything else stays on your computer; only the agents you run talk to their provider, as in your terminal.
 
-## Développement
+## Development
 
 ```bash
 npm ci
-npm run tauri dev        # app complète en mode dev
+npm run tauri dev        # full app in dev mode
 cd src-tauri && cargo test
 ```
 
-Voir [`CLAUDE.md`](CLAUDE.md) (conventions, architecture) et [`project.md`](project.md) (état et journal).
+See [`CLAUDE.md`](CLAUDE.md) (conventions, architecture) and [`project.md`](project.md) (status and changelog), both
+in French.

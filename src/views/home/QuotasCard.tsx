@@ -6,6 +6,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { t } from "@/i18n";
 import { useDashboard } from "@/stores/dashboard";
 import { QuotaRow } from "./QuotaRow";
 
@@ -23,10 +24,10 @@ export function QuotasCard({ className }: QuotasCardProps) {
   return (
     <Card className={className}>
       <CardHeader>
-        <CardTitle>Quotas &amp; abonnements</CardTitle>
+        <CardTitle>{t("home.quotasTitle")}</CardTitle>
         {!isLoading && (
           <CardDescription>
-            {count} {count <= 1 ? "fournisseur" : "fournisseurs"}
+            {t("home.providerCount", { n: count })}
           </CardDescription>
         )}
       </CardHeader>
@@ -42,7 +43,7 @@ export function QuotasCard({ className }: QuotasCardProps) {
             ))}
           </div>
         ) : !providers || providers.length === 0 ? (
-          <p className="text-sm text-muted-foreground animate-in fade-in-0 duration-300">Aucun fournisseur configuré</p>
+          <p className="text-sm text-muted-foreground animate-in fade-in-0 duration-300">{t("home.quotasEmpty")}</p>
         ) : (
           <div className="flex flex-col divide-y animate-in fade-in-0 duration-300">
             {providers.map((usage) => (

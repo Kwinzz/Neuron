@@ -34,6 +34,7 @@ import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { toast } from "@/stores/toast";
 import { useChat } from "@/stores/chat";
 import { NewMessagesPill } from "./NewMessagesPill";
+import { locale, t } from "@/i18n";
 
 const MAX_TEXTAREA_HEIGHT = 10 * 24 + 16;
 
@@ -51,7 +52,7 @@ function toBase64(buffer: ArrayBuffer): string {
 function pastedName(file: File): string {
   if (file.name && file.name !== "image.png") return file.name;
   const ext = file.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
-  const stamp = new Date().toLocaleTimeString("fr-FR").replace(/:/g, "-");
+  const stamp = new Date().toLocaleTimeString(locale()).replace(/:/g, "-");
   return `image-collee-${stamp}.${ext}`;
 }
 
@@ -205,7 +206,7 @@ export const Composer = memo(function Composer({
       const added = await load();
       setAttachments((current) => [...current, ...added]);
     } catch (err) {
-      toast({ tone: "danger", title: "Pièce jointe refusée", description: ipcErrorMessage(err) });
+      toast({ tone: "danger", title: t("chat.attachmentRejected"), description: ipcErrorMessage(err) });
     } finally {
       setImporting((n) => Math.max(0, n - count));
       textareaRef.current?.focus();
@@ -217,7 +218,7 @@ export const Composer = memo(function Composer({
     try {
       paths = await ipc.pickFiles();
     } catch (err) {
-      toast({ tone: "danger", title: "Sélection impossible", description: ipcErrorMessage(err) });
+      toast({ tone: "danger", title: t("chat.pickFailed"), description: ipcErrorMessage(err) });
       return;
     }
     if (paths.length > 0) void addAttachments(paths.length, () => ipc.importAttachments(paths));
@@ -382,7 +383,7 @@ export const Composer = memo(function Composer({
               aria-controls={slashOpen ? "slash-menu-listbox" : undefined}
               aria-activedescendant={slashOpen && slashFiltered.length > 0 ? `slash-option-${slashIndex}` : undefined}
               aria-label="Message"
-              placeholder={placeholder ?? "Demandez quelque chose à l'agent… (Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne, ↑ historique)"}
+              placeholder={placeholder ?? t("chat.composerPlaceholder")}
               className="min-h-0 max-h-[256px] overflow-y-auto px-3.5 pt-3 text-sm leading-6 field-sizing-fixed"
             />
             <InputGroupAddon align="block-end">
@@ -391,8 +392,8 @@ export const Composer = memo(function Composer({
                   variant="ghost"
                   size="icon-sm"
                   className="rounded-full text-muted-foreground hover:text-foreground"
-                  aria-label="Joindre des fichiers"
-                  title="Joindre des fichiers (ou coller une image)"
+                  aria-label={t("chat.attachFiles")}
+                  title={t("chat.attachFilesHint")}
                   onClick={() => void pickFiles()}
                 >
                   <Plus />
@@ -405,8 +406,8 @@ export const Composer = memo(function Composer({
                     variant="outline"
                     size="icon-sm"
                     className="rounded-full animate-in fade-in-0 zoom-in-75 duration-150"
-                    aria-label="Arrêter l'agent"
-                    title="Arrêter"
+                    aria-label={t("chat.stopAgent")}
+                    title={t("chat.stop")}
                     onClick={() => threadId && void useChat.getState().stop(threadId)}
                   >
                     <Square className="size-3.5 fill-current" />
@@ -416,7 +417,7 @@ export const Composer = memo(function Composer({
                   variant="default"
                   size="icon-sm"
                   className="rounded-full active:scale-95"
-                  aria-label="Envoyer"
+                  aria-label={t("chat.send")}
                   disabled={!canSend}
                   onClick={() => void sendCurrent()}
                 >

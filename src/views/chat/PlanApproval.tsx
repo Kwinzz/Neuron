@@ -4,14 +4,15 @@ import type { ChatItem } from "@/bindings/ChatItem";
 import { Button } from "@/components/ui/button";
 import { permissionLabel } from "@/lib/models";
 import { useChat } from "@/stores/chat";
+import { t } from "@/i18n";
 
 type PermissionItem = Extract<ChatItem, { kind: "permission" }>;
 
 /** How to run an approved plan: the mode the session switches to. */
 const RUN_MODES = [
-  { mode: "acceptEdits", label: "Exécuter en éditions auto", primary: true },
-  { mode: "auto", label: "Exécuter en auto", primary: false },
-  { mode: "manual", label: "Exécuter en demandant", primary: false },
+  { mode: "acceptEdits", label: "chat.runAcceptEdits", primary: true },
+  { mode: "auto", label: "chat.runAuto", primary: false },
+  { mode: "manual", label: "chat.runManual", primary: false },
 ] as const;
 
 /**
@@ -45,8 +46,8 @@ export const PlanApproval = memo(function PlanApproval({ item, threadId }: { ite
       <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
         {approved ? <Check className="size-3.5 text-ok" /> : <Pencil className="size-3.5" />}
         {approved
-          ? `Plan approuvé${chosen && chosen !== "plan" ? ` · exécution en ${permissionLabel(chosen).toLowerCase()}` : ""}`
-          : "Planification poursuivie : précise ce qu'il faut changer."}
+          ? `${t("chat.planApproved")}${chosen && chosen !== "plan" ? t("chat.planRunningIn", { mode: permissionLabel(chosen).toLowerCase() }) : ""}`
+          : t("chat.planContinued")}
       </div>
     );
   }
@@ -54,7 +55,7 @@ export const PlanApproval = memo(function PlanApproval({ item, threadId }: { ite
   return (
     <div
       role="group"
-      aria-label="Approbation du plan"
+      aria-label={t("chat.planApproval")}
       className="flex flex-col gap-3 rounded-xl border border-live/30 bg-card px-4 py-3 animate-in fade-in-0 slide-in-from-bottom-2 duration-200"
       onKeyDown={(e) => {
         if (e.key === "Escape") {
@@ -64,7 +65,7 @@ export const PlanApproval = memo(function PlanApproval({ item, threadId }: { ite
         }
       }}
     >
-      <p className="text-sm text-foreground">Exécuter ce plan ?</p>
+      <p className="text-sm text-foreground">{t("chat.runThisPlan")}</p>
       <div className="flex flex-wrap items-center gap-2">
         {RUN_MODES.map((r) => (
           <Button
@@ -74,11 +75,11 @@ export const PlanApproval = memo(function PlanApproval({ item, threadId }: { ite
             variant={r.primary ? "default" : "outline"}
             onClick={() => respond(true, r.mode)}
           >
-            {r.label}
+            {t(r.label)}
           </Button>
         ))}
         <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => respond(false, "plan")}>
-          Continuer à planifier
+          {t("chat.keepPlanning")}
         </Button>
       </div>
     </div>

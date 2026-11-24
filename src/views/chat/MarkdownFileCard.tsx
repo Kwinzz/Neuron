@@ -5,6 +5,7 @@ import { Markdown } from "@/components/markdown/Markdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toast";
+import { t } from "@/i18n";
 
 /** Longer documents start folded to this height (« Afficher tout »). */
 const FOLD_LINES = 40;
@@ -44,7 +45,7 @@ export const MarkdownFileCard = memo(function MarkdownFileCard({
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
     } catch {
-      toast({ tone: "danger", title: "Copie impossible" });
+      toast({ tone: "danger", title: t("chat.copyFailed") });
     }
   };
 
@@ -76,10 +77,10 @@ export const MarkdownFileCard = memo(function MarkdownFileCard({
         </button>
         {open && (
           <div className="flex shrink-0 items-center gap-1">
-            <div role="radiogroup" aria-label="Affichage" className="inline-flex h-6 items-center rounded-md bg-muted p-0.5">
+            <div role="radiogroup" aria-label={t("chat.display")} className="inline-flex h-6 items-center rounded-md bg-muted p-0.5">
               {[
-                { value: false, label: "Aperçu" },
-                { value: true, label: "Source" },
+                { value: false, label: t("chat.preview") },
+                { value: true, label: t("chat.source") },
               ].map((o) => (
                 <button
                   key={o.label}
@@ -100,8 +101,8 @@ export const MarkdownFileCard = memo(function MarkdownFileCard({
               variant="ghost"
               size="icon-sm"
               className="size-6 text-muted-foreground hover:text-foreground"
-              aria-label="Copier le Markdown"
-              title="Copier le Markdown"
+              aria-label={t("chat.copyMarkdown")}
+              title={t("chat.copyMarkdown")}
               onClick={() => void copy()}
             >
               {copied ? <Check className="size-3.5 text-ok" /> : <Copy className="size-3.5" />}
@@ -134,7 +135,7 @@ export const MarkdownFileCard = memo(function MarkdownFileCard({
                 className="h-auto px-0 text-muted-foreground hover:text-foreground"
                 onClick={() => setExpanded((v) => !v)}
               >
-                {expanded ? "Réduire" : "Afficher tout"}
+                {expanded ? t("chat.collapse") : t("chat.showAll")}
               </Button>
             </div>
           )}

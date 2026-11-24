@@ -2,6 +2,7 @@
  * Notification API used across the app, rendered by shadcn's <Toaster /> (sonner).
  * Kept as a tiny facade so callers don't depend on the toast library.
  */
+import { t } from "@/i18n";
 import { toast as sonner } from "sonner";
 
 export type ToastTone = "info" | "ok" | "warn" | "danger";
@@ -18,7 +19,7 @@ export function toast({ tone, title, description, onClick }: ToastInput, ttlMs =
   const options = {
     description,
     duration: ttlMs,
-    ...(onClick ? { action: { label: "Ouvrir", onClick } } : {}),
+    ...(onClick ? { action: { label: t("common.open"), onClick } } : {}),
   };
   switch (tone) {
     case "ok":

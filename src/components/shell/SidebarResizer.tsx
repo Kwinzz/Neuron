@@ -1,5 +1,6 @@
 import { type PointerEvent, useRef } from "react";
 import { SidebarRail, useSidebar } from "@/components/ui/sidebar";
+import { t } from "@/i18n";
 import { useLayout } from "@/stores/layout";
 
 /** Pointer travel (px) before a press on the rail counts as a drag rather than a click. */
@@ -47,8 +48,8 @@ export function SidebarResizer() {
 
   return (
     <SidebarRail
-      aria-label="Redimensionner la barre latérale"
-      title="Glisser pour redimensionner · clic pour replier"
+      aria-label={t("shell.resizeSidebar")}
+      title={t("shell.resizeSidebarHint")}
       className="in-data-[side=left]:cursor-col-resize"
       onClick={undefined}
       onPointerDown={onPointerDown}

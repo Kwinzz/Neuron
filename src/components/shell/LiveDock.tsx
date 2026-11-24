@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { MOD_LABEL } from "@/components/ui/Kbd";
 import { Separator } from "@/components/ui/separator";
 import { useNow } from "@/hooks/useNow";
+import { t } from "@/i18n";
 import { STATUS } from "@/lib/status";
 import { selectDockIds, useLive } from "@/stores/live";
 import { useUi } from "@/stores/ui";
@@ -62,12 +63,12 @@ function DockPanel({ open }: { open: boolean }) {
         open ? "translate-x-0 opacity-100" : "translate-x-3 opacity-0",
       )}
       style={{ width: DOCK_WIDTH - 16 }}
-      aria-label="Threads live"
+      aria-label={t("shell.liveThreads")}
     >
       {/* Rightmost header while open: part of the title bar, holds the window controls. */}
       <header data-tauri-drag-region className="flex h-12 shrink-0 select-none items-center gap-2 pl-4 pr-2">
         <Activity className="size-4 text-muted-foreground" />
-        <h2 data-tauri-drag-region className="text-sm font-medium">Threads live</h2>
+        <h2 data-tauri-drag-region className="text-sm font-medium">{t("shell.liveThreads")}</h2>
         {activeCount > 0 && (
           <Badge variant="secondary" className="font-mono tabular-nums animate-in zoom-in-75 fade-in-0 duration-200">
             {activeCount}
@@ -78,8 +79,8 @@ function DockPanel({ open }: { open: boolean }) {
           size="icon"
           className="ml-auto size-7"
           onClick={() => useUi.getState().toggleDock()}
-          aria-label={`Masquer (${MOD_LABEL}+J)`}
-          title={`Masquer (${MOD_LABEL}+J)`}
+          aria-label={t("shell.dockHide", { combo: `${MOD_LABEL}+J` })}
+          title={t("shell.dockHide", { combo: `${MOD_LABEL}+J` })}
         >
           <PanelRightClose />
         </Button>
@@ -96,9 +97,9 @@ function DockPanel({ open }: { open: boolean }) {
         <div className="min-w-0 p-2">
           {ids.length === 0 ? (
             <div className="flex flex-col items-center gap-1 px-6 py-12 text-center animate-in fade-in-0 duration-200">
-              <p className="text-sm font-medium">Aucun chat actif</p>
+              <p className="text-sm font-medium">{t("shell.dockEmptyTitle")}</p>
               <p className="text-xs text-muted-foreground">
-                Les chats en cours, tous projets confondus, apparaissent ici en temps réel.
+                {t("shell.dockEmptyBody")}
               </p>
             </div>
           ) : (
@@ -126,14 +127,14 @@ function ProjectFilterNote() {
   return (
     <div className="mx-2 mt-2 flex items-center gap-2 rounded-md bg-muted px-3 py-1.5 text-xs text-muted-foreground animate-in fade-in-0 slide-in-from-top-1 duration-200">
       <span className="min-w-0 flex-1 truncate">
-        Projet : <span className="font-medium text-foreground">{name ?? "sélectionné"}</span>
+        {t("shell.dockProjectFilter")} <span className="font-medium text-foreground">{name ?? t("shell.dockProjectSelected")}</span>
       </span>
       <Button
         variant="ghost"
         size="icon"
         className="size-5"
         onClick={() => useUi.getState().selectProject(null)}
-        aria-label="Retirer le filtre projet"
+        aria-label={t("shell.dockClearFilter")}
       >
         <X />
       </Button>

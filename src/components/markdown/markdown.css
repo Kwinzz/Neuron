@@ -254,7 +254,7 @@
 .md-prose.md-doc h2:has(+ h2)::after,
 .md-prose.md-doc h3:has(+ :is(h2, h3))::after,
 .md-prose.md-doc :is(h2, h3):last-child::after {
-  content: "Section vide";
+  content: var(--md-empty-label, "Section vide");
   display: block;
   margin-top: 0.35em;
   font-size: 0.8125rem;

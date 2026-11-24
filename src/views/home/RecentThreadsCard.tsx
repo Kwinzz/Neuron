@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { t } from "@/i18n";
 import { STATUS } from "@/lib/status";
 import { useDashboard } from "@/stores/dashboard";
 import { RecentThreadRow } from "./RecentThreadRow";
@@ -28,22 +29,20 @@ export function RecentThreadsCard({ className }: RecentThreadsCardProps) {
   const isLoading = loading && !recentThreads;
 
   const recent = useMemo(
-    () => (recentThreads ?? []).filter((t) => !STATUS[t.status].active).slice(0, 8),
+    () => (recentThreads ?? []).filter((th) => !STATUS[th.status].active).slice(0, 8),
     [recentThreads],
   );
 
-  const done = useMemo(() => recent.filter((t) => t.status === "done").length, [recent]);
+  const done = useMemo(() => recent.filter((th) => th.status === "done").length, [recent]);
 
   const description = isLoading
     ? undefined
-    : `${recent.length} ${recent.length <= 1 ? "chat" : "chats"} · ${done} ${
-        done <= 1 ? "terminé" : "terminés"
-      }`;
+    : `${t("home.recentChatCount", { n: recent.length })} · ${t("home.recentDoneCount", { n: done })}`;
 
   return (
     <Card className={className}>
       <CardHeader>
-        <CardTitle>Chats récents</CardTitle>
+        <CardTitle>{t("home.recentTitle")}</CardTitle>
         {description && <CardDescription>{description}</CardDescription>}
       </CardHeader>
       <CardContent>
@@ -55,19 +54,19 @@ export function RecentThreadsCard({ className }: RecentThreadsCardProps) {
           </div>
         ) : recent.length === 0 ? (
           <div className="flex flex-col items-center gap-1 py-8 text-center text-muted-foreground animate-in fade-in-0 duration-300">
-            <p className="font-medium">Aucun chat récent</p>
-            <p className="text-xs">Les chats terminés apparaîtront ici.</p>
+            <p className="font-medium">{t("home.recentEmptyTitle")}</p>
+            <p className="text-xs">{t("home.recentEmptyBody")}</p>
           </div>
         ) : (
           <div className="overflow-hidden rounded-lg border animate-in fade-in-0 duration-300">
             <Table>
               <TableHeader className="bg-muted/50">
                 <TableRow>
-                  <TableHead>Chat</TableHead>
-                  <TableHead>IA</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead className="text-right">Tokens</TableHead>
-                  <TableHead className="text-right">Mis à jour</TableHead>
+                  <TableHead>{t("home.colChat")}</TableHead>
+                  <TableHead>{t("home.colAgent")}</TableHead>
+                  <TableHead>{t("home.colStatus")}</TableHead>
+                  <TableHead className="text-right">{t("home.colTokens")}</TableHead>
+                  <TableHead className="text-right">{t("home.colUpdated")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

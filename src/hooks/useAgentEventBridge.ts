@@ -2,6 +2,7 @@ import { STATUS } from "@/lib/status";
 import { useEffect } from "react";
 import type { AgentEventEnvelope } from "@/bindings/AgentEventEnvelope";
 import type { TurnOutcome } from "@/bindings/TurnOutcome";
+import { type MessageKey, t } from "@/i18n";
 import { events, notify } from "@/lib/ipc";
 import { useActivity } from "@/stores/activity";
 import { useChat } from "@/stores/chat";
@@ -12,22 +13,17 @@ import { useNav } from "@/stores/nav";
 import { toast } from "@/stores/toast";
 import { useUi } from "@/stores/ui";
 
-const ATTENTION_TOAST: Record<Attention, { tone: "ok" | "warn" | "danger"; title: string }> = {
-  done: { tone: "ok", title: "Chat terminé" },
-  approval: { tone: "warn", title: "Approbation requise" },
-  error: { tone: "danger", title: "Chat en erreur" },
-};
-
-const NOTIFY_TITLE: Record<Attention, string> = {
-  done: "Réponse terminée",
-  approval: "Autorisation demandée",
-  error: "Erreur",
+// Message keys, not texts: translated when the toast / notification is raised (current language).
+const ATTENTION_TOAST: Record<Attention, { tone: "ok" | "warn" | "danger"; title: MessageKey }> = {
+  done: { tone: "ok", title: "shell.toastChatDone" },
+  approval: { tone: "warn", title: "shell.toastApproval" },
+  error: { tone: "danger", title: "shell.toastChatError" },
 };
 
 /** Approvals that are really a question or a plan to review get their own wording. */
 function approvalTitle(toolName: string | null | undefined, fallback: string): string {
-  if (toolName === "AskUserQuestion") return "L'agent pose une question";
-  if (toolName === "ExitPlanMode") return "Plan prêt à valider";
+  if (toolName === "AskUserQuestion") return t("shell.notifyQuestion");
+  if (toolName === "ExitPlanMode") return t("shell.notifyPlanReady");
   return fallback;
 }
 
@@ -36,24 +32,24 @@ const summaries = new Map<string, TurnSummaryEvent>();
 
 type TurnSummaryEvent = Extract<AgentEventEnvelope["event"], { kind: "TurnSummary" }>;
 
-const OUTCOME_TITLE: Record<TurnOutcome, string> = {
-  success: "✅ Tâche réussie",
-  partial: "⚠️ Tâche faite en partie",
-  failure: "❌ Tâche non effectuée",
-  unknown: "Réponse terminée",
+const OUTCOME_TITLE: Record<TurnOutcome, MessageKey> = {
+  success: "shell.outcomeSuccess",
+  partial: "shell.outcomePartial",
+  failure: "shell.outcomeFailure",
+  unknown: "shell.notifyDone",
 };
 
 /** Notification text: the agent's own summary and verdict when it gave one, else the chat title. */
 function notificationText(threadId: string, why: Attention, detail: string | null): { title: string; body: string } {
-  const chatTitle = useLive.getState().threads[threadId]?.title || "Chat sans titre";
-  if (why === "approval") return { title: approvalTitle(detail, NOTIFY_TITLE.approval), body: chatTitle };
+  const chatTitle = useLive.getState().threads[threadId]?.title || t("common.untitledChat");
+  if (why === "approval") return { title: approvalTitle(detail, t("shell.notifyApproval")), body: chatTitle };
   const summary = summaries.get(threadId);
   summaries.delete(threadId);
   if (why === "error") {
-    return { title: `❌ Erreur · ${chatTitle}`, body: summary?.summary || "L'agent s'est arrêté sur une erreur." };
+    return { title: t("shell.notifyErrorTitle", { title: chatTitle }), body: summary?.summary || t("shell.notifyErrorBody") };
   }
-  if (!summary) return { title: NOTIFY_TITLE.done, body: chatTitle };
-  return { title: `${OUTCOME_TITLE[summary.outcome]} · ${chatTitle}`, body: summary.summary || chatTitle };
+  if (!summary) return { title: t("shell.notifyDone"), body: chatTitle };
+  return { title: `${t(OUTCOME_TITLE[summary.outcome])} · ${chatTitle}`, body: summary.summary || chatTitle };
 }
 
 /** Last status notified per chat: one notification per transition. */
@@ -144,11 +140,11 @@ export function useAgentEventBridge(): void {
         if (after && after !== before) {
           const thread = useLive.getState().threads[envelope.threadId];
           const meta = ATTENTION_TOAST[after];
+          const title = t(meta.title);
           toast({
             tone: meta.tone,
-            title:
-              envelope.event.kind === "PermissionRequest" ? approvalTitle(envelope.event.toolName, meta.title) : meta.title,
-            description: thread?.title || "Chat sans titre",
+            title: envelope.event.kind === "PermissionRequest" ? approvalTitle(envelope.event.toolName, title) : title,
+            description: thread?.title || t("common.untitledChat"),
             onClick: () => {
               useUi.getState().focusThread(envelope.threadId);
               useUi.getState().setDockOpen(true);

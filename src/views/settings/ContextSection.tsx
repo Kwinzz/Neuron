@@ -13,6 +13,7 @@ import { useUi } from "@/stores/ui";
 import { SettingRow } from "./SettingRow";
 import { SettingSwitch } from "./SettingSwitch";
 import { useSettingsPatch } from "./useSettingsPatch";
+import { t } from "@/i18n";
 
 interface ContextSectionProps {
   settings: AppSettings;
@@ -37,10 +38,10 @@ export function ContextSection({ settings }: ContextSectionProps) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Layers className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          <span>Contexte injecté</span>
+          <span>{t("settings.contextTitle")}</span>
         </CardTitle>
         <CardDescription className="text-xs">
-          Éléments transmis automatiquement au démarrage d&apos;un nouveau chat.
+          {t("settings.contextDescription")}
         </CardDescription>
       </CardHeader>
 
@@ -48,8 +49,8 @@ export function ContextSection({ settings }: ContextSectionProps) {
         <div className="flex min-w-0 flex-col gap-3.5">
           <SettingRow
             id="ctx-memory"
-            label="Mémoire globale"
-            description="Tes préférences et règles enregistrées dans memory.md"
+            label={t("settings.ctxMemory")}
+            description={t("settings.ctxMemoryDescription")}
             control={
               <SettingSwitch
                 id="ctx-memory"
@@ -61,8 +62,8 @@ export function ContextSection({ settings }: ContextSectionProps) {
           />
           <SettingRow
             id="ctx-git"
-            label="Instantané git"
-            description="Branche, statut et derniers commits du projet"
+            label={t("settings.ctxGit")}
+            description={t("settings.ctxGitDescription")}
             control={
               <SettingSwitch
                 id="ctx-git"
@@ -74,8 +75,8 @@ export function ContextSection({ settings }: ContextSectionProps) {
           />
           <SettingRow
             id="ctx-recent-files"
-            label="Fichiers récents"
-            description="Fichiers du projet modifiés récemment"
+            label={t("settings.ctxRecent")}
+            description={t("settings.ctxRecentDescription")}
             control={
               <SettingSwitch
                 id="ctx-recent-files"
@@ -92,10 +93,7 @@ export function ContextSection({ settings }: ContextSectionProps) {
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
           <p className="flex min-w-0 items-start gap-2 text-xs text-muted-foreground">
             <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-            <span>
-              S&apos;applique aux nouveaux chats uniquement : le contexte est figé à la
-              création du chat.
-            </span>
+            <span>{t("settings.ctxNewChatsOnly")}</span>
           </p>
           <Button
             type="button"
@@ -104,7 +102,7 @@ export function ContextSection({ settings }: ContextSectionProps) {
             onClick={() => useUi.getState().navigate({ kind: "memory" })}
           >
             <Brain className="size-3.5" aria-hidden />
-            <span>Ouvrir la mémoire</span>
+            <span>{t("settings.openMemory")}</span>
           </Button>
         </div>
       </CardContent>

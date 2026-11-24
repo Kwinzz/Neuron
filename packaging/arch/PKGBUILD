@@ -1,21 +1,21 @@
-# Neuron — paquet Arch Linux construit depuis les sources du dépôt.
-# Depuis un clone :  cd packaging/arch && makepkg -si
+# Neuron — Arch Linux package built from the sources of this repository.
+# From a clone:  cd packaging/arch && makepkg -si
 pkgname=neuron
 pkgver=0.1.2
 pkgrel=1
-pkgdesc="Poste de pilotage graphique des agents IA en ligne de commande (Claude Code, Codex, Antigravity)"
+pkgdesc="Desktop cockpit for command-line AI agents (Claude Code, Codex, Antigravity)"
 arch=('x86_64' 'aarch64')
 url="https://github.com/Kwinzz/Neuron"
 license=('custom')
 depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator' 'openssl' 'hicolor-icon-theme')
 makedepends=('rust' 'cargo' 'nodejs' 'npm' 'git' 'mold')
 optdepends=(
-  'claude-code: agent Claude Code (sinon bouton « Installer » dans Neuron)'
-  'libnotify: notifications de bureau'
-  'kitty: terminal ouvert pour installer / connecter les agents (ou alacritty, konsole, gnome-terminal…)'
+  'claude-code: Claude Code agent (or the Install button in Neuron)'
+  'libnotify: desktop notifications'
+  'kitty: terminal opened to install / sign in to the agents (or alacritty, konsole, gnome-terminal…)'
 )
 options=('!lto' '!debug')
-# Pas de source à télécharger : on construit le dépôt qui contient ce PKGBUILD.
+# Nothing to download: the repository containing this PKGBUILD is built.
 source=()
 sha256sums=()
 
@@ -28,7 +28,7 @@ pkgver() {
 build() {
   cd "$(_root)"
   export CARGO_TARGET_DIR="$srcdir/target"
-  # Pas de LTO, compilation incrémentale, mold si présent (voir le fichier).
+  # No LTO, incremental build, mold when available (see the file).
   # shellcheck disable=SC1091
   . "$(_root)/packaging/linux-build-env.sh"
   npm ci

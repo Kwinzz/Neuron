@@ -9,7 +9,8 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CATEGORIES, CATEGORY_ORDER, isMemoryCategory } from "./categories";
+import { CATEGORY_ORDER, categoryMeta, isMemoryCategory } from "./categories";
+import { t } from "@/i18n";
 
 interface CategoryPickerProps {
   value: MemoryCategory;
@@ -24,7 +25,7 @@ export function CategoryPicker({
   size = "sm",
   disabled = false,
 }: CategoryPickerProps) {
-  const current = CATEGORIES[value];
+  const current = categoryMeta(value);
   const CurrentIcon = current.icon;
 
   return (
@@ -35,7 +36,7 @@ export function CategoryPicker({
           variant="outline"
           size={size}
           disabled={disabled}
-          aria-label={`Catégorie : ${current.label}`}
+          aria-label={t("memory.categoryAria", { label: current.label })}
           className="max-w-full"
         >
           <CurrentIcon className={cn("shrink-0", current.iconClass)} aria-hidden />
@@ -53,7 +54,7 @@ export function CategoryPicker({
           }}
         >
           {CATEGORY_ORDER.map((category) => {
-            const meta = CATEGORIES[category];
+            const meta = categoryMeta(category);
             const Icon = meta.icon;
             return (
               <DropdownMenuRadioItem key={category} value={category}>

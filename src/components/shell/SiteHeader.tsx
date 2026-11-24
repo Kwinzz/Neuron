@@ -4,6 +4,7 @@ import { MOD_LABEL } from "@/components/ui/Kbd";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { t } from "@/i18n";
 import { useLive } from "@/stores/live";
 import { useNav } from "@/stores/nav";
 import { useUi, type View } from "@/stores/ui";
@@ -18,12 +19,12 @@ function useViewTitle(view: View): { section: string; title: string } {
   const pageProject = useNav((s) =>
     view.kind === "project" ? s.projects.find((p) => p.id === view.id)?.name : undefined,
   );
-  if (view.kind === "thread") return { section: projectName ?? "Chats", title: chatTitle || "Chat" };
-  if (view.kind === "draft") return { section: draftProject ?? "Chats", title: "Nouveau chat" };
-  if (view.kind === "project") return { section: "Projets", title: pageProject ?? "Projet" };
-  if (view.kind === "memory") return { section: "Neuron", title: "Mémoire" };
-  if (view.kind === "settings") return { section: "Neuron", title: "Paramètres" };
-  return { section: "Neuron", title: "Accueil" };
+  if (view.kind === "thread") return { section: projectName ?? t("shell.chats"), title: chatTitle || t("shell.chat") };
+  if (view.kind === "draft") return { section: draftProject ?? t("shell.chats"), title: t("shell.navNewChat") };
+  if (view.kind === "project") return { section: t("shell.projects"), title: pageProject ?? t("shell.project") };
+  if (view.kind === "memory") return { section: "Neuron", title: t("shell.navMemory") };
+  if (view.kind === "settings") return { section: "Neuron", title: t("shell.navSettings") };
+  return { section: "Neuron", title: t("shell.navHome") };
 }
 
 /**
@@ -43,7 +44,7 @@ export function SiteHeader() {
       <div data-tauri-drag-region className="flex w-full min-w-0 items-center gap-1 pl-4 pr-2 lg:gap-2 lg:pl-6">
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
-        <nav data-tauri-drag-region aria-label="Fil d'Ariane" className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
+        <nav data-tauri-drag-region aria-label={t("shell.breadcrumb")} className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
           <span data-tauri-drag-region key={section} className="shrink-0 text-muted-foreground animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ease-snappy">{section}</span>
           <span data-tauri-drag-region className="text-muted-foreground">/</span>
           <h1 data-tauri-drag-region key={title} className="truncate font-medium animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ease-snappy">{title}</h1>
@@ -56,14 +57,14 @@ export function SiteHeader() {
             onClick={() => useUi.getState().setPaletteOpen(true)}
           >
             <Search />
-            <span className="flex-1 text-left">Rechercher…</span>
+            <span className="flex-1 text-left">{t("shell.searchPlaceholder")}</span>
             <kbd className="pointer-events-none rounded border bg-muted px-1.5 font-mono text-[10px] font-medium">
               {MOD_LABEL} K
             </kbd>
           </Button>
-          <Button size="sm" className="active:scale-[0.97]" onClick={() => useUi.getState().startChat(null)} title={`Nouveau chat (${MOD_LABEL}+N)`}>
+          <Button size="sm" className="active:scale-[0.97]" onClick={() => useUi.getState().startChat(null)} title={t("shell.navNewChatTooltip", { combo: `${MOD_LABEL}+N` })}>
             <Plus />
-            Nouveau chat
+            {t("shell.navNewChat")}
           </Button>
           <DockToggle />
           {/* The window controls sit in the top-right corner: here, or in the live dock's header when it is open. */}
@@ -91,7 +92,7 @@ function DockToggle() {
           className="relative size-8 active:scale-[0.97]"
           onClick={() => useUi.getState().toggleDock()}
           aria-pressed={dockOpen}
-          aria-label="Threads live"
+          aria-label={t("shell.liveThreads")}
         >
           <PanelRight />
           {attention > 0 && (
@@ -104,7 +105,7 @@ function DockToggle() {
           )}
         </Button>
       </TooltipTrigger>
-      <TooltipContent>Threads live ({MOD_LABEL}+J)</TooltipContent>
+      <TooltipContent>{t("shell.liveThreadsTooltip", { combo: `${MOD_LABEL}+J` })}</TooltipContent>
     </Tooltip>
   );
 }

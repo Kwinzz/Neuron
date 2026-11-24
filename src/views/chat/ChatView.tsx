@@ -20,6 +20,7 @@ import { AgentCursor } from "./AgentCursor";
 import { selectAnyRevealing, useReveal } from "@/stores/reveal";
 import { WorkingIndicator } from "./WorkingIndicator";
 import "./chat.css";
+import { t } from "@/i18n";
 
 const EMPTY_ITEMS: ChatItem[] = [];
 
@@ -95,7 +96,7 @@ export function ChatView({ threadId }: { threadId: string }) {
         ) : !loaded && error ? (
           <Alert variant="destructive" className="p-4">
             <XCircle />
-            <AlertTitle>Impossible de charger l'historique</AlertTitle>
+            <AlertTitle>{t("chat.historyLoadError")}</AlertTitle>
             <AlertDescription className="col-start-2 select-text whitespace-pre-wrap break-words">
               {error}
             </AlertDescription>
@@ -106,16 +107,16 @@ export function ChatView({ threadId }: { threadId: string }) {
                 className="text-foreground"
                 onClick={() => void useChat.getState().load(threadId, true)}
               >
-                Réessayer
+                {t("common.retry")}
               </Button>
             </div>
           </Alert>
         ) : loaded && items.length === 0 ? (
           <div className="my-auto flex flex-col items-center justify-center py-12 text-center">
             <AgentLogo agent={agent} size={32} className="text-muted-foreground" />
-            <h2 className="mt-3 text-base font-semibold text-foreground">Nouvelle conversation</h2>
+            <h2 className="mt-3 text-base font-semibold text-foreground">{t("chat.emptyTitle")}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Envoyez un premier message pour démarrer l'agent.
+              {t("chat.emptyHint")}
             </p>
           </div>
         ) : (

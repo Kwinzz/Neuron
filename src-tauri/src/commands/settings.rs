@@ -25,6 +25,16 @@ pub async fn update_app_settings(
 ) -> AppResult<AppSettings> {
     let previous = state.db.call(|c| app_settings::load(c)).await?;
     let stored = state.db.call(move |c| app_settings::save(c, settings)).await?;
+    if stored.language != previous.language {
+        crate::i18n::set(stored.language.unwrap_or(crate::i18n::Language::En));
+        // Texts Neuron writes itself follow: tray menu, `memory.md` headings.
+        crate::desktop::refresh_tray_menu(&app);
+        crate::agents::catalog::invalidate();
+        let file = state.paths.memory_file.clone();
+        if let Err(err) = state.db.call(move |c| crate::memory::export(c, &file)).await {
+            tracing::warn!(%err, "memory.md not rewritten in the new language");
+        }
+    }
     let problems = crate::desktop::apply(&app, &stored);
     if problems.is_empty() {
         return Ok(stored);

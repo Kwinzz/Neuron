@@ -126,11 +126,9 @@ impl AntigravityParser {
                     let is_error = state != "DONE";
                     out.push(AdapterEvent::ToolCallResult {
                         id: self.id(step),
-                        output: s
-                            .get("error")
-                            .and_then(Value::as_str)
-                            .map(str::to_string)
-                            .unwrap_or_else(|| if is_error { format!("État : {state}") } else { String::new() }),
+                        output: s.get("error").and_then(Value::as_str).map(str::to_string).unwrap_or_else(|| {
+                            if is_error { crate::tr!("État : {state}", "State: {state}") } else { String::new() }
+                        }),
                         is_error,
                     });
                     out.push(AdapterEvent::Status { status: ThreadStatus::Thinking, detail: None });

@@ -14,6 +14,8 @@ const KEY: &str = "app.settings";
 #[serde(rename_all = "camelCase", default)]
 #[ts(export)]
 pub struct AppSettings {
+    /// Interface language. `None` until the first launch resolves it (installer choice, else the system's).
+    pub language: Option<crate::i18n::Language>,
     /// Agent processes idle for this long are stopped (resumed transparently on the next message). 0 = never.
     pub idle_shutdown_minutes: u32,
     pub notifications: NotificationSettings,
@@ -27,6 +29,7 @@ pub struct AppSettings {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
+            language: None,
             idle_shutdown_minutes: 15,
             notifications: NotificationSettings::default(),
             context: ContextSettings::default(),
@@ -162,7 +165,10 @@ pub fn save(conn: &Connection, mut next: AppSettings) -> AppResult<AppSettings> 
         p.command = p.command.trim().to_string();
         p.args.retain(|a| !a.is_empty());
         if p.name.is_empty() || p.command.is_empty() {
-            return Err(AppError::Invalid("chaque CLI générique a besoin d'un nom et d'une commande".into()));
+            return Err(AppError::Invalid(crate::tr!(
+                "chaque CLI générique a besoin d'un nom et d'une commande",
+                "each generic CLI needs a name and a command"
+            )));
         }
         if p.id.trim().is_empty() {
             p.id = slug(&p.name);

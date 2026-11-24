@@ -3,6 +3,7 @@ import { cn } from "cn";
 import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { t } from "@/i18n";
 
 interface MemorySearchBarProps {
   value: string;
@@ -31,8 +32,8 @@ export function MemorySearchBar({ value, onChange, inputRef }: MemorySearchBarPr
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Rechercher dans la mémoire…"
-        aria-label="Rechercher dans la mémoire"
+        placeholder={t("memory.searchPlaceholder")}
+        aria-label={t("memory.searchAria")}
         className={cn(
           "pl-8 [&::-webkit-search-cancel-button]:hidden",
           value.length > 0 && "pr-8",
@@ -43,7 +44,7 @@ export function MemorySearchBar({ value, onChange, inputRef }: MemorySearchBarPr
           type="button"
           variant="ghost"
           size="icon-xs"
-          aria-label="Effacer la recherche"
+          aria-label={t("memory.clearSearch")}
           onClick={() => {
             onChange("");
             inputRef.current?.focus();

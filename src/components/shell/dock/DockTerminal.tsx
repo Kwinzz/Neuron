@@ -2,6 +2,7 @@ import { Fragment, memo, useCallback, useLayoutEffect, useMemo, useRef, useState
 import { cn } from "cn";
 import { ArrowDown } from "lucide-react";
 import type { ThreadStatus } from "@/bindings/ThreadStatus";
+import { t } from "@/i18n";
 import { describeStatus } from "@/lib/status";
 import { EMPTY_LINES, EMPTY_SUBAGENTS, type SubagentInfo, type TermLine, useActivity } from "@/stores/activity";
 import { SubagentLane } from "./SubagentLane";
@@ -91,7 +92,7 @@ export const DockTerminal = memo(function DockTerminal({ id, title, active, stat
           ref={scrollRef}
           role="log"
           aria-live="off"
-          aria-label={`Activité de ${title}`}
+          aria-label={t("shell.terminalAria", { title })}
           onScroll={scrollable ? handleScroll : undefined}
           className={cn(
             "min-w-0 rounded-lg border bg-background/60 px-2 py-1.5 font-mono text-[11px] leading-[18px] text-muted-foreground",
@@ -108,7 +109,7 @@ export const DockTerminal = memo(function DockTerminal({ id, title, active, stat
                 <span className="min-w-0 flex-1 truncate">{describeStatus(status, detail)}</span>
               </div>
             ) : (
-              <div className="truncate text-muted-foreground/70">Aucune activité enregistrée</div>
+              <div className="truncate text-muted-foreground/70">{t("shell.terminalEmpty")}</div>
             )
           ) : (
             <div className="flex min-w-0 flex-col">
@@ -133,7 +134,7 @@ export const DockTerminal = memo(function DockTerminal({ id, title, active, stat
         {scrollable && showJump && (
           <button
             type="button"
-            aria-label="Revenir en bas"
+            aria-label={t("shell.scrollToBottom")}
             onClick={(e) => {
               e.stopPropagation();
               const el = scrollRef.current;
@@ -162,7 +163,7 @@ export const DockTerminal = memo(function DockTerminal({ id, title, active, stat
             onKeyDown={(e) => e.stopPropagation()}
             className="rounded-sm px-1 text-[10px] text-muted-foreground transition-colors duration-150 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
-            {expanded ? "Réduire" : "Afficher tout"}
+            {expanded ? t("shell.collapse") : t("shell.showAll")}
           </button>
         </div>
       )}

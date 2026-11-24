@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { t } from "@/i18n";
 import { bucketTitle } from "@/lib/format";
 import { useDashboard } from "@/stores/dashboard";
 import { AgentTotals } from "./AgentTotals";
@@ -23,9 +24,6 @@ import { isUsageMetric, METRIC_ORDER, METRICS, type UsageMetric } from "./usageM
 import { useUsageChartData } from "./useUsageChartData";
 
 const EMPTY_BUCKETS: never[] = [];
-
-const COST_HINT =
-  "Au tarif API : Claude tel que communiqué, Codex et Antigravity estimés depuis les tokens";
 
 export function ConsumptionCard() {
   const usage = useDashboard((s) => s.snapshot?.usage);
@@ -59,7 +57,7 @@ export function ConsumptionCard() {
         `${spec.format(visibleTotal)}${spec.unit ? ` ${spec.unit}` : ""}`,
         RANGE_LABEL[shownRange],
         peak && visibleAgents.length > 0 && rows.length > 1
-          ? `pic ${bucketTitle(peak.key, shownRange)} (${spec.format(peak.total)})`
+          ? t("home.consumptionPeak", { when: bucketTitle(peak.key, shownRange), value: spec.format(peak.total) })
           : null,
       ]
         .filter(Boolean)
@@ -69,8 +67,8 @@ export function ConsumptionCard() {
   return (
     <Card className="@container/card">
       <CardHeader>
-        <CardTitle>Consommation</CardTitle>
-        <CardDescription title={metric === "cost" ? COST_HINT : undefined}>{description}</CardDescription>
+        <CardTitle>{t("home.consumptionTitle")}</CardTitle>
+        <CardDescription title={metric === "cost" ? t("home.costHint") : undefined}>{description}</CardDescription>
         <CardAction>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <ToggleGroup
@@ -82,7 +80,7 @@ export function ConsumptionCard() {
               onValueChange={(v) => {
                 if (isUsageMetric(v)) setMetric(v);
               }}
-              aria-label="Mesure affichée"
+              aria-label={t("home.metricAria")}
             >
               {METRIC_ORDER.map((m) => (
                 <ToggleGroupItem key={m} value={m}>
@@ -101,11 +99,11 @@ export function ConsumptionCard() {
                   void useDashboard.getState().setRange(v);
                 }
               }}
-              aria-label="Période de consommation"
+              aria-label={t("home.rangeAria")}
             >
-              <ToggleGroupItem value="day">Jour</ToggleGroupItem>
-              <ToggleGroupItem value="week">7 jours</ToggleGroupItem>
-              <ToggleGroupItem value="month">30 jours</ToggleGroupItem>
+              <ToggleGroupItem value="day">{t("home.rangeDay")}</ToggleGroupItem>
+              <ToggleGroupItem value="week">{t("home.range7d")}</ToggleGroupItem>
+              <ToggleGroupItem value="month">{t("home.range30d")}</ToggleGroupItem>
             </ToggleGroup>
             <Button
               type="button"
@@ -116,7 +114,7 @@ export function ConsumptionCard() {
               onClick={() => setTableMode((v) => !v)}
             >
               {tableMode ? <BarChart3 /> : <Table2 />}
-              <span>{tableMode ? "Graphique" : "Tableau"}</span>
+              <span>{tableMode ? t("home.viewChart") : t("home.viewTable")}</span>
             </Button>
           </div>
         </CardAction>
@@ -136,10 +134,10 @@ export function ConsumptionCard() {
               <BarChart3 className="size-5" />
             </div>
             <p className="font-medium">
-              {metric === "cost" ? "Aucun coût sur cette période" : "Aucune consommation sur cette période"}
+              {metric === "cost" ? t("home.consumptionEmptyCost") : t("home.consumptionEmpty")}
             </p>
             <p className="text-xs text-muted-foreground">
-              L&apos;usage de Claude Code et de Codex (terminal compris) apparaît ici dès leur prochaine réponse.
+              {t("home.consumptionEmptyBody")}
             </p>
           </div>
         ) : (

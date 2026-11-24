@@ -20,10 +20,18 @@ pub enum AppError {
     #[error("invalid input: {0}")]
     Invalid(String),
     /// An agent CLI could not be started because it does not exist (not installed / not in the PATH).
-    #[error("« {0} » est introuvable : le CLI n'est pas installé (ou pas dans le PATH).")]
+    #[error("{}", not_installed_message(.0))]
     AgentNotInstalled(String),
     #[error("{0}")]
     Other(String),
+}
+
+/// Message of [`AppError::AgentNotInstalled`] in the current language (`access::classify_error` recognizes both).
+fn not_installed_message(binary: &str) -> String {
+    crate::tr!(
+        "« {binary} » est introuvable : le CLI n'est pas installé (ou pas dans le PATH).",
+        "“{binary}” was not found: the CLI is not installed (or not in the PATH)."
+    )
 }
 
 impl AppError {

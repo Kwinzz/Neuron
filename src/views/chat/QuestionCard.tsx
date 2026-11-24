@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useChat } from "@/stores/chat";
 import { type Question, parseQuestions } from "./questions";
+import { t } from "@/i18n";
 
 type PermissionItem = Extract<ChatItem, { kind: "permission" }>;
 
@@ -105,7 +106,7 @@ export const QuestionCard = memo(function QuestionCard({ item, threadId }: { ite
 
   return (
     <form
-      aria-label="Questions de l'agent"
+      aria-label={t("chat.agentQuestions")}
       className="flex flex-col gap-4 rounded-xl border border-live/30 bg-card px-4 py-3.5 animate-in fade-in-0 slide-in-from-bottom-2 duration-200"
       onSubmit={(e) => {
         e.preventDefault();
@@ -114,7 +115,7 @@ export const QuestionCard = memo(function QuestionCard({ item, threadId }: { ite
     >
       <div className="flex items-center gap-2 text-sm font-medium text-foreground">
         <MessageCircleQuestion className="size-4 shrink-0 text-live" />
-        {questions.length > 1 ? "L'agent a des questions" : "L'agent a une question"}
+        {questions.length > 1 ? t("chat.agentHasQuestions") : t("chat.agentHasQuestion")}
       </div>
 
       {questions.map((q, i) => {
@@ -125,7 +126,7 @@ export const QuestionCard = memo(function QuestionCard({ item, threadId }: { ite
               {q.header && <Badge variant="secondary">{q.header}</Badge>}
               <span className="text-sm text-foreground">{q.question}</span>
               <span className="text-xs text-muted-foreground">
-                {q.multiSelect ? "plusieurs choix possibles" : "un seul choix"}
+                {q.multiSelect ? t("chat.multipleChoices") : t("chat.singleChoice")}
               </span>
             </legend>
             <div role={q.multiSelect ? "group" : "radiogroup"} className="flex flex-col gap-1.5">
@@ -142,8 +143,8 @@ export const QuestionCard = memo(function QuestionCard({ item, threadId }: { ite
               <OptionRow
                 multi={q.multiSelect}
                 selected={c.other}
-                label="Autre…"
-                description={c.other ? null : "Écrire ma propre réponse"}
+                label={t("chat.otherOption")}
+                description={c.other ? null : t("chat.otherOptionHint")}
                 onClick={() => toggleOther(i, q)}
               />
               {c.other && (
@@ -151,8 +152,8 @@ export const QuestionCard = memo(function QuestionCard({ item, threadId }: { ite
                   autoFocus
                   value={c.text}
                   onChange={(e) => update(i, (prev) => ({ ...prev, text: e.target.value }))}
-                  placeholder="Ta réponse…"
-                  aria-label={`Réponse libre : ${q.question}`}
+                  placeholder={t("chat.answerPlaceholder")}
+                  aria-label={t("chat.freeAnswer", { question: q.question })}
                   className="h-8 text-sm"
                 />
               )}
@@ -163,10 +164,10 @@ export const QuestionCard = memo(function QuestionCard({ item, threadId }: { ite
 
       <div className="flex items-center gap-2">
         <Button type="submit" size="sm" disabled={!ready}>
-          Répondre
+          {t("chat.answer")}
         </Button>
         <Button type="button" size="sm" variant="ghost" className="text-muted-foreground" onClick={() => respond(false)}>
-          Ignorer
+          {t("chat.skip")}
         </Button>
       </div>
     </form>

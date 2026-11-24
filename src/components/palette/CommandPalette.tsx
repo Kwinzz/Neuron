@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/command";
 import { MOD_LABEL } from "@/components/ui/Kbd";
 import { StatusDot } from "@/components/ui/StatusDot";
+import { t } from "@/i18n";
 import { formatRelative } from "@/lib/format";
 import { fuzzyScore, normalize } from "@/lib/fuzzy";
 import { ipcErrorMessage } from "@/lib/ipc";
@@ -54,8 +55,8 @@ export function CommandPalette() {
     <CommandDialog
       open={open}
       onOpenChange={setOpen}
-      title="Palette de commandes"
-      description="Rechercher un chat, un projet ou une action"
+      title={t("shell.paletteTitle")}
+      description={t("shell.paletteDescription")}
       className="sm:max-w-xl"
     >
       {open && <PaletteContent />}
@@ -81,86 +82,86 @@ function useCommands(): Command[] {
     const list: Command[] = [
       {
         id: "thread:new",
-        group: "Actions",
-        title: "Nouveau chat",
-        subtitle: "Ouvrir un chat vide avec Claude",
-        keywords: "nouveau chat créer lancer agent claude",
+        group: t("shell.paletteGroupActions"),
+        title: t("shell.navNewChat"),
+        subtitle: t("shell.paletteNewChatSubtitle"),
+        keywords: t("shell.paletteNewChatKeywords"),
         icon: <Plus size={15} />,
         hint: <CommandShortcut>{MOD_LABEL}+N</CommandShortcut>,
         run: () => ui().startChat(null),
       },
       {
         id: "nav:home",
-        group: "Navigation",
-        title: "Accueil",
-        subtitle: "Quotas, consommation et activité",
-        keywords: "accueil home dashboard tableau de bord",
+        group: t("shell.scGroupNavigation"),
+        title: t("shell.navHome"),
+        subtitle: t("shell.paletteHomeSubtitle"),
+        keywords: t("shell.paletteHomeKeywords"),
         icon: <LayoutDashboard size={15} />,
         run: () => ui().navigate({ kind: "home" }),
       },
       {
         id: "nav:memory",
-        group: "Navigation",
-        title: "Mémoire",
-        subtitle: "Mémoire globale partagée par les agents (memory.md, MCP)",
-        keywords: "mémoire memory souvenirs règles préférences profil mcp",
+        group: t("shell.scGroupNavigation"),
+        title: t("shell.navMemory"),
+        subtitle: t("shell.paletteMemorySubtitle"),
+        keywords: t("shell.paletteMemoryKeywords"),
         icon: <Brain size={15} />,
         run: () => ui().navigate({ kind: "memory" }),
       },
       {
         id: "nav:settings",
-        group: "Navigation",
-        title: "Paramètres",
-        subtitle: "Agents inactifs, agents & MCP, notifications, contexte injecté, CLI génériques",
-        keywords: "paramètres settings préférences options notifications cli générique pty",
+        group: t("shell.scGroupNavigation"),
+        title: t("shell.navSettings"),
+        subtitle: t("shell.paletteSettingsSubtitle"),
+        keywords: t("shell.paletteSettingsKeywords"),
         icon: <Settings size={15} />,
         hint: <CommandShortcut>{MOD_LABEL}+,</CommandShortcut>,
         run: () => ui().openSettings(),
       },
       {
         id: "nav:shortcuts",
-        group: "Navigation",
-        title: "Raccourcis clavier",
-        keywords: "raccourcis clavier shortcuts aide touches",
+        group: t("shell.scGroupNavigation"),
+        title: t("shell.shortcutsTitle"),
+        keywords: t("shell.paletteShortcutsKeywords"),
         icon: <Keyboard size={15} />,
         hint: <CommandShortcut>{MOD_LABEL}+/</CommandShortcut>,
         run: () => ui().setShortcutsOpen(true),
       },
       {
         id: "nav:dock",
-        group: "Navigation",
-        title: dockOpen ? "Masquer les threads live" : "Afficher les threads live",
-        keywords: "dock threads live panneau",
+        group: t("shell.scGroupNavigation"),
+        title: dockOpen ? t("shell.paletteDockHide") : t("shell.paletteDockShow"),
+        keywords: t("shell.paletteDockKeywords"),
         icon: <PanelRight size={15} />,
         hint: <CommandShortcut>{MOD_LABEL}+J</CommandShortcut>,
         run: () => ui().toggleDock(),
       },
     ];
 
-    for (const t of threads) {
-      const active = STATUS[t.status].active;
+    for (const th of threads) {
+      const active = STATUS[th.status].active;
       list.push({
-        id: `thread:${t.id}`,
-        group: active ? "Chats actifs" : "Chats récents",
-        title: t.title || "Chat sans titre",
-        subtitle: [t.projectName, active ? describeStatus(t.status, t.detail) : formatRelative(t.updatedAt)]
+        id: `thread:${th.id}`,
+        group: active ? t("shell.paletteGroupActiveChats") : t("shell.paletteGroupRecentChats"),
+        title: th.title || t("common.untitledChat"),
+        subtitle: [th.projectName, active ? describeStatus(th.status, th.detail) : formatRelative(th.updatedAt)]
           .filter(Boolean)
           .join(" · "),
-        keywords: `${t.agent} ${t.model ?? ""}`,
-        icon: active ? <StatusDot status={t.status} /> : <AgentLogo agent={t.agent} size={15} />,
-        hint: <AgentBadge agent={t.agent} variant="short" className="text-xs" />,
-        run: () => openThread(t.id),
+        keywords: `${th.agent} ${th.model ?? ""}`,
+        icon: active ? <StatusDot status={th.status} /> : <AgentLogo agent={th.agent} size={15} />,
+        hint: <AgentBadge agent={th.agent} variant="short" className="text-xs" />,
+        run: () => openThread(th.id),
       });
     }
 
     for (const p of projects ?? []) {
       list.push({
         id: `project:${p.id}`,
-        group: "Projets",
+        group: t("shell.projects"),
         title: p.name,
         subtitle: p.path,
         icon: <FolderGit2 size={15} />,
-        hint: <CommandShortcut className="tracking-normal">{p.threadCount} chats</CommandShortcut>,
+        hint: <CommandShortcut className="tracking-normal">{t("shell.paletteChatCount", { n: p.threadCount })}</CommandShortcut>,
         run: () => {
           ui().openProject(p.id, "context");
         },
@@ -208,15 +209,15 @@ function PaletteContent() {
   const run = (cmd: Command) => {
     setOpen(false);
     Promise.resolve(cmd.run()).catch((err: unknown) =>
-      toast({ tone: "danger", title: "Commande échouée", description: ipcErrorMessage(err) }),
+      toast({ tone: "danger", title: t("shell.paletteCommandFailed"), description: ipcErrorMessage(err) }),
     );
   };
 
   return (
     <CommandRoot shouldFilter={false} loop>
-      <CommandInput value={query} onValueChange={setQuery} placeholder="Rechercher un chat, un projet, une action…" />
+      <CommandInput value={query} onValueChange={setQuery} placeholder={t("shell.palettePlaceholder")} />
       <CommandList className="max-h-[420px]">
-        <CommandEmpty className="animate-in fade-in-0 duration-150">Aucun résultat pour « {query} »</CommandEmpty>
+        <CommandEmpty className="animate-in fade-in-0 duration-150">{t("shell.paletteNoResult", { query })}</CommandEmpty>
         {groups.map(([group, items]) => (
           <CommandGroup key={group} heading={group}>
             {items.map((cmd) => (

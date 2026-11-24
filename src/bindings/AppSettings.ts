@@ -2,10 +2,15 @@
 import type { BackgroundSettings } from "./BackgroundSettings";
 import type { ContextSettings } from "./ContextSettings";
 import type { GenericCliProfile } from "./GenericCliProfile";
+import type { Language } from "./Language";
 import type { NotificationSettings } from "./NotificationSettings";
 import type { QuickLauncherSettings } from "./QuickLauncherSettings";
 
 export type AppSettings = { 
+/**
+ * Interface language. `None` until the first launch resolves it (installer choice, else the system's).
+ */
+language: Language | null, 
 /**
  * Agent processes idle for this long are stopped (resumed transparently on the next message). 0 = never.
  */

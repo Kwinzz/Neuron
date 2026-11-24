@@ -1,6 +1,7 @@
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { t } from "@/i18n";
 import { useDashboard } from "@/stores/dashboard";
 
 interface DashboardErrorProps {
@@ -11,7 +12,7 @@ export function DashboardError({ message }: DashboardErrorProps) {
   return (
     <Alert variant="destructive">
       <AlertCircle />
-      <AlertTitle>Impossible de charger le tableau de bord</AlertTitle>
+      <AlertTitle>{t("home.loadErrorTitle")}</AlertTitle>
       <AlertDescription>{message}</AlertDescription>
       <AlertAction>
         <Button
@@ -22,7 +23,7 @@ export function DashboardError({ message }: DashboardErrorProps) {
             void useDashboard.getState().load();
           }}
         >
-          Réessayer
+          {t("common.retry")}
         </Button>
       </AlertAction>
     </Alert>

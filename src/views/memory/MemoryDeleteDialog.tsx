@@ -13,6 +13,7 @@ import {
 import { ipcErrorMessage } from "@/lib/ipc";
 import { useMemory } from "@/stores/memory";
 import { toast } from "@/stores/toast";
+import { t } from "@/i18n";
 
 interface MemoryDeleteDialogProps {
   memory: Memory;
@@ -32,12 +33,12 @@ export function MemoryDeleteDialog({
     setPending(true);
     try {
       await useMemory.getState().remove(memory.id);
-      toast({ tone: "ok", title: "Souvenir supprimé" });
+      toast({ tone: "ok", title: t("memory.deleted") });
       onOpenChange(false);
     } catch (err: unknown) {
       toast({
         tone: "danger",
-        title: "Impossible de supprimer le souvenir",
+        title: t("memory.deleteFailed"),
         description: ipcErrorMessage(err),
       });
     } finally {
@@ -54,9 +55,9 @@ export function MemoryDeleteDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Supprimer ce souvenir ?</DialogTitle>
+          <DialogTitle>{t("memory.deleteTitle")}</DialogTitle>
           <DialogDescription>
-            Il sera retiré de memory.md et ne sera plus injecté dans les nouveaux chats.
+            {t("memory.deleteDescription")}
           </DialogDescription>
         </DialogHeader>
 
@@ -71,7 +72,7 @@ export function MemoryDeleteDialog({
             disabled={pending}
             onClick={() => onOpenChange(false)}
           >
-            Annuler
+            {t("common.cancel")}
           </Button>
           <Button
             type="button"
@@ -80,7 +81,7 @@ export function MemoryDeleteDialog({
             onClick={() => void handleConfirm()}
           >
             {pending && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
-            <span>Supprimer</span>
+            <span>{t("common.delete")}</span>
           </Button>
         </DialogFooter>
       </DialogContent>

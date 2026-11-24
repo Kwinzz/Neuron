@@ -4,10 +4,11 @@ import { cn } from "cn";
 import type { FileChange } from "@/bindings/FileChange";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { UnifiedDiff } from "./UnifiedDiff";
+import { t } from "@/i18n";
 
 const KIND = {
-  add: { icon: FilePlus, label: "Nouveau fichier" },
-  delete: { icon: FileMinus, label: "Supprimé" },
+  add: { icon: FilePlus, label: "chat.fileAdded" },
+  delete: { icon: FileMinus, label: "chat.fileDeleted" },
   update: { icon: FilePen, label: null },
 } as const;
 
@@ -39,7 +40,7 @@ export const FileEditBlock = memo(function FileEditBlock({ change }: { change: F
             <span className="text-muted-foreground">{dir}</span>
             <span className="text-foreground">{name}</span>
           </span>
-          {meta.label && <span className="shrink-0 text-xs text-muted-foreground">{meta.label}</span>}
+          {meta.label && <span className="shrink-0 text-xs text-muted-foreground">{t(meta.label)}</span>}
           <span className="flex shrink-0 items-center gap-1.5 font-mono text-[11px] font-medium tabular-nums">
             <span className="text-ok">+{change.added}</span>
             <span className="text-destructive">−{change.removed}</span>

@@ -114,15 +114,16 @@ fn store(
 
 /// Copy a file picked by the user.
 pub fn import_file(root: &Path, source: &Path) -> AppResult<Attachment> {
-    let meta = std::fs::metadata(source).map_err(|e| AppError::Invalid(format!("{} : {e}", source.display())))?;
+    let meta = std::fs::metadata(source)
+        .map_err(|e| AppError::Invalid(crate::tr!("{} : {e}", "{}: {e}", source.display())))?;
     if !meta.is_file() {
-        return Err(AppError::Invalid(format!("pas un fichier : {}", source.display())));
+        return Err(AppError::Invalid(crate::tr!("pas un fichier : {}", "not a file: {}", source.display())));
     }
     if meta.len() > MAX_BYTES {
-        return Err(AppError::Invalid(format!(
-            "fichier trop lourd (max {} Mo) : {}",
-            MAX_BYTES / 1_048_576,
-            source.display()
+        let (max, file) = (MAX_BYTES / 1_048_576, source.display());
+        return Err(AppError::Invalid(crate::tr!(
+            "fichier trop lourd (max {max} Mo) : {file}",
+            "file too large (max {max} MB): {file}"
         )));
     }
     let name = source.file_name().and_then(|n| n.to_str()).unwrap_or("fichier").to_string();
@@ -133,9 +134,9 @@ pub fn import_file(root: &Path, source: &Path) -> AppResult<Attachment> {
 pub fn save_base64(root: &Path, name: &str, mime: &str, data: &str) -> AppResult<Attachment> {
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(data.trim())
-        .map_err(|e| AppError::Invalid(format!("image collée illisible : {e}")))?;
+        .map_err(|e| AppError::Invalid(crate::tr!("image collée illisible : {e}", "unreadable pasted image: {e}")))?;
     if bytes.len() as u64 > MAX_BYTES {
-        return Err(AppError::Invalid("image trop lourde".into()));
+        return Err(AppError::Invalid(crate::tr!("image trop lourde", "image too large")));
     }
     store(root, name, Some(mime), |dest| std::fs::write(dest, &bytes).map(|()| bytes.len() as u64))
 }
@@ -145,11 +146,15 @@ pub fn validate(root: &Path, list: &[Attachment]) -> AppResult<Vec<Attachment>> 
     let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
     list.iter()
         .map(|a| {
-            let path = Path::new(&a.path)
-                .canonicalize()
-                .map_err(|_| AppError::Invalid(format!("pièce jointe introuvable : {}", a.name)))?;
+            let path = Path::new(&a.path).canonicalize().map_err(|_| {
+                AppError::Invalid(crate::tr!("pièce jointe introuvable : {}", "attachment not found: {}", a.name))
+            })?;
             if !path.starts_with(&root) {
-                return Err(AppError::Invalid(format!("pièce jointe refusée : {}", a.name)));
+                return Err(AppError::Invalid(crate::tr!(
+                    "pièce jointe refusée : {}",
+                    "attachment refused: {}",
+                    a.name
+                )));
             }
             Ok(a.clone())
         })
@@ -169,7 +174,10 @@ pub fn note(list: &[&Attachment]) -> String {
     if list.is_empty() {
         return String::new();
     }
-    let mut out = String::from("\n\nPièces jointes (fichiers locaux, à lire avec tes outils) :\n");
+    let mut out = crate::tr!(
+        "\n\nPièces jointes (fichiers locaux, à lire avec tes outils) :\n",
+        "\n\nAttachments (local files, read them with your tools):\n"
+    );
     for a in list {
         out.push_str(&format!("- {} — {}\n", a.name, a.path));
     }

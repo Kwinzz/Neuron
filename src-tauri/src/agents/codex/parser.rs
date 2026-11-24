@@ -91,7 +91,9 @@ impl CodexParser {
                 usage: TokenUsage::default(),
                 duration_ms: None,
                 error: Some(error_message(
-                    v.pointer("/error/message").and_then(Value::as_str).unwrap_or("Échec du tour Codex"),
+                    v.pointer("/error/message")
+                        .and_then(Value::as_str)
+                        .unwrap_or(crate::i18n::pick("Échec du tour Codex", "Codex turn failed")),
                 )),
             }],
             Some("error") => vec![AdapterEvent::Warning(

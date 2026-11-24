@@ -3,6 +3,7 @@ import { cn } from "cn";
 import { Code, Eye } from "lucide-react";
 import { Markdown } from "@/components/markdown/Markdown";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { t } from "@/i18n";
 
 type ViewMode = "rendered" | "raw";
 
@@ -21,7 +22,7 @@ export function ContextMarkdown({ markdown, size = "sm", className }: ContextMar
     <div className="flex min-w-0 flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-muted-foreground tabular-nums">
-          <span className="font-mono">{lineCount}</span> {lineCount <= 1 ? "ligne" : "lignes"}
+          <span className="font-mono">{lineCount}</span> {t("project.ctxLineWord", { n: lineCount })}
         </span>
 
         <ToggleGroup
@@ -34,13 +35,13 @@ export function ContextMarkdown({ markdown, size = "sm", className }: ContextMar
             if (value === "rendered" || value === "raw") setMode(value);
           }}
         >
-          <ToggleGroupItem value="rendered" aria-label="Affichage rendu">
+          <ToggleGroupItem value="rendered" aria-label={t("project.ctxRenderedAria")}>
             <Eye aria-hidden />
-            <span>Rendu</span>
+            <span>{t("project.ctxRendered")}</span>
           </ToggleGroupItem>
-          <ToggleGroupItem value="raw" aria-label="Affichage brut">
+          <ToggleGroupItem value="raw" aria-label={t("project.ctxRawAria")}>
             <Code aria-hidden />
-            <span>Brut</span>
+            <span>{t("project.ctxRaw")}</span>
           </ToggleGroupItem>
         </ToggleGroup>
       </div>
@@ -53,7 +54,7 @@ export function ContextMarkdown({ markdown, size = "sm", className }: ContextMar
         )}
       >
         {isEmpty ? (
-          <p className="text-xs text-muted-foreground">Aucun contexte.</p>
+          <p className="text-xs text-muted-foreground">{t("project.ctxEmpty")}</p>
         ) : mode === "rendered" ? (
           <Markdown size={size} doc>
             {markdown}

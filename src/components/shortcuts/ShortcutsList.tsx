@@ -1,8 +1,8 @@
 import { cn } from "cn";
 import { Kbd } from "@/components/ui/Kbd";
-import { SHORTCUTS, comboKeys, type Shortcut } from "@/lib/shortcuts";
+import { SHORTCUTS, comboKeys, shortcutGroupLabel, type Shortcut } from "@/lib/shortcuts";
 
-const GROUP_ORDER: readonly Shortcut["group"][] = ["Navigation", "Fenêtre", "Chat"];
+const GROUP_ORDER: readonly Shortcut["group"][] = ["navigation", "window", "chat"];
 
 const GROUPED_SHORTCUTS: ReadonlyArray<{
   group: Shortcut["group"];
@@ -20,8 +20,8 @@ export function ShortcutsList({ className }: ShortcutsListProps) {
   return (
     <div className={cn("flex min-w-0 flex-col gap-5", className)}>
       {GROUPED_SHORTCUTS.map(({ group, items }) => (
-        <section key={group} aria-label={group} className="flex min-w-0 flex-col gap-1.5">
-          <h3 className="text-xs font-medium text-muted-foreground">{group}</h3>
+        <section key={group} aria-label={shortcutGroupLabel(group)} className="flex min-w-0 flex-col gap-1.5">
+          <h3 className="text-xs font-medium text-muted-foreground">{shortcutGroupLabel(group)}</h3>
           <ul className="divide-y divide-border">
             {items.map((shortcut) => {
               const keys = comboKeys(shortcut.combo);

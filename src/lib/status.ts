@@ -1,4 +1,5 @@
 import type { ThreadStatus } from "@/bindings/ThreadStatus";
+import { type MessageKey, t } from "@/i18n";
 
 export type StatusTone = "live" | "pending" | "warn" | "ok" | "danger" | "muted";
 
@@ -9,17 +10,28 @@ export interface StatusMeta {
   active: boolean;
 }
 
+/** `label` is a getter so it always follows the interface language. */
+function meta(key: MessageKey, tone: StatusTone, active: boolean): StatusMeta {
+  return {
+    get label() {
+      return t(key);
+    },
+    tone,
+    active,
+  };
+}
+
 export const STATUS: Record<ThreadStatus, StatusMeta> = {
-  idle: { label: "Inactif", tone: "muted", active: false },
-  starting: { label: "Démarrage", tone: "live", active: true },
-  thinking: { label: "Réflexion", tone: "live", active: true },
-  reading: { label: "Lecture", tone: "live", active: true },
-  editing: { label: "Édition", tone: "live", active: true },
-  running: { label: "Exécution", tone: "live", active: true },
-  awaiting_approval: { label: "En attente d'approbation", tone: "warn", active: true },
-  done: { label: "Terminé", tone: "ok", active: false },
-  error: { label: "Erreur", tone: "danger", active: false },
-  cancelled: { label: "Annulé", tone: "muted", active: false },
+  idle: meta("shell.statusIdle", "muted", false),
+  starting: meta("shell.statusStarting", "live", true),
+  thinking: meta("shell.statusThinking", "live", true),
+  reading: meta("shell.statusReading", "live", true),
+  editing: meta("shell.statusEditing", "live", true),
+  running: meta("shell.statusRunning", "live", true),
+  awaiting_approval: meta("shell.statusAwaitingApproval", "warn", true),
+  done: meta("shell.statusDone", "ok", false),
+  error: meta("common.error", "danger", false),
+  cancelled: meta("shell.statusCancelled", "muted", false),
 };
 
 /** Tailwind text color per tone (static strings). */
@@ -47,15 +59,15 @@ export function describeStatus(status: ThreadStatus, detail: string | null | und
   const file = detail.split(/[\\/]/).pop() ?? detail;
   switch (status) {
     case "reading":
-      return `Lecture de ${file}`;
+      return t("shell.statusReadingFile", { file });
     case "editing":
-      return `Édition de ${file}`;
+      return t("shell.statusEditingFile", { file });
     case "running":
-      return `Exécution : ${detail}`;
+      return t("shell.statusRunningDetail", { detail });
     case "awaiting_approval":
-      return `Approbation : ${detail}`;
+      return t("shell.statusApprovalDetail", { detail });
     case "error":
-      return `Erreur : ${detail}`;
+      return t("shell.statusErrorDetail", { detail });
     default:
       return `${STATUS[status].label} · ${detail}`;
   }

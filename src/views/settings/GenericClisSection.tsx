@@ -19,6 +19,7 @@ import { CardEmpty } from "@/views/project/CardEmpty";
 import { GenericCliDeleteDialog } from "./GenericCliDeleteDialog";
 import { GenericCliEditor } from "./GenericCliEditor";
 import { GenericCliRow, type ProfileTestState } from "./GenericCliRow";
+import { t } from "@/i18n";
 
 type EditorMode = { kind: "new" } | { kind: "edit"; id: string } | null;
 
@@ -69,7 +70,7 @@ export function GenericClisSection({ settings }: GenericClisSectionProps) {
       const base = useSettings.getState().settings ?? settings;
       const nextClis = base.genericClis.filter((item) => item.id !== deleteTarget.id);
       await useSettings.getState().save({ ...base, genericClis: nextClis });
-      toast({ tone: "ok", title: "CLI supprimé" });
+      toast({ tone: "ok", title: t("settings.cliDeleted") });
       void useModels.getState().load(true);
       handleDismissTest(deleteTarget.id);
       if (editorMode?.kind === "edit" && editorMode.id === deleteTarget.id) {
@@ -79,7 +80,7 @@ export function GenericClisSection({ settings }: GenericClisSectionProps) {
     } catch (err: unknown) {
       toast({
         tone: "danger",
-        title: "Impossible de supprimer le CLI",
+        title: t("settings.cliDeleteFailed"),
         description: ipcErrorMessage(err),
       });
     } finally {
@@ -93,11 +94,10 @@ export function GenericClisSection({ settings }: GenericClisSectionProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <SquareTerminal className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-            <span>CLI génériques</span>
+            <span>{t("settings.genericTitle")}</span>
           </CardTitle>
           <CardDescription className="text-xs">
-            Un processus par message, sans mémoire entre les messages ni demande
-            d&apos;autorisation. Utilisable comme modèle dans « Nouveau chat ».
+            {t("settings.genericDescription")}
           </CardDescription>
           <CardAction>
             <Button
@@ -107,7 +107,7 @@ export function GenericClisSection({ settings }: GenericClisSectionProps) {
               onClick={() => setEditorMode({ kind: "new" })}
             >
               <Plus className="size-3.5" aria-hidden />
-              <span>Ajouter un CLI</span>
+              <span>{t("settings.addCli")}</span>
             </Button>
           </CardAction>
         </CardHeader>
@@ -126,8 +126,7 @@ export function GenericClisSection({ settings }: GenericClisSectionProps) {
 
           {profiles.length === 0 && editorMode === null ? (
             <CardEmpty icon={SquareTerminal}>
-              Aucun CLI générique. Ajoute Ollama, Aider, Gemini CLI… pour les utiliser
-              comme modèle.
+              {t("settings.genericEmpty")}
             </CardEmpty>
           ) : (
             <div className="flex min-w-0 flex-col gap-2.5">

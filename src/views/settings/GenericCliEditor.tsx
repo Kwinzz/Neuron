@@ -26,6 +26,7 @@ import {
 import { GenericCliTestResult } from "./GenericCliTestResult";
 import { SettingRow } from "./SettingRow";
 import { SettingSwitch } from "./SettingSwitch";
+import { t } from "@/i18n";
 
 interface GenericCliEditorProps {
   settings: AppSettings;
@@ -112,13 +113,13 @@ export function GenericCliEditor({
           : [...base.genericClis, draft];
 
       await useSettings.getState().save({ ...base, genericClis: nextClis });
-      toast({ tone: "ok", title: "CLI enregistré" });
+      toast({ tone: "ok", title: t("settings.cliSaved") });
       void useModels.getState().load(true);
       onSaved();
     } catch (err: unknown) {
       toast({
         tone: "danger",
-        title: "Impossible d'enregistrer le CLI",
+        title: t("settings.cliSaveFailed"),
         description: ipcErrorMessage(err),
       });
     } finally {
@@ -152,14 +153,14 @@ export function GenericCliEditor({
     >
       <div className="flex min-w-0 items-center justify-between gap-2">
         <h3 className="truncate text-sm font-medium text-foreground">
-          {editingProfile ? `Modifier « ${editingProfile.name} »` : "Nouveau CLI"}
+          {editingProfile ? t("settings.editCli", { name: editingProfile.name }) : t("settings.newCli")}
         </h3>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button type="button" variant="outline" size="xs" disabled={saving}>
               <Sparkles aria-hidden />
-              <span>Préréglages</span>
+              <span>{t("settings.presets")}</span>
               <ChevronDown aria-hidden />
             </Button>
           </DropdownMenuTrigger>
@@ -180,7 +181,7 @@ export function GenericCliEditor({
 
       <div className="grid min-w-0 gap-3 sm:grid-cols-2">
         <div className="flex min-w-0 flex-col gap-1.5">
-          <Label htmlFor="cli-name">Nom</Label>
+          <Label htmlFor="cli-name">{t("settings.cliName")}</Label>
           <Input
             ref={nameInputRef}
             id="cli-name"
@@ -192,7 +193,7 @@ export function GenericCliEditor({
         </div>
 
         <div className="flex min-w-0 flex-col gap-1.5">
-          <Label htmlFor="cli-command">Commande</Label>
+          <Label htmlFor="cli-command">{t("settings.cliCommand")}</Label>
           <Input
             id="cli-command"
             value={command}
@@ -206,8 +207,8 @@ export function GenericCliEditor({
 
       <div className="flex min-w-0 flex-col gap-1.5">
         <Label htmlFor="cli-args">
-          <span>Arguments</span>
-          <span className="text-xs font-normal text-muted-foreground">(un par ligne)</span>
+          <span>{t("settings.cliArgs")}</span>
+          <span className="text-xs font-normal text-muted-foreground">{t("settings.cliArgsHint")}</span>
         </Label>
         <Textarea
           id="cli-args"
@@ -222,18 +223,18 @@ export function GenericCliEditor({
           <code className="rounded bg-muted px-1 py-0.5 font-mono text-foreground">
             {"{prompt}"}
           </code>{" "}
-          sera remplacé par ton message ; sans{" "}
+          {t("settings.promptReplaced")}{" "}
           <code className="rounded bg-muted px-1 py-0.5 font-mono text-foreground">
             {"{prompt}"}
           </code>
-          , le message est envoyé sur l&apos;entrée standard.
+          {t("settings.promptStdin")}
         </p>
       </div>
 
       <SettingRow
         id="cli-pty"
-        label="Pseudo-terminal"
-        description="Pour les outils qui exigent un vrai terminal ; les codes couleur sont retirés."
+        label={t("settings.pty")}
+        description={t("settings.ptyDescription")}
         disabled={saving}
         control={
           <SettingSwitch
@@ -247,7 +248,7 @@ export function GenericCliEditor({
       />
 
       <div className="flex min-w-0 flex-col gap-1.5">
-        <span className="text-xs font-medium text-muted-foreground">Aperçu</span>
+        <span className="text-xs font-medium text-muted-foreground">{t("settings.preview")}</span>
         <div className="min-w-0 rounded-md border bg-background p-2">
           <GenericCliCommandPreview
             command={trimmedCommand}
@@ -264,7 +265,7 @@ export function GenericCliEditor({
           variant="outline"
           size="sm"
           disabled={!tauri || !trimmedCommand || testing || saving}
-          title={!tauri ? "Disponible dans l'application" : undefined}
+          title={!tauri ? t("settings.inAppOnly") : undefined}
           onClick={() => void handleTest()}
         >
           {testing ? (
@@ -272,12 +273,12 @@ export function GenericCliEditor({
           ) : (
             <Play className="size-3.5" aria-hidden />
           )}
-          <span>Tester</span>
+          <span>{t("settings.test")}</span>
         </Button>
 
         <div className="flex items-center gap-2">
           <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={onCancel}>
-            Annuler
+            {t("common.cancel")}
           </Button>
           <Button
             type="button"
@@ -287,7 +288,7 @@ export function GenericCliEditor({
             onClick={() => void handleSave()}
           >
             {saving && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
-            <span>Enregistrer</span>
+            <span>{t("common.save")}</span>
           </Button>
         </div>
       </div>

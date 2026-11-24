@@ -73,7 +73,7 @@ pub async fn update_provider(state: State<'_, AppState>, update: ProviderUpdate)
             let now = now_ms();
             providers::update(conn, &update, now)?;
             let provider = providers::get(conn, &update.id)?
-                .ok_or_else(|| AppError::NotFound(format!("provider {}", update.id)))?;
+                .ok_or_else(|| AppError::NotFound(crate::tr!("provider {}", "provider {}", update.id)))?;
             providers::usage(conn, provider, now)
         })
         .await

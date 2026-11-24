@@ -1,4 +1,4 @@
-import { type ComponentProps, memo, type ReactNode } from "react";
+import { type ComponentProps, type CSSProperties, memo, type ReactNode } from "react";
 import { cn } from "cn";
 import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import { CodeBlock } from "./CodeBlock";
 import { splitBlocks } from "./splitBlocks";
 import "./markdown.css";
+import { t } from "@/i18n";
 
 type ReactMarkdownProps = ComponentProps<typeof ReactMarkdown>;
 
@@ -63,6 +64,14 @@ interface MarkdownProps {
   streaming?: boolean;
 }
 
+/** Document mode: the « Section vide » annotation is CSS `content`, fed by a custom property in the UI language. */
+function docStyle(): CSSProperties {
+  const style: CSSProperties & Record<"--md-empty-label", string> = {
+    "--md-empty-label": JSON.stringify(t("chat.emptySection")),
+  };
+  return style;
+}
+
 /** One top-level block of a streaming answer; unchanged blocks keep their parsed output. */
 const MarkdownBlock = memo(function MarkdownBlock({ text, highlight }: { text: string; highlight: boolean }) {
   return (
@@ -89,6 +98,7 @@ export const Markdown = memo(function Markdown({
         doc && "md-doc",
         className,
       )}
+      style={doc ? docStyle() : undefined}
     >
       {streaming ? (
         splitBlocks(children).map((block, i) => <MarkdownBlock key={i} text={block} highlight={highlight} />)

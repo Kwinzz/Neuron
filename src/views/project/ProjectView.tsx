@@ -3,6 +3,7 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { t } from "@/i18n";
 import { useNav } from "@/stores/nav";
 import { useUi } from "@/stores/ui";
 import { ContextEditor } from "./ContextEditor";
@@ -73,11 +74,11 @@ export function ProjectView({ projectId, tab }: ProjectViewProps) {
           className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 has-data-[slot=alert-action]:pr-40"
         >
           <AlertCircle aria-hidden />
-          <AlertTitle>Projet introuvable</AlertTitle>
+          <AlertTitle>{t("project.notFound")}</AlertTitle>
           <AlertDescription>{errorFile}</AlertDescription>
           <AlertAction>
             <Button size="xs" variant="outline" onClick={() => useUi.getState().focusThread(null)}>
-              Retour à l'accueil
+              {t("project.backHome")}
             </Button>
           </AlertAction>
         </Alert>
@@ -102,9 +103,9 @@ export function ProjectView({ projectId, tab }: ProjectViewProps) {
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
-          <TabsTrigger value="context">Contexte</TabsTrigger>
+          <TabsTrigger value="context">{t("project.ctxButton")}</TabsTrigger>
           <TabsTrigger value="chats">
-            <span>Chats</span>
+            <span>{t("shell.chats")}</span>
             <span className="rounded-full bg-muted px-1.5 font-mono text-[10px] tabular-nums text-muted-foreground">
               {chatCount}
             </span>

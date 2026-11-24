@@ -23,6 +23,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { fileIcon, fileTypeLabel, formatSize } from "./fileMeta";
+import { t } from "@/i18n";
 
 interface MessageAttachmentsProps {
   items: Attachment[];
@@ -46,7 +47,7 @@ const MessageImageThumb = memo(function MessageImageThumb({
     <button
       type="button"
       onClick={() => onOpen(index)}
-      aria-label={`Agrandir ${item.name}`}
+      aria-label={t("chat.enlargeImage", { name: item.name })}
       className="block cursor-pointer overflow-hidden rounded-lg outline-none transition-opacity duration-150 hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
     >
       <img
@@ -247,7 +248,7 @@ export const MessageAttachments = memo(function MessageAttachments({
                         variant="ghost"
                         size="icon-sm"
                         onClick={goPrev}
-                        aria-label="Image précédente"
+                        aria-label={t("chat.previousImage")}
                       >
                         <ChevronLeft className="size-4" aria-hidden="true" />
                       </Button>
@@ -256,7 +257,7 @@ export const MessageAttachments = memo(function MessageAttachments({
                         variant="ghost"
                         size="icon-sm"
                         onClick={goNext}
-                        aria-label="Image suivante"
+                        aria-label={t("chat.nextImage")}
                       >
                         <ChevronRight className="size-4" aria-hidden="true" />
                       </Button>
@@ -267,7 +268,7 @@ export const MessageAttachments = memo(function MessageAttachments({
                       type="button"
                       variant="ghost"
                       size="icon-sm"
-                      aria-label="Fermer"
+                      aria-label={t("common.close")}
                     >
                       <X className="size-4" aria-hidden="true" />
                     </Button>

@@ -17,6 +17,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AGENTS } from "@/lib/agents";
 import { findModel, useModels } from "@/stores/models";
+import { t } from "@/i18n";
 
 interface ModelPickerProps {
   agent: AgentKind;
@@ -58,7 +59,7 @@ export const ModelPicker = memo(function ModelPicker({
   }, []);
 
   const current = findModel(providers, agent, model);
-  const label = current?.label ?? model ?? `${AGENTS[agent].label} · par défaut`;
+  const label = current?.label ?? model ?? t("chat.agentDefault", { agent: AGENTS[agent].label });
 
   const pick = (a: AgentKind, m: ModelInfo | null) => {
     onChange(a, m);
@@ -73,7 +74,7 @@ export const ModelPicker = memo(function ModelPicker({
           size="sm"
           disabled={disabled}
           className="h-7 max-w-64 gap-1.5 px-2 text-xs font-normal text-muted-foreground transition-colors duration-150 hover:text-foreground [&>svg:last-child]:transition-transform [&>svg:last-child]:duration-200 data-[state=open]:[&>svg:last-child]:rotate-180"
-          aria-label="Modèle"
+          aria-label={t("chat.model")}
         >
           {current ? <VendorLogo vendor={current.vendor} size={14} /> : <AgentLogo agent={agent} size={14} />}
           <span className="truncate">{label}</span>
@@ -82,9 +83,9 @@ export const ModelPicker = memo(function ModelPicker({
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 p-0">
         <Command loop>
-          <CommandInput placeholder="Rechercher un modèle…" />
+          <CommandInput placeholder={t("chat.searchModel")} />
           <CommandList className={cn("max-h-80", listClassName)}>
-            <CommandEmpty>{loading ? "Chargement des modèles…" : "Aucun modèle"}</CommandEmpty>
+            <CommandEmpty>{loading ? t("chat.loadingModels") : t("chat.noModel")}</CommandEmpty>
             {providers.map((p, i) => {
               const locked = Boolean(lockAgent) && p.agent !== agent;
               return (
@@ -95,18 +96,18 @@ export const ModelPicker = memo(function ModelPicker({
                       <span className="flex items-center gap-1.5">
                         <AgentLogo agent={p.agent} size={12} />
                         {p.label}
-                        {!p.available && <span className="font-normal text-destructive">· non installé</span>}
-                        {locked && <span className="font-normal">· nouveau chat requis</span>}
+                        {!p.available && <span className="font-normal text-destructive">· {t("chat.notInstalled")}</span>}
+                        {locked && <span className="font-normal">· {t("chat.newChatRequired")}</span>}
                       </span>
                     }
                   >
                     <CommandItem
-                      value={`${p.label} défaut`}
+                      value={`${p.label} ${t("chat.defaultSearchWord")}`}
                       disabled={locked || !p.available}
                       onSelect={() => pick(p.agent, null)}
                     >
                       <AgentLogo agent={p.agent} size={14} />
-                      <span className="flex-1">Modèle par défaut</span>
+                      <span className="flex-1">{t("chat.defaultModelItem")}</span>
                       <Check className={cn("size-4", p.agent === agent && model === null ? "opacity-100" : "opacity-0")} />
                     </CommandItem>
                     {p.models.map((m) => (
@@ -121,7 +122,7 @@ export const ModelPicker = memo(function ModelPicker({
                           <span className="truncate">{m.label}</span>
                           {(m.hint || m.effortModels) && (
                             <span className="truncate text-xs text-muted-foreground">
-                              {[m.hint, m.effortModels ? `${m.efforts.length} niveaux de raisonnement` : null]
+                              {[m.hint, m.effortModels ? t("chat.reasoningLevels", { n: m.efforts.length }) : null]
                                 .filter(Boolean)
                                 .join(" · ")}
                             </span>
@@ -136,7 +137,7 @@ export const ModelPicker = memo(function ModelPicker({
             })}
           </CommandList>
           <div className="flex items-center justify-between border-t px-2 py-1.5 text-xs text-muted-foreground">
-            <span>{lockAgent ? "Changer de fournisseur = nouveau chat" : "Tous fournisseurs confondus"}</span>
+            <span>{lockAgent ? t("chat.changeProviderNewChat") : t("chat.allProviders")}</span>
             <Button
               variant="ghost"
               size="sm"
@@ -145,7 +146,7 @@ export const ModelPicker = memo(function ModelPicker({
               disabled={loading}
             >
               <RefreshCw className={cn("size-3", loading && "animate-spin")} />
-              Actualiser
+              {t("chat.refresh")}
             </Button>
           </div>
         </Command>

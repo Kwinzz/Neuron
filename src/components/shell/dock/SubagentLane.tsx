@@ -1,6 +1,7 @@
 import { memo, useMemo, useState } from "react";
 import { cn } from "cn";
 import { ChevronRight, GitBranch } from "lucide-react";
+import { type MessageKey, t } from "@/i18n";
 import { formatTokens } from "@/lib/format";
 import type { SubagentInfo, TermLine } from "@/stores/activity";
 import { TermLineView } from "./TermLineView";
@@ -12,10 +13,10 @@ interface SubagentLaneProps {
 
 const MAX_VISIBLE = 4;
 
-const SUB_STATUS_LABEL: Record<SubagentInfo["status"], string> = {
-  running: "En cours",
-  completed: "Terminé",
-  failed: "Échec",
+const SUB_STATUS_LABEL: Record<SubagentInfo["status"], MessageKey> = {
+  running: "shell.subRunning",
+  completed: "shell.subCompleted",
+  failed: "shell.subFailed",
 };
 
 /** Collapsible indented lane for a sub-agent inside a chat's mini terminal. */
@@ -59,9 +60,9 @@ export const SubagentLane = memo(function SubagentLane({ sub, lines }: SubagentL
               ✗
             </span>
           )}
-          <span className="sr-only">{SUB_STATUS_LABEL[sub.status]}</span>
+          <span className="sr-only">{t(SUB_STATUS_LABEL[sub.status])}</span>
           <span>
-            {toolCount} {toolCount === 1 ? "outil" : "outils"}
+            {t("shell.toolCount", { n: toolCount })}
           </span>
           {sub.tokens !== null && <span>· {formatTokens(sub.tokens)}</span>}
           <ChevronRight
@@ -78,13 +79,13 @@ export const SubagentLane = memo(function SubagentLane({ sub, lines }: SubagentL
               <span className="w-3 shrink-0 text-center" aria-hidden>
                 ›
               </span>
-              <span className="min-w-0 flex-1 truncate">{sub.lastTool ?? "démarrage…"}</span>
+              <span className="min-w-0 flex-1 truncate">{sub.lastTool ?? t("shell.subStarting")}</span>
             </div>
           ) : (
             <>
               {hiddenCount > 0 && (
                 <div className="pl-[18px] text-[10px] text-muted-foreground/60">
-                  … {hiddenCount} {hiddenCount === 1 ? "ligne masquée" : "lignes masquées"}
+                  … {t("shell.hiddenLines", { n: hiddenCount })}
                 </div>
               )}
               {visibleLines.map((line) => (

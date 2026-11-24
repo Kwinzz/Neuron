@@ -10,9 +10,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { toast } from "@/stores/toast";
 import { CopyPromptHint } from "./CopyPromptHint";
-import { IMPORT_ORIGINS, REFORMULATE_MAX_CHARS } from "./importOrigins";
+import { IMPORT_ORIGINS, REFORMULATE_MAX_CHARS, originLabel } from "./importOrigins";
 import { ImportCliSources } from "./ImportCliSources";
 import { ImportOriginPicker } from "./ImportOriginPicker";
+import { locale, t } from "@/i18n";
 
 export type ImportSourceTab = "paste" | "cli";
 
@@ -28,11 +29,11 @@ interface ImportSourceStepProps {
 
 function placeholderFor(origin: MemoryImportOrigin): string {
   const meta = IMPORT_ORIGINS[origin];
-  if (meta.web) return `Colle ici la réponse de ${meta.label}…`;
+  if (meta.web) return t("memory.placeholderWeb", { assistant: originLabel(origin) });
   if (origin === "other") {
-    return "Écris ou colle ce que tes agents doivent savoir sur toi, un souvenir par ligne…";
+    return t("memory.placeholderOther");
   }
-  return `Colle ici les instructions de ${meta.label}, ou charge-les depuis l'onglet « Fichiers des CLI »…`;
+  return t("memory.placeholderCli", { assistant: originLabel(origin) });
 }
 
 export function ImportSourceStep({
@@ -56,7 +57,7 @@ export function ImportSourceStep({
       const path = await ipc.pickImportFile();
       if (path !== null) onTextChange(await ipc.readMemoryImportFile(path));
     } catch (err: unknown) {
-      toast({ tone: "danger", title: "Impossible de lire le fichier", description: ipcErrorMessage(err) });
+      toast({ tone: "danger", title: t("memory.readFileFailed"), description: ipcErrorMessage(err) });
     } finally {
       setPickingFile(false);
     }
@@ -79,24 +80,24 @@ export function ImportSourceStep({
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <Label htmlFor="memory-import-origin" className="text-muted-foreground">
-            Provenance
+            {t("memory.originLabel")}
           </Label>
           <ImportOriginPicker id="memory-import-origin" value={origin} onChange={onOriginChange} disabled={disabled} />
         </div>
         <TabsList>
           <TabsTrigger value="paste" disabled={disabled}>
             <ClipboardPaste aria-hidden />
-            Coller
+            {t("memory.tabPaste")}
           </TabsTrigger>
           <TabsTrigger value="cli" disabled={disabled}>
             <SquareTerminal aria-hidden />
-            Fichiers des CLI
+            {t("memory.tabCliFiles")}
           </TabsTrigger>
         </TabsList>
       </div>
 
       <TabsContent value="paste" className="flex min-w-0 flex-col gap-3">
-        {meta.web && <CopyPromptHint assistant={meta.label} />}
+        {meta.web && <CopyPromptHint assistant={originLabel(origin)} />}
 
         <Textarea
           rows={10}
@@ -105,7 +106,7 @@ export function ImportSourceStep({
           disabled={disabled}
           autoFocus
           spellCheck={false}
-          aria-label="Texte à importer"
+          aria-label={t("memory.textToImport")}
           placeholder={placeholderFor(origin)}
           className="max-h-[42vh] min-h-56 resize-none font-mono text-xs leading-relaxed md:text-xs"
         />
@@ -119,21 +120,21 @@ export function ImportSourceStep({
             onClick={() => void handleOpenFile()}
           >
             <FolderOpen aria-hidden />
-            <span>Ouvrir un fichier…</span>
+            <span>{t("memory.openFile")}</span>
           </Button>
 
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs text-muted-foreground">
             {length > 0 && (
               <span className={cn("tabular-nums", tooLongForAi && "text-warn")}>
-                {length.toLocaleString("fr-FR")} caractères
-                {tooLongForAi && " · trop long pour la reformulation IA"}
+                {t("memory.chars", { n: length.toLocaleString(locale()) })}
+                {tooLongForAi && ` · ${t("memory.tooLongForAi")}`}
               </span>
             )}
             <span className="hidden items-center gap-1 sm:inline-flex">
               <Kbd>Ctrl</Kbd>
               <span>+</span>
-              <Kbd>Entrée</Kbd>
-              <span>pour continuer</span>
+              <Kbd>{t("memory.keyEnter")}</Kbd>
+              <span>{t("memory.toContinue")}</span>
             </span>
           </div>
         </div>

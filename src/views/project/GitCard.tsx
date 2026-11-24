@@ -14,18 +14,19 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { type MessageKey, t } from "@/i18n";
 import { CardEmpty } from "./CardEmpty";
 import { CardSectionLabel } from "./CardSectionLabel";
 
 const MAX_CHANGED = 10;
 
-const STATUS_LEGEND: ReadonlyArray<{ code: string; label: string; toneClass: string }> = [
-  { code: "M", label: "Modifié", toneClass: "text-warn" },
-  { code: "A", label: "Ajouté", toneClass: "text-ok" },
-  { code: "D", label: "Supprimé", toneClass: "text-destructive" },
-  { code: "R", label: "Renommé", toneClass: "text-live" },
-  { code: "U", label: "Non suivi", toneClass: "text-ok" },
-  { code: "!", label: "Conflit", toneClass: "text-destructive" },
+const STATUS_LEGEND: ReadonlyArray<{ code: string; label: MessageKey; toneClass: string }> = [
+  { code: "M", label: "project.gitModified", toneClass: "text-warn" },
+  { code: "A", label: "project.gitAdded", toneClass: "text-ok" },
+  { code: "D", label: "project.gitDeleted", toneClass: "text-destructive" },
+  { code: "R", label: "project.gitRenamed", toneClass: "text-live" },
+  { code: "U", label: "project.gitUntracked", toneClass: "text-ok" },
+  { code: "!", label: "project.gitConflict", toneClass: "text-destructive" },
 ];
 
 interface ParsedChange {
@@ -42,35 +43,35 @@ function parsePorcelainLine(line: string): ParsedChange {
   const path = arrowIndex !== -1 ? rawPath.slice(arrowIndex + 4) : rawPath;
 
   if (xy === "UU" || xy === "AA" || xy === "DD" || xy.includes("U")) {
-    return { letter: "!", label: "Conflit", toneClass: "text-destructive", path };
+    return { letter: "!", label: t("project.gitConflict"), toneClass: "text-destructive", path };
   }
 
   if (xy === "??") {
-    return { letter: "U", label: "Non suivi", toneClass: "text-ok", path };
+    return { letter: "U", label: t("project.gitUntracked"), toneClass: "text-ok", path };
   }
 
   if (xy.includes("D")) {
-    return { letter: "D", label: "Supprimé", toneClass: "text-destructive", path };
+    return { letter: "D", label: t("project.gitDeleted"), toneClass: "text-destructive", path };
   }
 
   if (xy.includes("R")) {
-    return { letter: "R", label: "Renommé", toneClass: "text-live", path };
+    return { letter: "R", label: t("project.gitRenamed"), toneClass: "text-live", path };
   }
 
   if (xy.includes("A")) {
-    return { letter: "A", label: "Ajouté", toneClass: "text-ok", path };
+    return { letter: "A", label: t("project.gitAdded"), toneClass: "text-ok", path };
   }
 
   if (xy.includes("M")) {
-    return { letter: "M", label: "Modifié", toneClass: "text-warn", path };
+    return { letter: "M", label: t("project.gitModified"), toneClass: "text-warn", path };
   }
 
   if (xy.includes("C")) {
-    return { letter: "C", label: "Copié", toneClass: "text-live", path };
+    return { letter: "C", label: t("project.gitCopied"), toneClass: "text-live", path };
   }
 
   const first = xy.trim().charAt(0) || "?";
-  return { letter: first, label: "Autre", toneClass: "text-muted-foreground", path };
+  return { letter: first, label: t("project.gitOther"), toneClass: "text-muted-foreground", path };
 }
 
 function splitFilePath(filePath: string): { dir: string; name: string } {
@@ -116,7 +117,7 @@ export function GitCard({ git, loading, error }: GitCardProps) {
         {git && (
           <>
             <CardDescription className="truncate font-mono text-xs">
-              {git.branch ?? "HEAD détachée"}
+              {git.branch ?? t("project.detachedHead")}
             </CardDescription>
             <CardAction>
               <Badge variant="outline" className="font-mono tabular-nums">
@@ -135,9 +136,9 @@ export function GitCard({ git, loading, error }: GitCardProps) {
             ))}
           </div>
         ) : error && !git ? (
-          <CardEmpty icon={AlertCircle}>État git indisponible.</CardEmpty>
+          <CardEmpty icon={AlertCircle}>{t("project.gitUnavailable")}</CardEmpty>
         ) : !git ? (
-          <CardEmpty icon={GitBranch}>Ce dossier n'est pas un dépôt git.</CardEmpty>
+          <CardEmpty icon={GitBranch}>{t("project.notARepo")}</CardEmpty>
         ) : (
           <div className="flex min-w-0 flex-col gap-3">
             <div className="flex min-w-0 flex-col gap-1.5">
@@ -148,7 +149,7 @@ export function GitCard({ git, loading, error }: GitCardProps) {
                       <Button
                         variant="ghost"
                         size="icon-xs"
-                        aria-label="Légende des statuts"
+                        aria-label={t("project.gitLegend")}
                         className="size-5 text-muted-foreground hover:text-foreground"
                       >
                         <Info className="size-3.5" aria-hidden />
@@ -166,7 +167,7 @@ export function GitCard({ git, loading, error }: GitCardProps) {
                             >
                               {item.code}
                             </span>
-                            <span>{item.label}</span>
+                            <span>{t(item.label)}</span>
                           </li>
                         ))}
                       </ul>
@@ -174,12 +175,12 @@ export function GitCard({ git, loading, error }: GitCardProps) {
                   </Tooltip>
                 }
               >
-                Modifications
+                {t("project.gitChanges")}
               </CardSectionLabel>
 
               {git.changed.length === 0 ? (
                 <CardEmpty icon={Check} tone="ok">
-                  Arbre de travail propre
+                  {t("project.gitClean")}
                 </CardEmpty>
               ) : (
                 <>
@@ -210,7 +211,7 @@ export function GitCard({ git, loading, error }: GitCardProps) {
                   </ul>
                   {remainingCount > 0 && (
                     <p className="font-mono text-xs tabular-nums text-muted-foreground">
-                      + {remainingCount} {remainingCount === 1 ? "autre" : "autres"}
+                      + {t("project.gitMore", { n: remainingCount })}
                     </p>
                   )}
                 </>
@@ -227,11 +228,11 @@ export function GitCard({ git, loading, error }: GitCardProps) {
                   </span>
                 }
               >
-                Derniers commits
+                {t("project.gitRecentCommits")}
               </CardSectionLabel>
 
               {git.recentCommits.length === 0 ? (
-                <CardEmpty icon={GitCommitHorizontal}>Aucun commit</CardEmpty>
+                <CardEmpty icon={GitCommitHorizontal}>{t("project.gitNoCommit")}</CardEmpty>
               ) : (
                 <ul className="flex min-w-0 flex-col gap-1.5">
                   {git.recentCommits.map((line, index) => {

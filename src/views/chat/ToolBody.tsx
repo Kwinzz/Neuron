@@ -5,6 +5,7 @@ import { DiffView } from "./DiffView";
 import { OutputBlock } from "./OutputBlock";
 import { arr, asObject, num, prettyJson, str } from "./json";
 import { baseToolName } from "./toolMeta";
+import { t } from "@/i18n";
 
 interface ToolBodyProps {
   name: string;
@@ -160,7 +161,7 @@ export function ToolBody({ name, input, output, outputTone = "default" }: ToolBo
       {renderInput(name, input)}
       {output !== null && output.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <div className="text-xs font-medium text-muted-foreground">Sortie</div>
+          <div className="text-xs font-medium text-muted-foreground">{t("chat.output")}</div>
           <OutputBlock text={output} maxLines={60} tone={outputTone} />
         </div>
       )}

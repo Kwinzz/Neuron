@@ -1,6 +1,7 @@
 import { cn } from "cn";
 import { Copy, Minus, Square, X } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
+import { t } from "@/i18n";
 import { appWindow } from "@/lib/ipc";
 
 /** Minimize / maximize-restore / close, replacing the native title bar (`decorations: false`). */
@@ -34,16 +35,16 @@ export function WindowControls({ className }: { className?: string }) {
 
   return (
     <div className={cn("flex shrink-0 items-center", className)}>
-      <ControlButton label="Réduire" onClick={() => void appWindow.minimize()}>
+      <ControlButton label={t("shell.winMinimize")} onClick={() => void appWindow.minimize()}>
         <Minus className="size-4" />
       </ControlButton>
       <ControlButton
-        label={maximized ? "Restaurer" : "Agrandir"}
+        label={maximized ? t("shell.winRestore") : t("shell.winMaximize")}
         onClick={() => void appWindow.toggleMaximize()}
       >
         {maximized ? <Copy className="size-3.5 -scale-x-100" /> : <Square className="size-3.5" />}
       </ControlButton>
-      <ControlButton label="Fermer" danger onClick={() => void appWindow.close()}>
+      <ControlButton label={t("common.close")} danger onClick={() => void appWindow.close()}>
         <X className="size-4" />
       </ControlButton>
     </div>

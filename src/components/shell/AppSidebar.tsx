@@ -53,6 +53,7 @@ import { useNav } from "@/stores/nav";
 import { toast } from "@/stores/toast";
 import { useUi } from "@/stores/ui";
 import neuronMark from "@/assets/neuron-mark.png";
+import { t } from "@/i18n";
 import { SidebarResizer } from "./SidebarResizer";
 
 /** Chats shown per project folder / in the loose "Chats" list before "Afficher plus". */
@@ -110,39 +111,39 @@ function MainNav() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              tooltip={`Nouveau chat (${MOD_LABEL}+N)`}
+              tooltip={t("shell.navNewChatTooltip", { combo: `${MOD_LABEL}+N` })}
               isActive={isDraft}
               onClick={() => useUi.getState().startChat(null)}
               className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground data-[active=true]:bg-primary data-[active=true]:text-primary-foreground"
             >
               <CirclePlus />
-              <span>Nouveau chat</span>
+              <span>{t("shell.navNewChat")}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Accueil" isActive={isHome} onClick={() => useUi.getState().navigate({ kind: "home" })}>
+            <SidebarMenuButton tooltip={t("shell.navHome")} isActive={isHome} onClick={() => useUi.getState().navigate({ kind: "home" })}>
               <Home />
-              <span>Accueil</span>
+              <span>{t("shell.navHome")}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Mémoire" isActive={isMemory} onClick={() => useUi.getState().navigate({ kind: "memory" })}>
+            <SidebarMenuButton tooltip={t("shell.navMemory")} isActive={isMemory} onClick={() => useUi.getState().navigate({ kind: "memory" })}>
               <Brain />
-              <span>Mémoire</span>
+              <span>{t("shell.navMemory")}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip={`Paramètres (${MOD_LABEL}+,)`} isActive={isSettings} onClick={() => useUi.getState().openSettings()}>
+            <SidebarMenuButton tooltip={t("shell.navSettingsTooltip", { combo: `${MOD_LABEL}+,` })} isActive={isSettings} onClick={() => useUi.getState().openSettings()}>
               <Settings />
-              <span>Paramètres</span>
+              <span>{t("shell.navSettings")}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip={`Rechercher (${MOD_LABEL}+K)`} onClick={() => useUi.getState().setPaletteOpen(true)}>
+            <SidebarMenuButton tooltip={t("shell.navSearchTooltip", { combo: `${MOD_LABEL}+K` })} onClick={() => useUi.getState().setPaletteOpen(true)}>
               <Search />
-              <span>Rechercher</span>
+              <span>{t("common.search")}</span>
             </SidebarMenuButton>
             <SidebarMenuBadge className="text-muted-foreground">{MOD_LABEL}+K</SidebarMenuBadge>
           </SidebarMenuItem>
@@ -177,7 +178,7 @@ async function addProject() {
     if (created) useNav.getState().setProjectOpen(created.id, true);
     void useDashboard.getState().load();
   } catch (err) {
-    toast({ tone: "danger", title: "Projet non ajouté", description: ipcErrorMessage(err) });
+    toast({ tone: "danger", title: t("shell.projectAddFailed"), description: ipcErrorMessage(err) });
   }
 }
 
@@ -186,17 +187,17 @@ function ProjectsNav() {
   const byProject = useChatsByProject();
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Projets</SidebarGroupLabel>
-      <SidebarGroupAction title="Ajouter un projet (dossier)" onClick={() => void addProject()}>
+      <SidebarGroupLabel>{t("shell.projects")}</SidebarGroupLabel>
+      <SidebarGroupAction title={t("shell.addProjectTitle")} onClick={() => void addProject()}>
         <FolderPlus />
-        <span className="sr-only">Ajouter un projet</span>
+        <span className="sr-only">{t("shell.addProject")}</span>
       </SidebarGroupAction>
       <SidebarMenu>
         {projects.length === 0 && (
           <SidebarMenuItem>
             <SidebarMenuButton onClick={() => void addProject()} className="text-muted-foreground">
               <FolderPlus />
-              <span>Ajouter un dossier…</span>
+              <span>{t("shell.addFolder")}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         )}
@@ -224,7 +225,7 @@ const ProjectFolder = memo(function ProjectFolder({ project, chats }: { project:
       void useNav.getState().load();
       void useDashboard.getState().load();
     } catch (err) {
-      toast({ tone: "danger", title: "Projet non retiré", description: ipcErrorMessage(err) });
+      toast({ tone: "danger", title: t("shell.projectRemoveFailed"), description: ipcErrorMessage(err) });
     }
   };
 
@@ -251,17 +252,17 @@ const ProjectFolder = memo(function ProjectFolder({ project, chats }: { project:
           <DropdownMenuTrigger asChild>
             <SidebarMenuAction showOnHover>
               <MoreHorizontal />
-              <span className="sr-only">Actions du projet</span>
+              <span className="sr-only">{t("shell.projectActions")}</span>
             </SidebarMenuAction>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="right" align="start" className="w-52">
             <DropdownMenuItem onClick={() => useUi.getState().startChat(project.id)}>
               <Plus />
-              Nouveau chat ici
+              {t("shell.newChatHere")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => useUi.getState().openProject(project.id, "context")}>
               <FileText />
-              Contexte du projet
+              {t("shell.projectContext")}
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => {
@@ -270,12 +271,12 @@ const ProjectFolder = memo(function ProjectFolder({ project, chats }: { project:
               }}
             >
               <MessageSquare />
-              Filtrer le dock sur ce projet
+              {t("shell.filterDock")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={() => void remove()}>
               <Trash2 />
-              Retirer le projet
+              {t("shell.removeProject")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -289,7 +290,7 @@ const ProjectFolder = memo(function ProjectFolder({ project, chats }: { project:
                 className="text-muted-foreground"
               >
                 <Plus />
-                <span>Nouveau chat</span>
+                <span>{t("shell.navNewChat")}</span>
               </SidebarMenuSubButton>
             </SidebarMenuSubItem>
             <SidebarMenuSubItem>
@@ -299,7 +300,7 @@ const ProjectFolder = memo(function ProjectFolder({ project, chats }: { project:
                 className="text-muted-foreground"
               >
                 <FileText />
-                <span>Contexte & projet</span>
+                <span>{t("shell.contextAndProject")}</span>
               </SidebarMenuSubButton>
             </SidebarMenuSubItem>
             {visible.map((c, i) => (
@@ -314,7 +315,7 @@ const ProjectFolder = memo(function ProjectFolder({ project, chats }: { project:
             {chats.length > PAGE && (
               <SidebarMenuSubItem>
                 <SidebarMenuSubButton onClick={() => setShowAll((v) => !v)} className="text-xs text-muted-foreground">
-                  <span>{showAll ? "Afficher moins" : `Afficher ${chats.length - PAGE} de plus`}</span>
+                  <span>{showAll ? t("shell.showLess") : t("shell.showMore", { n: chats.length - PAGE })}</span>
                 </SidebarMenuSubButton>
               </SidebarMenuSubItem>
             )}
@@ -333,7 +334,7 @@ function LooseChatsNav() {
   const visible = showAll ? chats : chats.slice(0, PAGE);
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Chats</SidebarGroupLabel>
+      <SidebarGroupLabel>{t("shell.chats")}</SidebarGroupLabel>
       <SidebarMenu>
         {visible.map((c, i) => (
           <SidebarMenuItem
@@ -347,7 +348,7 @@ function LooseChatsNav() {
         {chats.length > PAGE && (
           <SidebarMenuItem>
             <SidebarMenuButton onClick={() => setShowAll((v) => !v)} className="text-xs text-muted-foreground">
-              <span>{showAll ? "Afficher moins" : `Afficher ${chats.length - PAGE} de plus`}</span>
+              <span>{showAll ? t("shell.showLess") : t("shell.showMore", { n: chats.length - PAGE })}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         )}
@@ -361,7 +362,7 @@ const ChatLink = memo(function ChatLink({ chat, sub = false }: { chat: ThreadSum
   const title = useLive((s) => s.threads[chat.id]?.title ?? chat.title);
   const status = useLive((s) => s.threads[chat.id]?.status ?? chat.status);
   const active = useUi((s) => s.view.kind === "thread" && s.view.id === chat.id);
-  const label = title || "Chat sans titre";
+  const label = title || t("common.untitledChat");
   const open = () => useUi.getState().focusThread(chat.id);
   const working = STATUS[status].active;
 

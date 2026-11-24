@@ -16,7 +16,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { toast } from "@/stores/toast";
-import { CATEGORIES, CATEGORY_ORDER } from "./categories";
+import { CATEGORY_ORDER, categoryMeta } from "./categories";
+import { t } from "@/i18n";
 
 interface MemoryHeaderCardProps {
   info: MemoryInfo | null;
@@ -47,7 +48,7 @@ export function MemoryHeaderCard({
     } catch (err: unknown) {
       toast({
         tone: "danger",
-        title: "Impossible d'ouvrir memory.md",
+        title: t("memory.openFileFailed"),
         description: ipcErrorMessage(err),
       });
     } finally {
@@ -65,14 +66,13 @@ export function MemoryHeaderCard({
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <CardTitle className="flex flex-wrap items-center gap-2">
             <Brain className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-            <span>Mémoire globale</span>
+            <span>{t("memory.title")}</span>
             <Badge variant="secondary" className="font-mono tabular-nums">
               {total}
             </Badge>
           </CardTitle>
           <CardDescription>
-            Partagée par tous tes agents : injectée au début de chaque nouveau chat et
-            accessible en direct via le serveur MCP de Neuron.
+            {t("memory.description")}
           </CardDescription>
         </div>
 
@@ -89,15 +89,15 @@ export function MemoryHeaderCard({
             ) : (
               <FileText aria-hidden />
             )}
-            <span>Ouvrir memory.md</span>
+            <span>{t("memory.openMemoryFile")}</span>
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={onImport}>
             <Download aria-hidden />
-            <span>Importer</span>
+            <span>{t("memory.import")}</span>
           </Button>
           <Button type="button" size="sm" onClick={onNew}>
             <Plus aria-hidden />
-            <span>Nouveau souvenir</span>
+            <span>{t("memory.newMemory")}</span>
           </Button>
         </div>
       </CardHeader>
@@ -126,7 +126,7 @@ export function MemoryHeaderCard({
 
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           {visibleBadgeCategories.map((category) => {
-            const meta = CATEGORIES[category];
+            const meta = categoryMeta(category);
             const Icon = meta.icon;
             const count = counts[category];
             return (

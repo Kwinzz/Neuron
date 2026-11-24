@@ -1,4 +1,5 @@
 import type { UsageSums } from "@/bindings/UsageSums";
+import { t } from "@/i18n";
 import { formatCost, formatTokens } from "@/lib/format";
 import { useDashboard } from "@/stores/dashboard";
 import { computeDelta } from "./computeDelta";
@@ -19,34 +20,34 @@ export function SectionCards() {
     <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
       <KpiCard
         index={0}
-        label="Tokens entrée"
+        label={t("home.kpiInput")}
         value={totals ? formatTokens(totals.input) : "—"}
         delta={totals && prev ? computeDelta(totals.input, prev.input) : null}
-        hint="Prompts et contexte envoyés (hors cache)"
+        hint={t("home.kpiInputHint")}
         loading={isLoading}
       />
       <KpiCard
         index={1}
-        label="Tokens sortie"
+        label={t("home.kpiOutput")}
         value={totals ? formatTokens(totals.output) : "—"}
         delta={totals && prev ? computeDelta(totals.output, prev.output) : null}
-        hint="Réponses générées par les agents"
+        hint={t("home.kpiOutputHint")}
         loading={isLoading}
       />
       <KpiCard
         index={2}
-        label="Coût total"
+        label={t("home.kpiCost")}
         value={totals ? formatCost(totals.costUsd) : "—"}
         delta={totals && prev ? computeDelta(totals.costUsd, prev.costUsd) : null}
-        hint="Tous fournisseurs, au tarif API : Claude tel que communiqué, Codex et Antigravity estimés depuis les tokens"
+        hint={t("home.kpiCostHint")}
         loading={isLoading}
       />
       <KpiCard
         index={3}
-        label="Tokens au total"
+        label={t("home.kpiTotal")}
         value={totals ? formatTokens(allTokens(totals)) : "—"}
         delta={totals && prev ? computeDelta(allTokens(totals), allTokens(prev)) : null}
-        hint="Tous fournisseurs : entrée, sortie, lectures et écritures de cache"
+        hint={t("home.kpiTotalHint")}
         loading={isLoading}
       />
     </div>

@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import { cn } from "cn";
 import { formatCliArg, hasPromptPlaceholder } from "./genericCliFormat";
+import { t } from "@/i18n";
 
 interface GenericCliCommandPreviewProps {
   command: string;
@@ -51,10 +52,10 @@ export function GenericCliCommandPreview({
           ))}
         </>
       ) : (
-        <span className="italic text-muted-foreground/60">commande…</span>
+        <span className="italic text-muted-foreground/60">{t("settings.commandPlaceholder")}</span>
       )}
       {usesStdin && (
-        <span className="ml-2 text-muted-foreground/70">← message sur stdin</span>
+        <span className="ml-2 text-muted-foreground/70">{t("settings.stdinHint")}</span>
       )}
     </code>
   );

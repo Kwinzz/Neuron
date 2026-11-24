@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { cn } from "cn";
 import { diffLines } from "diff";
 import { Button } from "@/components/ui/button";
+import { t } from "@/i18n";
 
 const CONTEXT_KEEP = 3;
 const CONTEXT_COLLAPSE_THRESHOLD = 8;
@@ -88,7 +89,7 @@ export function DiffView({ oldText, newText }: DiffViewProps) {
           if (row.kind === "gap") {
             return (
               <div key={idx} className="bg-muted/50 px-3 py-0.5 text-muted-foreground select-none">
-                ⋯ {row.count} lignes inchangées
+                ⋯ {t("chat.unchangedLines", { n: row.count })}
               </div>
             );
           }
@@ -115,7 +116,7 @@ export function DiffView({ oldText, newText }: DiffViewProps) {
             onClick={() => setExpanded((v) => !v)}
             className="h-auto px-0 text-muted-foreground transition-colors hover:text-foreground active:scale-95"
           >
-            {expanded ? "Réduire" : `Afficher tout (${rows.length} lignes)`}
+            {expanded ? t("chat.collapse") : t("chat.showAllLines", { n: rows.length })}
           </Button>
         </div>
       )}

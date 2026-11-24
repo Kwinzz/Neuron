@@ -9,6 +9,7 @@ import type { AgentKind } from "@/bindings/AgentKind";
 import { ipc, ipcErrorMessage, isTauri } from "@/lib/ipc";
 import { useModels } from "@/stores/models";
 import { toast } from "@/stores/toast";
+import { t } from "@/i18n";
 
 export type AccessAction = "install" | "login";
 
@@ -106,8 +107,8 @@ export const useAccess = create<AccessState>((set, get) => ({
         tone: "danger",
         title:
           action === "install"
-            ? "Installation impossible"
-            : "Connexion impossible",
+            ? t("settings.installFailed")
+            : t("settings.signInFailed"),
         description: ipcErrorMessage(err),
       });
       return;
@@ -129,16 +130,16 @@ export const useAccess = create<AccessState>((set, get) => ({
         if (action === "install" && access.loggedIn !== true) {
           toast({
             tone: "ok",
-            title: `${access.label} est installé`,
-            description: "Il reste à te connecter à ton compte.",
+            title: t("settings.agentInstalled", { agent: access.label }),
+            description: t("settings.signInRemaining"),
           });
         } else {
           toast({
             tone: "ok",
             title:
               action === "install"
-                ? `${access.label} est installé`
-                : `${access.label} est connecté`,
+                ? t("settings.agentInstalled", { agent: access.label })
+                : t("settings.agentSignedIn", { agent: access.label }),
             description: access.account ?? undefined,
           });
         }

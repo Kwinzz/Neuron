@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { t } from "@/i18n";
 
 export function ShortcutsSection() {
   return (
@@ -14,9 +15,9 @@ export function ShortcutsSection() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Keyboard className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          <span>Raccourcis clavier</span>
+          <span>{t("settings.shortcutsTitle")}</span>
         </CardTitle>
-        <CardDescription className="text-xs">Ctrl correspond à ⌘ sur macOS.</CardDescription>
+        <CardDescription className="text-xs">{t("settings.shortcutsDescription")}</CardDescription>
       </CardHeader>
       <CardContent className="min-w-0">
         <ShortcutsList />

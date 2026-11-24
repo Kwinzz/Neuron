@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { cn } from "cn";
+import { t } from "@/i18n";
 import { stripSummaryLine } from "@/lib/turnSummary";
 import type { TermLine } from "@/stores/activity";
 
@@ -86,7 +87,7 @@ export const TermLineView = memo(function TermLineView({ line, showResult }: Ter
           ∴
         </span>
         <span className="min-w-0 flex-1 truncate italic text-muted-foreground">
-          <span className="italic">réflexion…</span>
+          <span className="italic">{t("shell.termThinking")}</span>
           {line.text ? ` ${line.text}` : null}
         </span>
       </div>
@@ -99,7 +100,7 @@ export const TermLineView = memo(function TermLineView({ line, showResult }: Ter
         <span className="w-3 shrink-0 text-center text-warn" aria-hidden>
           ?
         </span>
-        <span className="min-w-0 flex-1 truncate text-warn">Autorisation : {line.text}</span>
+        <span className="min-w-0 flex-1 truncate text-warn">{t("shell.termPermission", { text: line.text })}</span>
       </div>
     );
   }

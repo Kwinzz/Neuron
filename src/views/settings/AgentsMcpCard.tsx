@@ -25,36 +25,17 @@ import { ipcErrorMessage } from "@/lib/ipc";
 import { useMemory } from "@/stores/memory";
 import { toast } from "@/stores/toast";
 import { CardSectionLabel } from "@/views/project/CardSectionLabel";
+import { t, type MessageKey } from "@/i18n";
 
-const MCP_TOOLS: ReadonlyArray<{ name: string; description: string }> = [
-  {
-    name: "neuron_memory_read",
-    description: "Lit toute la mémoire, groupée par catégorie.",
-  },
-  {
-    name: "neuron_memory_search",
-    description: "Recherche plein texte dans les souvenirs.",
-  },
-  {
-    name: "neuron_memory_save",
-    description: "Enregistre un nouveau souvenir durable.",
-  },
-  {
-    name: "neuron_memory_update",
-    description: "Corrige un souvenir (texte ou catégorie).",
-  },
-  {
-    name: "neuron_memory_delete",
-    description: "Retire un souvenir devenu faux.",
-  },
-  {
-    name: "neuron_project_context_read",
-    description: "Lit le .neuron/context.md du projet du chat.",
-  },
-  {
-    name: "neuron_project_context_update",
-    description: "Met à jour le .neuron/context.md du projet.",
-  },
+/** Tool names are never translated; their descriptions are. */
+const MCP_TOOLS: ReadonlyArray<{ name: string; description: MessageKey }> = [
+  { name: "neuron_memory_read", description: "settings.toolMemoryRead" },
+  { name: "neuron_memory_search", description: "settings.toolMemorySearch" },
+  { name: "neuron_memory_save", description: "settings.toolMemorySave" },
+  { name: "neuron_memory_update", description: "settings.toolMemoryUpdate" },
+  { name: "neuron_memory_delete", description: "settings.toolMemoryDelete" },
+  { name: "neuron_project_context_read", description: "settings.toolContextRead" },
+  { name: "neuron_project_context_update", description: "settings.toolContextUpdate" },
 ];
 
 export function AgentsMcpCard() {
@@ -84,7 +65,7 @@ export function AgentsMcpCard() {
     } catch (err: unknown) {
       toast({
         tone: "danger",
-        title: "Impossible de copier la commande",
+        title: t("settings.copyCommandFailed"),
         description: ipcErrorMessage(err),
       });
     }
@@ -98,11 +79,10 @@ export function AgentsMcpCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Plug className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          <span>Agents & MCP</span>
+          <span>{t("settings.mcpTitle")}</span>
         </CardTitle>
         <CardDescription>
-          Les agents lisent et enrichissent la mémoire en direct via le serveur
-          MCP de Neuron (état par agent dans « Fournisseurs IA »).
+          {t("settings.mcpDescription")}
         </CardDescription>
       </CardHeader>
 
@@ -110,12 +90,12 @@ export function AgentsMcpCard() {
         {info && !info.mcpEnabled && (
           <Alert>
             <Info aria-hidden />
-            <AlertTitle>Serveur MCP désactivé</AlertTitle>
+            <AlertTitle>{t("settings.mcpDisabled")}</AlertTitle>
           </Alert>
         )}
 
         <div className="flex min-w-0 flex-col gap-2">
-          <CardSectionLabel>Outils exposés</CardSectionLabel>
+          <CardSectionLabel>{t("settings.mcpTools")}</CardSectionLabel>
           <ul className="flex min-w-0 flex-col gap-2">
             {MCP_TOOLS.map((tool) => (
               <li key={tool.name} className="flex min-w-0 flex-col gap-0.5">
@@ -123,7 +103,7 @@ export function AgentsMcpCard() {
                   {tool.name}
                 </code>
                 <span className="text-xs text-muted-foreground">
-                  {tool.description}
+                  {t(tool.description)}
                 </span>
               </li>
             ))}
@@ -144,7 +124,7 @@ export function AgentsMcpCard() {
                 className="size-3.5 shrink-0 transition-transform duration-150 group-data-[state=open]:rotate-90"
                 aria-hidden
               />
-              <span>Commande du serveur</span>
+              <span>{t("settings.mcpServerCommand")}</span>
             </Button>
           </CollapsibleTrigger>
 
@@ -160,7 +140,7 @@ export function AgentsMcpCard() {
                       type="button"
                       variant="ghost"
                       size="icon-xs"
-                      aria-label="Copier la commande"
+                      aria-label={t("settings.copyCommand")}
                       onClick={() => void handleCopyCommand(info.mcpCommand)}
                       className="shrink-0"
                     >
@@ -171,7 +151,7 @@ export function AgentsMcpCard() {
                       )}
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>{copied ? "Copié" : "Copier"}</TooltipContent>
+                  <TooltipContent>{copied ? t("common.copied") : t("common.copy")}</TooltipContent>
                 </Tooltip>
               </div>
             ) : (

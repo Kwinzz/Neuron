@@ -11,12 +11,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ipcErrorMessage } from "@/lib/ipc";
 import { useMemory } from "@/stores/memory";
 import { toast } from "@/stores/toast";
-import { CATEGORIES } from "./categories";
+import { categoryMeta as getCategoryMeta } from "./categories";
 import { CategoryPicker } from "./CategoryPicker";
 import { HighlightedText } from "./HighlightedText";
 import { MemoryDeleteDialog } from "./MemoryDeleteDialog";
 import { MemorySource } from "./MemorySource";
 import { MemoryTime } from "./MemoryTime";
+import { t } from "@/i18n";
 
 interface MemoryRowProps {
   memory: Memory;
@@ -77,7 +78,7 @@ export const MemoryRow = memo(function MemoryRow({
     } catch (err: unknown) {
       toast({
         tone: "danger",
-        title: "Impossible d'enregistrer",
+        title: t("memory.saveFailed"),
         description: ipcErrorMessage(err),
       });
     } finally {
@@ -98,7 +99,7 @@ export const MemoryRow = memo(function MemoryRow({
     }
   };
 
-  const categoryMeta = CATEGORIES[memory.category];
+  const categoryMeta = getCategoryMeta(memory.category);
   const CategoryIcon = categoryMeta.icon;
   const activeQuery = query?.trim() ?? "";
 
@@ -120,7 +121,7 @@ export const MemoryRow = memo(function MemoryRow({
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={handleEditKeyDown}
               disabled={saving}
-              aria-label="Modifier le souvenir"
+              aria-label={t("memory.editAria")}
               className="min-h-20 resize-none"
             />
 
@@ -136,11 +137,11 @@ export const MemoryRow = memo(function MemoryRow({
                 <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:inline-flex">
                   <Kbd>{MOD_LABEL}</Kbd>
                   <span>+</span>
-                  <Kbd>Entrée</Kbd>
-                  <span>enregistrer</span>
+                  <Kbd>{t("memory.keyEnter")}</Kbd>
+                  <span>{t("memory.hintSave")}</span>
                   <span aria-hidden>·</span>
-                  <Kbd>Échap</Kbd>
-                  <span>annuler</span>
+                  <Kbd>{t("memory.keyEscape")}</Kbd>
+                  <span>{t("memory.hintCancel")}</span>
                 </span>
 
                 <Button
@@ -150,7 +151,7 @@ export const MemoryRow = memo(function MemoryRow({
                   disabled={saving}
                   onClick={cancelEdit}
                 >
-                  Annuler
+                  {t("common.cancel")}
                 </Button>
 
                 <Button
@@ -160,7 +161,7 @@ export const MemoryRow = memo(function MemoryRow({
                   onClick={() => void saveEdit()}
                 >
                   {saving && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
-                  <span>Enregistrer</span>
+                  <span>{t("common.save")}</span>
                 </Button>
               </div>
             </div>
@@ -199,14 +200,14 @@ export const MemoryRow = memo(function MemoryRow({
                     type="button"
                     variant="ghost"
                     size="icon-xs"
-                    aria-label="Modifier"
+                    aria-label={t("common.edit")}
                     onClick={startEdit}
                     className="text-muted-foreground hover:text-foreground"
                   >
                     <Pencil aria-hidden />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Modifier</TooltipContent>
+                <TooltipContent>{t("common.edit")}</TooltipContent>
               </Tooltip>
 
               <Tooltip>
@@ -215,14 +216,14 @@ export const MemoryRow = memo(function MemoryRow({
                     type="button"
                     variant="ghost"
                     size="icon-xs"
-                    aria-label="Supprimer"
+                    aria-label={t("common.delete")}
                     onClick={() => setDeleteOpen(true)}
                     className="text-muted-foreground hover:text-destructive"
                   >
                     <Trash2 aria-hidden />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Supprimer</TooltipContent>
+                <TooltipContent>{t("common.delete")}</TooltipContent>
               </Tooltip>
             </div>
           </>

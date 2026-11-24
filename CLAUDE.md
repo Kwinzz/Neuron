@@ -43,6 +43,7 @@ src-tauri/
   installer/                hooks NSIS de l'installateur Windows
   rustfmt.toml              `max_width = 120`, `use_small_heuristics = "Max"` (`cargo fmt` avant chaque commit)
 src/
+  i18n/                     langues : index.ts (t, setLang, locale), catalog.ts, fr/<ns>.ts (référence), en/<ns>.ts
   bindings/                 GÉNÉRÉ par `cargo test` (ts-rs) — ne pas éditer à la main
   lib/ipc.ts                SEUL point d'accès à invoke()/listen()
   lib/                      agents.ts (méta + ordre), status.ts, format.ts, fuzzy.ts, models.ts, chatDefaults.ts,
@@ -108,6 +109,11 @@ scripts/neon-bridge.sh      bridge vers Antigravity pour le sous-agent neon
   `IconBox`, `Kbd`, `LiveTimer`. Barre de réglages de chat : `components/chat/ChatSettingsBar` (modèle exact,
   niveau de raisonnement, permissions d'exécution + bascule `ModeSwitch` Exécuter/Planifier, Maj+Tab — options dans `lib/models.ts`).
 - Valeurs KPI `text-2xl font-semibold tabular-nums`, descriptions `text-muted-foreground`. Police Geist / Geist Mono.
+- **Langues (fr / en)** : aucun texte en dur dans les composants — `t("ns.clé", vars)` de `@/i18n` (utilisable hors
+  composants ; jamais au niveau module : la langue serait figée). Ajouter la clé dans `src/i18n/fr/<ns>.ts` ET
+  `src/i18n/en/<ns>.ts` (compilation cassée sinon). Nombres / dates : `lib/format.ts` ou `locale()`, jamais `"fr-FR"`.
+  Rust : `tr!("Français", "English")` / `i18n::pick` pour tout texte visible (erreurs, scripts, menu, prompts agents) ;
+  ne jamais appeler `i18n::set` dans un test.
 - **Vocabulaire UI** : on dit « chat » (pas « thread ») partout, sauf le panneau « Threads live ». L'accueil s'appelle
   « Accueil ». Le code (types, tables, commandes) garde `thread`.
 - **Rafraîchissements** : garder les références inchangées (`keepIfSame` de `lib/sameValue.ts`) quand un store

@@ -88,6 +88,23 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-24 — Anglais + français, choix de la langue à l'installation
+- **Interface** : `src/i18n` — `t("ns.clé", vars)` utilisable partout, messages par espace de noms (`fr/<ns>.ts` =
+  référence, `en/<ns>.ts` typé `Translation<…>` : une clé manquante casse la compilation), app remontée au
+  changement de langue (`LocalizedApp`, clé = langue ; la fenêtre de demande rapide relit le réglage à chaque
+  ouverture), formats de nombres / dates selon la langue (`lib/format.ts`, `locale()`). Traduction des écrans
+  répartie entre trois agents neon (shell/accueil/projet, chat/demande rapide, paramètres/mémoire). Réglage
+  **Paramètres → Général → Langue**.
+- **Backend** : `i18n.rs` (`Language`, `tr!("…", "…")`, `pick`), `AppSettings.language` (`None` jusqu'au premier
+  lancement → choix de l'installateur, sinon langue du système via `sys-locale`). Erreurs, scripts des terminaux,
+  menu de la zone de notification, en-têtes de `memory.md` (relus dans les deux langues), instructions données aux
+  agents, serveur MCP (lit la langue des réglages).
+- **Installateur Windows** : NSIS anglais + français avec sélecteur ; `hooks.nsh` écrit `HKCU\Software\Neuron\Language`
+  et pose la question « démarrer avec Windows » dans la langue choisie. **Linux** : `install.sh` bilingue, demande la
+  langue (défaut : système ; `--lang en|fr`), l'enregistre dans `~/.config/neuron/language`.
+- **README** : `README.md` en anglais, `README.fr.md` en français ; `packaging/arch/README.md`, `.desktop`
+  (Name[fr]) et PKGBUILD en anglais ; métadonnées du bundle en anglais.
+
 ### 2026-11-24 — Traces d'affichage sous Linux (logo figé, barre blanche) + optimisations du chat
 - Logo de l'agent et curseur blanc restés à l'écran après la fin d'un tour : les animations infinies d'opacité /
   d'échelle ont leur propre calque dans WebKitGTK, dont la dernière image pouvait rester affichée. Sous Linux :

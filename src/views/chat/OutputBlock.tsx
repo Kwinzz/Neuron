@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
+import { t } from "@/i18n";
 
 const COLLAPSED_CHAR_CAP = 20_000;
 const EXPANDED_CHAR_CAP = 400_000;
@@ -48,7 +49,7 @@ export function OutputBlock({ text, maxLines = 60, tone = "default" }: OutputBlo
         )}
       >
         {displayText}
-        {hardTruncated && "\n\n(sortie tronquée)"}
+        {hardTruncated && `\n\n${t("chat.outputTruncated")}`}
       </pre>
       {canExpand && (
         <div>
@@ -58,7 +59,7 @@ export function OutputBlock({ text, maxLines = 60, tone = "default" }: OutputBlo
             onClick={() => setExpanded((v) => !v)}
             className="h-auto px-0 text-muted-foreground transition-colors hover:text-foreground active:scale-95"
           >
-            {expanded ? "Réduire" : `Afficher tout (${totalLines} lignes)`}
+            {expanded ? t("chat.collapse") : t("chat.showAllLines", { n: totalLines })}
           </Button>
         </div>
       )}

@@ -34,6 +34,7 @@ import { Kbd, MOD_LABEL } from "@/components/ui/Kbd";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { t } from "@/i18n";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { toast } from "@/stores/toast";
 
@@ -130,7 +131,7 @@ export function ContextEditor({
     } catch (err: unknown) {
       toast({
         tone: "danger",
-        title: "Échec de l'enregistrement",
+        title: t("project.saveFailed"),
         description: ipcErrorMessage(err),
       });
     } finally {
@@ -216,11 +217,11 @@ export function ContextEditor({
         className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 has-data-[slot=alert-action]:pr-28"
       >
         <AlertCircle aria-hidden />
-        <AlertTitle>Impossible de lire context.md</AlertTitle>
+        <AlertTitle>{t("project.readFailed")}</AlertTitle>
         <AlertDescription>{error}</AlertDescription>
         <AlertAction>
           <Button size="xs" variant="outline" onClick={onRetry}>
-            Réessayer
+            {t("common.retry")}
           </Button>
         </AlertAction>
       </Alert>
@@ -245,9 +246,9 @@ export function ContextEditor({
       {file.created && (
         <Alert className="animate-in fade-in-0 duration-150">
           <Info aria-hidden />
-          <AlertTitle>Fichier créé à partir du modèle</AlertTitle>
+          <AlertTitle>{t("project.createdFromTemplate")}</AlertTitle>
           <AlertDescription>
-            Complète-le : il sera injecté dans chaque nouveau chat de ce projet.
+            {t("project.createdFromTemplateBody")}
           </AlertDescription>
         </Alert>
       )}
@@ -274,11 +275,11 @@ export function ContextEditor({
 
             <div className="flex shrink-0 items-center text-xs" aria-live="polite">
               {saving ? (
-                <span className="text-muted-foreground">Enregistrement…</span>
+                <span className="text-muted-foreground">{t("project.saving")}</span>
               ) : dirty ? (
                 <span className="inline-flex items-center gap-1.5 text-warn">
                   <span className="size-1.5 shrink-0 rounded-full bg-warn" aria-hidden />
-                  <span>Non enregistré</span>
+                  <span>{t("project.unsaved")}</span>
                 </span>
               ) : (
                 <span
@@ -289,7 +290,7 @@ export function ContextEditor({
                   )}
                 >
                   <Check className="size-3.5 text-ok" aria-hidden />
-                  <span>Enregistré</span>
+                  <span>{t("project.saved")}</span>
                 </span>
               )}
             </div>
@@ -308,17 +309,17 @@ export function ContextEditor({
                 }
               }}
             >
-              <ToggleGroupItem value="edit" aria-label="Éditer">
+              <ToggleGroupItem value="edit" aria-label={t("project.modeEdit")}>
                 <PencilLine aria-hidden />
-                <span className="hidden @md:inline">Éditer</span>
+                <span className="hidden @md:inline">{t("project.modeEdit")}</span>
               </ToggleGroupItem>
-              <ToggleGroupItem value="split" aria-label="Partagé">
+              <ToggleGroupItem value="split" aria-label={t("project.modeSplit")}>
                 <Columns2 aria-hidden />
-                <span className="hidden @md:inline">Partagé</span>
+                <span className="hidden @md:inline">{t("project.modeSplit")}</span>
               </ToggleGroupItem>
-              <ToggleGroupItem value="preview" aria-label="Aperçu">
+              <ToggleGroupItem value="preview" aria-label={t("project.modePreview")}>
                 <Eye aria-hidden />
-                <span className="hidden @md:inline">Aperçu</span>
+                <span className="hidden @md:inline">{t("project.modePreview")}</span>
               </ToggleGroupItem>
             </ToggleGroup>
 
@@ -326,16 +327,16 @@ export function ContextEditor({
               variant="ghost"
               size="sm"
               disabled={!dirty || saving}
-              aria-label="Annuler les modifications"
+              aria-label={t("project.revertChanges")}
               onClick={() => updateDraft(savedContent)}
             >
               <Undo2 aria-hidden />
-              <span>Annuler</span>
+              <span>{t("common.cancel")}</span>
             </Button>
 
             <Button size="sm" disabled={!dirty || saving} onClick={() => void save()}>
               <Save aria-hidden />
-              <span>Enregistrer</span>
+              <span>{t("common.save")}</span>
               <Kbd className="ml-1 border-primary-foreground/25 bg-primary-foreground/15 text-primary-foreground">
                 {MOD_LABEL} S
               </Kbd>
@@ -351,7 +352,7 @@ export function ContextEditor({
                   Markdown
                 </span>
                 <span className="font-mono text-xs text-muted-foreground tabular-nums">
-                  {lineCount} {lineCount <= 1 ? "ligne" : "lignes"} · {charCount} car.
+                  {t("project.editorStats", { lines: lineCount, chars: charCount })}
                 </span>
               </div>
               <div className="h-[clamp(22rem,62vh,44rem)] focus-within:ring-2 focus-within:ring-ring/50 focus-within:ring-inset">
@@ -364,8 +365,8 @@ export function ContextEditor({
                   }}
                   onScroll={handleEditorScroll}
                   spellCheck={false}
-                  aria-label="Contenu de context.md"
-                  placeholder="# Contexte du projet…"
+                  aria-label={t("project.editorAria")}
+                  placeholder={t("project.editorPlaceholder")}
                   className="size-full resize-none bg-transparent p-4 font-mono text-[13px] leading-6 text-foreground outline-none placeholder:text-muted-foreground selection:bg-accent"
                 />
               </div>
@@ -381,17 +382,17 @@ export function ContextEditor({
             >
               <div className="flex h-9 items-center justify-between gap-2 border-b px-3">
                 <span className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-                  Aperçu
+                  {t("project.modePreview")}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  Rendu en direct
+                  {t("project.liveRender")}
                 </span>
               </div>
               <div ref={previewRef} className="h-[clamp(22rem,62vh,44rem)] overflow-y-auto p-4">
                 {deferredDraft.trim().length > 0 ? (
                   renderedPreview
                 ) : (
-                  <p className="text-sm text-muted-foreground">Aucun contenu à prévisualiser.</p>
+                  <p className="text-sm text-muted-foreground">{t("project.previewEmpty")}</p>
                 )}
               </div>
             </div>
@@ -409,17 +410,17 @@ export function ContextEditor({
               <Layers className="size-4 shrink-0 text-muted-foreground" aria-hidden />
               <span className="flex min-w-0 flex-col">
                 <span className="truncate text-sm font-medium text-foreground">
-                  Ce que recevra un nouveau chat
+                  {t("project.newChatReceives")}
                 </span>
                 <span className="truncate text-xs font-normal text-muted-foreground">
-                  Contexte figé à la création de chaque chat
+                  {t("project.newChatReceivesHint")}
                 </span>
               </span>
             </span>
             <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
               {preview && (
                 <span className="font-mono tabular-nums">
-                  {previewSourceCount} {previewSourceCount <= 1 ? "source" : "sources"}
+                  {t("project.sourceCount", { n: previewSourceCount })}
                 </span>
               )}
               <ChevronDown
@@ -437,7 +438,7 @@ export function ContextEditor({
               <Skeleton className="h-32 w-full rounded-lg" />
             </div>
           ) : !preview ? (
-            <p className="text-xs text-muted-foreground">Aperçu indisponible.</p>
+            <p className="text-xs text-muted-foreground">{t("project.previewUnavailable")}</p>
           ) : (
             <ContextBundleView bundle={preview} size="sm" className="max-h-[480px]" />
           )}

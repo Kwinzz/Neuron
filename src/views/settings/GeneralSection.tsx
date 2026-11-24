@@ -11,19 +11,19 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { t } from "@/i18n";
+import { LanguageCard } from "./LanguageCard";
 import { useSettingsPatch } from "./useSettingsPatch";
 
 const MAX_IDLE_MINUTES = 1440;
 
-const PRESETS: ReadonlyArray<{ value: number; label: string }> = [
-  { value: 0, label: "Jamais" },
-  { value: 5, label: "5 min" },
-  { value: 15, label: "15 min" },
-  { value: 30, label: "30 min" },
-  { value: 60, label: "60 min" },
-];
+const PRESETS: readonly number[] = [0, 5, 15, 30, 60];
 
-const PRESET_VALUES = new Set(PRESETS.map((preset) => preset.value));
+const PRESET_VALUES = new Set(PRESETS);
+
+function presetLabel(value: number): string {
+  return value === 0 ? t("settings.idleNever") : t("settings.idlePreset", { n: value });
+}
 
 interface GeneralSectionProps {
   settings: AppSettings;
@@ -78,107 +78,109 @@ export function GeneralSection({ settings }: GeneralSectionProps) {
     if (nextIndex === null) return;
 
     const nextPreset = PRESETS[nextIndex];
-    if (!nextPreset) return;
+    if (nextPreset === undefined) return;
 
     e.preventDefault();
     radioRefs.current[nextIndex]?.focus();
-    selectMinutes(nextPreset.value);
+    selectMinutes(nextPreset);
   };
 
-  const activePresetIndex = PRESETS.findIndex((preset) => preset.value === minutes);
+  const activePresetIndex = PRESETS.findIndex((preset) => preset === minutes);
   const focusableIndex = activePresetIndex >= 0 ? activePresetIndex : 0;
 
   return (
-    <Card size="sm" className="min-w-0">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Timer className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          <span>Arrêt des agents inactifs</span>
-        </CardTitle>
-        <CardDescription className="text-xs">
-          Les processus inactifs sont arrêtés pour libérer la mémoire ; le chat reprend
-          automatiquement au message suivant.
-        </CardDescription>
-      </CardHeader>
+    <>
+      <LanguageCard settings={settings} />
+      <Card size="sm" className="min-w-0">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Timer className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            <span>{t("settings.idleTitle")}</span>
+          </CardTitle>
+          <CardDescription className="text-xs">
+            {t("settings.idleDescription")}
+          </CardDescription>
+        </CardHeader>
 
-      <CardContent className="flex min-w-0 flex-col gap-4">
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <div
-            role="radiogroup"
-            aria-label="Délai avant arrêt des agents inactifs"
-            className="inline-flex flex-wrap items-center rounded-lg border bg-muted/40 p-0.5"
-          >
-            {PRESETS.map((preset, index) => {
-              const checked = preset.value === minutes;
-              return (
-                <button
-                  key={preset.value}
-                  ref={(el) => {
-                    radioRefs.current[index] = el;
+        <CardContent className="flex min-w-0 flex-col gap-4">
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
+            <div
+              role="radiogroup"
+              aria-label={t("settings.idleGroupLabel")}
+              className="inline-flex flex-wrap items-center rounded-lg border bg-muted/40 p-0.5"
+            >
+              {PRESETS.map((preset, index) => {
+                const checked = preset === minutes;
+                return (
+                  <button
+                    key={preset}
+                    ref={(el) => {
+                      radioRefs.current[index] = el;
+                    }}
+                    type="button"
+                    role="radio"
+                    aria-checked={checked}
+                    tabIndex={index === focusableIndex ? 0 : -1}
+                    onClick={() => selectMinutes(preset)}
+                    onKeyDown={(e) => handleRadioKeyDown(index, e)}
+                    className={cn(
+                      "h-7 cursor-pointer rounded-md px-2.5 text-xs font-medium tabular-nums transition-colors duration-150 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                      checked
+                        ? "bg-background text-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {presetLabel(preset)}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Label htmlFor="idle-custom-minutes" className="text-xs text-muted-foreground">
+                {t("settings.idleCustom")}
+              </Label>
+              <div className="flex items-center gap-1.5">
+                <Input
+                  id="idle-custom-minutes"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={MAX_IDLE_MINUTES}
+                  step={1}
+                  value={customDraft}
+                  placeholder={String(minutes)}
+                  onChange={(e) => setCustomDraft(e.target.value)}
+                  onBlur={commitCustom}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitCustom();
+                    } else if (e.key === "Escape") {
+                      setCustomDraft(isPreset ? "" : String(minutes));
+                      e.currentTarget.blur();
+                    }
                   }}
-                  type="button"
-                  role="radio"
-                  aria-checked={checked}
-                  tabIndex={index === focusableIndex ? 0 : -1}
-                  onClick={() => selectMinutes(preset.value)}
-                  onKeyDown={(e) => handleRadioKeyDown(index, e)}
-                  className={cn(
-                    "h-7 cursor-pointer rounded-md px-2.5 text-xs font-medium tabular-nums transition-colors duration-150 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                    checked
-                      ? "bg-background text-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {preset.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Label htmlFor="idle-custom-minutes" className="text-xs text-muted-foreground">
-              Personnalisé
-            </Label>
-            <div className="flex items-center gap-1.5">
-              <Input
-                id="idle-custom-minutes"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                max={MAX_IDLE_MINUTES}
-                step={1}
-                value={customDraft}
-                placeholder={String(minutes)}
-                onChange={(e) => setCustomDraft(e.target.value)}
-                onBlur={commitCustom}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    commitCustom();
-                  } else if (e.key === "Escape") {
-                    setCustomDraft(isPreset ? "" : String(minutes));
-                    e.currentTarget.blur();
-                  }
-                }}
-                className="w-24 font-mono tabular-nums"
-              />
-              <span className="text-xs text-muted-foreground">min</span>
+                  className="w-24 font-mono tabular-nums"
+                />
+                <span className="text-xs text-muted-foreground">{t("settings.minUnit")}</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <p className="text-xs text-muted-foreground">
-          {minutes === 0 ? (
-            "Les agents restent actifs tant que Neuron est ouvert."
-          ) : (
-            <>
-              Arrêt après{" "}
-              <span className="font-mono tabular-nums text-foreground">{minutes}</span> min
-              d&apos;inactivité.
-            </>
-          )}
-        </p>
-      </CardContent>
-    </Card>
+          <p className="text-xs text-muted-foreground">
+            {minutes === 0 ? (
+              t("settings.idleNeverHint")
+            ) : (
+              <>
+                {t("settings.idleAfterPrefix")}{" "}
+                <span className="font-mono tabular-nums text-foreground">{minutes}</span>{" "}
+                {t("settings.idleAfterSuffix")}
+              </>
+            )}
+          </p>
+        </CardContent>
+      </Card>
+    </>
   );
 }

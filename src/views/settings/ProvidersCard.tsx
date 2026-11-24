@@ -31,6 +31,7 @@ import { AGENTS } from "@/lib/agents";
 import { cn } from "cn";
 import { AgyMemoryLine } from "./AgyMemoryLine";
 import { accessIssue, MANAGED_AGENTS, useAccess } from "@/stores/access";
+import { t } from "@/i18n";
 
 /** Claude Code, Antigravity, Codex: installed? signed in? — with « Installer » / « Se connecter ». */
 export function ProvidersCard() {
@@ -52,11 +53,10 @@ export function ProvidersCard() {
             className="size-4 shrink-0 text-muted-foreground"
             aria-hidden
           />
-          <span>Fournisseurs IA</span>
+          <span>{t("settings.providersTitle")}</span>
         </CardTitle>
         <CardDescription>
-          Les CLI que Neuron pilote. L'installation et la connexion s'ouvrent
-          dans un terminal ; Neuron détecte la fin tout seul.
+          {t("settings.providersDescription")}
         </CardDescription>
         <CardAction>
           <Tooltip>
@@ -65,7 +65,7 @@ export function ProvidersCard() {
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                aria-label="Vérifier à nouveau"
+                aria-label={t("settings.recheck")}
                 disabled={loading}
                 onClick={() => void useAccess.getState().load(true)}
               >
@@ -75,7 +75,7 @@ export function ProvidersCard() {
                 />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Vérifier à nouveau</TooltipContent>
+            <TooltipContent>{t("settings.recheck")}</TooltipContent>
           </Tooltip>
         </CardAction>
       </CardHeader>
@@ -112,7 +112,7 @@ function ProviderRow({ agent, loaded }: { agent: AgentKind; loaded: boolean }) {
           {!access ? (
             loaded ? (
               <span className="text-xs text-muted-foreground">
-                État inconnu
+                {t("settings.unknownState")}
               </span>
             ) : (
               <Skeleton className="h-4 w-32" />
@@ -134,7 +134,7 @@ function ProviderRow({ agent, loaded }: { agent: AgentKind; loaded: boolean }) {
             ) : (
               <Badge variant="outline" className="gap-1">
                 <Check className="text-ok" aria-hidden />
-                <span>Prêt</span>
+                <span>{t("settings.ready")}</span>
               </Badge>
             )}
           </div>
@@ -148,14 +148,14 @@ function ProviderRow({ agent, loaded }: { agent: AgentKind; loaded: boolean }) {
           ) : (
             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
               <Check className="size-3.5 shrink-0 text-ok" aria-hidden />
-              <span>Mémoire Neuron branchée à chaque session</span>
+              <span>{t("settings.memoryEverySession")}</span>
             </span>
           )}
         </div>
       )}
       {access && issue && (
         <p className="min-w-0 pl-[30px] text-xs text-muted-foreground">
-          {issue === "not_installed" ? "Commande officielle : " : "Commande : "}
+          {issue === "not_installed" ? t("settings.officialCommand") : t("settings.commandLabel")}
           <code className="font-mono wrap-anywhere text-foreground/80">
             {issue === "not_installed"
               ? access.installCommand
@@ -172,7 +172,7 @@ function StatusLine({ access }: { access: AgentAccess }) {
     return (
       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
         <CircleSlash className="size-3.5 shrink-0" aria-hidden />
-        <span>Non installé</span>
+        <span>{t("settings.notInstalled")}</span>
       </span>
     );
   }
@@ -180,7 +180,7 @@ function StatusLine({ access }: { access: AgentAccess }) {
     return (
       <span className="inline-flex items-center gap-1 text-xs text-warn">
         <TriangleAlert className="size-3.5 shrink-0" aria-hidden />
-        <span>Installé · non connecté</span>
+        <span>{t("settings.installedNotSignedIn")}</span>
       </span>
     );
   }
@@ -188,13 +188,13 @@ function StatusLine({ access }: { access: AgentAccess }) {
     return (
       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
         <CircleHelp className="size-3.5 shrink-0" aria-hidden />
-        <span>Installé · connexion non vérifiable</span>
+        <span>{t("settings.installedUnverifiable")}</span>
       </span>
     );
   }
   return (
     <span className="truncate text-xs text-muted-foreground">
-      Connecté{access.account ? ` · ${access.account}` : ""}
+      {access.account ? t("settings.signedInAs", { account: access.account }) : t("settings.signedIn")}
     </span>
   );
 }

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { isTauri } from "@/lib/ipc";
 import { GenericCliCommandPreview } from "./GenericCliCommandPreview";
 import { GenericCliTestResult } from "./GenericCliTestResult";
+import { t } from "@/i18n";
 
 export interface ProfileTestState {
   pending: boolean;
@@ -50,14 +51,14 @@ export function GenericCliRow({
         <div className="flex shrink-0 items-center gap-1">
           <Button type="button" size="xs" variant="ghost" onClick={onEdit}>
             <Pencil aria-hidden />
-            <span>Modifier</span>
+            <span>{t("common.edit")}</span>
           </Button>
           <Button
             type="button"
             size="xs"
             variant="ghost"
             disabled={pending || !tauri}
-            title={!tauri ? "Disponible dans l'application" : undefined}
+            title={!tauri ? t("settings.inAppOnly") : undefined}
             onClick={onTest}
           >
             {pending ? (
@@ -65,7 +66,7 @@ export function GenericCliRow({
             ) : (
               <Play aria-hidden />
             )}
-            <span>Tester</span>
+            <span>{t("settings.test")}</span>
           </Button>
           <Button
             type="button"
@@ -75,7 +76,7 @@ export function GenericCliRow({
             onClick={onDelete}
           >
             <Trash2 aria-hidden />
-            <span>Supprimer</span>
+            <span>{t("common.delete")}</span>
           </Button>
         </div>
       </div>

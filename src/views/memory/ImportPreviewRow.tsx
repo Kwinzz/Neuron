@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { CategoryPicker } from "./CategoryPicker";
 import { ImportCheckbox } from "./ImportCheckbox";
 import type { ImportRow } from "./importOrigins";
+import { t } from "@/i18n";
 
 interface ImportPreviewRowProps {
   row: ImportRow;
@@ -48,7 +49,7 @@ export const ImportPreviewRow = memo(function ImportPreviewRow({
       <ImportCheckbox
         checked={row.checked}
         onCheckedChange={(checked) => onChange(row.id, { checked })}
-        label={`Importer le souvenir ${index + 1}`}
+        label={t("memory.importItem", { n: index + 1 })}
         disabled={disabled}
         className="mt-2"
       />
@@ -59,9 +60,9 @@ export const ImportPreviewRow = memo(function ImportPreviewRow({
           value={row.content}
           onChange={(e) => onChange(row.id, { content: e.target.value })}
           disabled={disabled}
-          aria-label={`Contenu du souvenir ${index + 1}`}
+          aria-label={t("memory.itemContent", { n: index + 1 })}
           aria-invalid={empty || undefined}
-          placeholder="Souvenir vide : il ne sera pas importé"
+          placeholder={t("memory.emptyItemPlaceholder")}
           className="min-h-8 resize-none py-1.5"
         />
         <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -73,7 +74,7 @@ export const ImportPreviewRow = memo(function ImportPreviewRow({
           />
           {duplicate && (
             <Badge variant="outline" className="text-muted-foreground">
-              Déjà en mémoire
+              {t("memory.alreadyInMemory")}
             </Badge>
           )}
         </div>
@@ -85,7 +86,7 @@ export const ImportPreviewRow = memo(function ImportPreviewRow({
         size="icon-xs"
         disabled={disabled}
         onClick={() => onRemove(row.id)}
-        aria-label={`Retirer le souvenir ${index + 1}`}
+        aria-label={t("memory.removeItem", { n: index + 1 })}
         className="mt-1 text-muted-foreground"
       >
         <X aria-hidden />

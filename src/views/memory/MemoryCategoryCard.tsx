@@ -12,8 +12,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CardEmpty } from "@/views/project/CardEmpty";
-import { CATEGORIES } from "./categories";
+import { categoryMeta } from "./categories";
 import { MemoryRow } from "./MemoryRow";
+import { t } from "@/i18n";
 
 interface MemoryCategoryCardProps {
   category: MemoryCategory;
@@ -26,7 +27,7 @@ export const MemoryCategoryCard = memo(function MemoryCategoryCard({
   items,
   highlightId,
 }: MemoryCategoryCardProps) {
-  const meta = CATEGORIES[category];
+  const meta = categoryMeta(category);
   const Icon = meta.icon;
 
   return (
@@ -54,7 +55,7 @@ export const MemoryCategoryCard = memo(function MemoryCategoryCard({
       <CardContent className="min-w-0">
         {items.length === 0 ? (
           <CardEmpty icon={Icon}>
-            Aucun souvenir. Ex. : « {meta.example} »
+            {t("memory.emptyCategory", { example: meta.example })}
           </CardEmpty>
         ) : (
           <ul className="-mx-3 flex min-w-0 flex-col">

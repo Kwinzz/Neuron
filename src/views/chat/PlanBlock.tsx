@@ -3,6 +3,7 @@ import type { ChatItem } from "@/bindings/ChatItem";
 import { asObject, str } from "./json";
 import { MarkdownFileCard } from "./MarkdownFileCard";
 import { baseName } from "./planDocs";
+import { t } from "@/i18n";
 
 type ToolItem = Extract<ChatItem, { kind: "tool" }>;
 
@@ -18,9 +19,9 @@ export const PlanBlock = memo(function PlanBlock({ item }: { item: ToolItem }) {
     <MarkdownFileCard
       name={file ? baseName(file) : "plan.md"}
       path={file}
-      content={plan.trim() ? plan : "_Plan vide._"}
-      badge="Plan"
-      note={dropped ? "non retenu" : undefined}
+      content={plan.trim() ? plan : t("chat.emptyPlan")}
+      badge={t("chat.planBadge")}
+      note={dropped ? t("chat.planDropped") : undefined}
     />
   );
 });

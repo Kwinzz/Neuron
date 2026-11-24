@@ -19,6 +19,7 @@ import { formatRelative } from "@/lib/format";
 import { ipc, ipcErrorMessage, quickWindow } from "@/lib/ipc";
 import { resolveModelId } from "@/stores/models";
 import { QuickProjectPicker } from "./QuickProjectPicker";
+import { t } from "@/i18n";
 
 /** Agents a quick request can start (generic CLIs need a profile picked in the app). */
 const QUICK_AGENTS: readonly AgentKind[] = ["claude_code", "antigravity", "codex"];
@@ -228,18 +229,18 @@ export function QuickLauncher() {
             disabled={state !== "idle"}
             placeholder={
               target
-                ? `Message pour « ${target.title || "Chat sans titre"} »…`
+                ? t("quick.messageFor", { title: target.title || t("common.untitledChat") })
                 : project
-                  ? `Demande quelque chose dans ${project.name}…`
-                  : "Demande quelque chose…"
+                  ? t("quick.askInProject", { project: project.name })
+                  : t("quick.ask")
             }
-            aria-label="Ta demande"
+            aria-label={t("quick.yourRequest")}
             className="min-h-7 flex-1 resize-none bg-transparent text-base leading-7 outline-none placeholder:text-muted-foreground disabled:opacity-60"
           />
           {state === "sending" && <Loader2 className="mt-1.5 size-4 shrink-0 animate-spin text-muted-foreground" />}
           {state === "sent" && (
             <span className="mt-1 flex shrink-0 items-center gap-1 text-sm text-ok animate-in fade-in-0 zoom-in-95 duration-150">
-              <Check className="size-4" /> Envoyé
+              <Check className="size-4" /> {t("quick.sent")}
             </span>
           )}
         </div>
@@ -250,13 +251,13 @@ export function QuickLauncher() {
           </p>
         )}
 
-        <ul ref={listRef} className="min-h-0 flex-1 overflow-y-auto border-t p-1.5" aria-label="Destination">
+        <ul ref={listRef} className="min-h-0 flex-1 overflow-y-auto border-t p-1.5" aria-label={t("quick.destination")}>
           <li data-index={0}>
             <Row active={selected === 0} onSelect={() => setSelected(0)}>
               <span className="flex size-5 shrink-0 items-center justify-center">
                 <Plus className="size-4" />
               </span>
-              <span className="font-medium">Nouveau chat</span>
+              <span className="font-medium">{t("quick.newChat")}</span>
               <span
                 className="ml-auto flex items-center gap-1"
                 // The pickers are popovers: keep the row selection, not the caret logic, for their clicks.
@@ -303,12 +304,12 @@ export function QuickLauncher() {
           </li>
           {chats.length > 0 ? (
             <li className="px-2.5 pt-2 pb-1 text-xs font-medium text-muted-foreground" aria-hidden>
-              {project ? `Chats de ${project.name}` : "Chats récents"}
+              {project ? t("quick.projectChats", { project: project.name }) : t("quick.recentChats")}
             </li>
           ) : (
             project && (
               <li className="px-2.5 pt-2 pb-1 text-xs text-muted-foreground" aria-hidden>
-                Aucun chat dans {project.name} pour l&apos;instant.
+                {t("quick.noChatsInProject", { project: project.name })}
               </li>
             )
           )}
@@ -316,7 +317,7 @@ export function QuickLauncher() {
             <li key={chat.id} data-index={i + 1}>
               <Row active={selected === i + 1} onSelect={() => setSelected(i + 1)}>
                 <AgentLogo agent={chat.agent} size={16} className="shrink-0" />
-                <span className="min-w-0 flex-1 truncate">{chat.title || "Chat sans titre"}</span>
+                <span className="min-w-0 flex-1 truncate">{chat.title || t("common.untitledChat")}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {[project ? null : chat.projectName, formatRelative(chat.updatedAt)].filter(Boolean).join(" · ")}
                 </span>
@@ -326,13 +327,13 @@ export function QuickLauncher() {
         </ul>
 
         <footer className="flex items-center gap-3 border-t px-4 py-2 text-xs whitespace-nowrap text-muted-foreground">
-          <Hint keys="↑ ↓">chat</Hint>
-          <Hint keys="Tab">agent</Hint>
-          <Hint keys="Ctrl M">modèle</Hint>
-          <Hint keys="Ctrl P">projet</Hint>
-          <Hint keys="Ctrl ↵">envoyer + ouvrir</Hint>
+          <Hint keys="↑ ↓">{t("quick.hintChat")}</Hint>
+          <Hint keys="Tab">{t("quick.hintAgent")}</Hint>
+          <Hint keys="Ctrl M">{t("quick.hintModel")}</Hint>
+          <Hint keys="Ctrl P">{t("quick.hintProject")}</Hint>
+          <Hint keys="Ctrl ↵">{t("quick.hintSendOpen")}</Hint>
           <span className="ml-auto flex items-center gap-1.5 text-foreground">
-            <CornerDownLeft className="size-3.5" /> {text.trim() ? "Envoyer" : "Ouvrir"}
+            <CornerDownLeft className="size-3.5" /> {text.trim() ? t("quick.send") : t("common.open")}
           </span>
         </footer>
       </div>

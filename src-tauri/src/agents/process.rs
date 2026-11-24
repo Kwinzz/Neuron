@@ -40,7 +40,10 @@ pub fn spawn_error(binary: &str, err: std::io::Error) -> AppError {
     if err.kind() == std::io::ErrorKind::NotFound {
         return AppError::AgentNotInstalled(binary.to_string());
     }
-    AppError::Other(format!("impossible de lancer « {binary} » ({err}). Le CLI est-il installé et dans le PATH ?"))
+    AppError::Other(crate::tr!(
+        "impossible de lancer « {binary} » ({err}). Le CLI est-il installé et dans le PATH ?",
+        "could not start “{binary}” ({err}). Is the CLI installed and in the PATH?"
+    ))
 }
 
 /// Keep the last bytes of a stream (stderr) for diagnostics.
@@ -91,7 +94,11 @@ where
     P: FnMut(&str) -> Vec<AdapterEvent> + Send + 'static,
 {
     if !cwd.is_dir() {
-        return Err(AppError::Invalid(format!("dossier de travail introuvable : {}", cwd.display())));
+        return Err(AppError::Invalid(crate::tr!(
+            "dossier de travail introuvable : {}",
+            "working folder not found: {}",
+            cwd.display()
+        )));
     }
     let mut child: Child = command(binary, args, cwd)
         .stdin(Stdio::piped())
@@ -102,7 +109,7 @@ where
     let pid = child.id();
     let (Some(stdin), Some(stdout), Some(stderr)) = (child.stdin.take(), child.stdout.take(), child.stderr.take())
     else {
-        return Err(AppError::Other("pipes du processus indisponibles".into()));
+        return Err(AppError::Other(crate::tr!("pipes du processus indisponibles", "process pipes unavailable")));
     };
 
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<SessionCommand>();

@@ -32,6 +32,7 @@ vte = "0.14"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip"] }
 base64 = "0.22"
 similar = "2"
+sys-locale = "0.3"
 tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-global-shortcut = "2"

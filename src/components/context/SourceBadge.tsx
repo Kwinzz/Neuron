@@ -1,7 +1,8 @@
 import type { ContextSource } from "@/bindings/ContextSource";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { SOURCE_ICON, SOURCE_LABEL } from "./sourceMeta";
+import { t } from "@/i18n";
+import { SOURCE_ICON, sourceLabel } from "./sourceMeta";
 
 interface SourceBadgeProps {
   source: ContextSource;
@@ -9,10 +10,10 @@ interface SourceBadgeProps {
 
 export function SourceBadge({ source }: SourceBadgeProps) {
   const Icon = SOURCE_ICON[source.kind];
-  const typeLabel = SOURCE_LABEL[source.kind];
+  const typeLabel = sourceLabel(source.kind);
   const ariaLabel = source.detail
-    ? `${typeLabel} : ${source.label}, ${source.detail}`
-    : `${typeLabel} : ${source.label}`;
+    ? t("project.ctxSourceAriaDetail", { type: typeLabel, label: source.label, detail: source.detail })
+    : t("project.ctxSourceAria", { type: typeLabel, label: source.label });
 
   return (
     <Tooltip>

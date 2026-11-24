@@ -2,6 +2,7 @@ import { memo, useMemo } from "react";
 import { MessageCircleQuestion } from "lucide-react";
 import type { ChatItem } from "@/bindings/ChatItem";
 import { parseAnswers, parseQuestions } from "./questions";
+import { t } from "@/i18n";
 
 type ToolItem = Extract<ChatItem, { kind: "tool" }>;
 
@@ -17,7 +18,7 @@ export const QuestionSummary = memo(function QuestionSummary({ item }: { item: T
     <div className="flex flex-col gap-2 rounded-xl border bg-card px-4 py-3 animate-in fade-in-0 duration-200">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <MessageCircleQuestion className="size-3.5 shrink-0" />
-        {skipped ? "Questions ignorées" : questions.length > 1 ? "Tes réponses" : "Ta réponse"}
+        {skipped ? t("chat.questionsSkipped") : questions.length > 1 ? t("chat.yourAnswers") : t("chat.yourAnswer")}
       </div>
       <dl className="flex flex-col gap-1.5">
         {questions.map((q) => (

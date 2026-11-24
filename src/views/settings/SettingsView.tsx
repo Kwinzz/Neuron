@@ -16,6 +16,7 @@ import { NotificationsSection } from "./NotificationsSection";
 import { SettingsNav } from "./SettingsNav";
 import { SettingsSkeleton } from "./SettingsSkeleton";
 import { ShortcutsSection } from "./ShortcutsSection";
+import { t } from "@/i18n";
 
 interface SettingsViewProps {
   section?: SettingsSection;
@@ -36,7 +37,7 @@ export function SettingsView({ section }: SettingsViewProps) {
         setLoadError(message);
         toast({
           tone: "danger",
-          title: "Paramètres indisponibles",
+          title: t("settings.unavailable"),
           description: message,
         });
       });
@@ -57,9 +58,9 @@ export function SettingsView({ section }: SettingsViewProps) {
   return (
     <div className="flex min-w-0 flex-col gap-4 p-4 md:gap-6 md:p-6">
       <header className="flex min-w-0 flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Paramètres</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">{t("settings.title")}</h1>
         <p className="text-sm text-muted-foreground">
-          Préférences de Neuron, enregistrées automatiquement.
+          {t("settings.subtitle")}
         </p>
       </header>
 
@@ -77,11 +78,11 @@ export function SettingsView({ section }: SettingsViewProps) {
           ) : loadError !== null && settings === null ? (
             <Alert variant="destructive" className="has-data-[slot=alert-action]:pr-28">
               <AlertCircle aria-hidden />
-              <AlertTitle>Paramètres indisponibles</AlertTitle>
+              <AlertTitle>{t("settings.unavailable")}</AlertTitle>
               <AlertDescription>{loadError}</AlertDescription>
               <AlertAction>
                 <Button type="button" size="xs" variant="outline" onClick={loadSettings}>
-                  Réessayer
+                  {t("common.retry")}
                 </Button>
               </AlertAction>
             </Alert>

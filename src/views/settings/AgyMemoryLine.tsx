@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ipcErrorMessage } from "@/lib/ipc";
 import { useMemory } from "@/stores/memory";
 import { toast } from "@/stores/toast";
+import { t } from "@/i18n";
 
 /**
  * Antigravity ⇄ Neuron memory: agy takes no MCP server per session, so Neuron registers it once in agy's
@@ -27,18 +28,18 @@ export function AgyMemoryLine() {
     try {
       if (action === "connect") {
         await useMemory.getState().connectAgy();
-        toast({ tone: "ok", title: "Antigravity connecté à la mémoire" });
+        toast({ tone: "ok", title: t("settings.agyConnected") });
       } else {
         await useMemory.getState().disconnectAgy();
-        toast({ tone: "ok", title: "Antigravity déconnecté de la mémoire" });
+        toast({ tone: "ok", title: t("settings.agyDisconnected") });
       }
     } catch (err: unknown) {
       toast({
         tone: "danger",
         title:
           action === "connect"
-            ? "Impossible de connecter Antigravity"
-            : "Impossible de déconnecter Antigravity",
+            ? t("settings.agyConnectFailed")
+            : t("settings.agyDisconnectFailed"),
         description: ipcErrorMessage(err),
       });
     } finally {
@@ -55,7 +56,7 @@ export function AgyMemoryLine() {
         <>
           <span className="inline-flex items-center gap-1">
             <Check className="size-3.5 shrink-0 text-ok" aria-hidden />
-            <span>Mémoire Neuron branchée</span>
+            <span>{t("settings.memoryLinked")}</span>
           </span>
           <Button
             type="button"
@@ -67,7 +68,7 @@ export function AgyMemoryLine() {
             {pending === "disconnect" && (
               <Loader2 className="size-3.5 animate-spin" aria-hidden />
             )}
-            <span>Débrancher</span>
+            <span>{t("settings.unplug")}</span>
           </Button>
         </>
       ) : (
@@ -75,12 +76,10 @@ export function AgyMemoryLine() {
           {agy === "outdated" ? (
             <span className="inline-flex items-center gap-1 text-warn">
               <TriangleAlert className="size-3.5 shrink-0" aria-hidden />
-              <span>Mémoire à rebrancher (chemin de Neuron changé)</span>
+              <span>{t("settings.memoryOutdated")}</span>
             </span>
           ) : (
-            <span title="Antigravity n'accepte pas de serveur MCP par session : Neuron l'inscrit une fois dans sa configuration (agy mcp add neuron).">
-              Mémoire Neuron non branchée
-            </span>
+            <span title={t("settings.agyMcpHint")}>{t("settings.memoryNotLinked")}</span>
           )}
           <Button
             type="button"
@@ -93,7 +92,7 @@ export function AgyMemoryLine() {
               <Loader2 className="size-3.5 animate-spin" aria-hidden />
             )}
             <span>
-              {agy === "outdated" ? "Rebrancher" : "Brancher la mémoire"}
+              {agy === "outdated" ? t("settings.replug") : t("settings.plugMemory")}
             </span>
           </Button>
         </>

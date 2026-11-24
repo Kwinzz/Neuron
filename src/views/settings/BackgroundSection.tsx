@@ -8,14 +8,31 @@ import { Separator } from "@/components/ui/separator";
 import { SettingRow } from "./SettingRow";
 import { SettingSwitch } from "./SettingSwitch";
 import { useSettingsPatch } from "./useSettingsPatch";
+import { t } from "@/i18n";
 
 const DEFAULT_SHORTCUT = "Ctrl+Shift+Space";
 
 /** Shortcut text → readable keys ("Ctrl+Shift+Space" → Ctrl · Maj · Espace). */
-const KEY_LABEL: Record<string, string> = { Shift: "Maj", Space: "Espace", Alt: "Alt", Ctrl: "Ctrl", Super: "Win" };
+function keyLabel(part: string): string | undefined {
+  switch (part) {
+    case "Shift":
+      return t("settings.keyShift");
+    case "Space":
+      return t("settings.keySpace");
+    case "Alt":
+      return "Alt";
+    case "Ctrl":
+      return "Ctrl";
+    case "Super":
+      return "Win";
+    default:
+      return undefined;
+  }
+}
 
 function prettyKey(part: string): string {
-  if (KEY_LABEL[part]) return KEY_LABEL[part];
+  const label = keyLabel(part);
+  if (label) return label;
   if (/^Key[A-Z]$/.test(part)) return part.slice(3);
   if (/^Digit\d$/.test(part)) return part.slice(5);
   return part;
@@ -53,11 +70,11 @@ function ShortcutRecorder({ value, onChange }: { value: string; onChange: (next:
       onClick={() => setRecording((r) => !r)}
       onKeyDown={onKeyDown}
       onBlur={() => setRecording(false)}
-      aria-label="Raccourci de la demande rapide"
+      aria-label={t("settings.shortcutAria")}
       className="flex h-8 min-w-40 items-center justify-center gap-1 rounded-lg border bg-background px-2.5 text-sm transition-colors duration-150 outline-none hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       {recording ? (
-        <span className="text-muted-foreground animate-pulse">Appuie sur la combinaison…</span>
+        <span className="text-muted-foreground animate-pulse">{t("settings.shortcutRecording")}</span>
       ) : (
         value.split("+").map((part) => (
           <kbd key={part} className="rounded border bg-muted px-1.5 font-mono text-[11px] font-medium">
@@ -80,18 +97,17 @@ export function BackgroundSection({ settings }: { settings: AppSettings }) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <AppWindow className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-            <span>Arrière-plan</span>
+            <span>{t("settings.bgTitle")}</span>
           </CardTitle>
           <CardDescription className="text-xs">
-            Neuron reste dans la zone de notification (près de l&apos;horloge) : les agents continuent, les
-            notifications arrivent et la demande rapide reste disponible.
+            {t("settings.bgDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex min-w-0 flex-col gap-4">
           <SettingRow
             id="bg-close-to-tray"
-            label="Continuer en arrière-plan à la fermeture"
-            description="La croix cache la fenêtre au lieu de quitter. « Quitter Neuron » dans le menu de l'icône arrête tout."
+            label={t("settings.closeToTray")}
+            description={t("settings.closeToTrayDescription")}
             control={
               <SettingSwitch
                 id="bg-close-to-tray"
@@ -106,11 +122,11 @@ export function BackgroundSection({ settings }: { settings: AppSettings }) {
           <Separator />
           <SettingRow
             id="bg-autostart"
-            label={IS_WINDOWS ? "Lancer avec Windows" : "Lancer à l'ouverture de session"}
+            label={IS_WINDOWS ? t("settings.launchWithWindows") : t("settings.launchAtLogin")}
             description={
               import.meta.env.DEV
-                ? "Démarre Neuron discrètement dans la zone de notification à l'ouverture de session (sans effet en mode dev : seule l'app installée s'inscrit au démarrage)."
-                : "Démarre Neuron discrètement dans la zone de notification à l'ouverture de session."
+                ? t("settings.launchDescriptionDev")
+                : t("settings.launchDescription")
             }
             control={
               <SettingSwitch
@@ -130,17 +146,16 @@ export function BackgroundSection({ settings }: { settings: AppSettings }) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Keyboard className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-            <span>Demande rapide</span>
+            <span>{t("settings.quickTitle")}</span>
           </CardTitle>
           <CardDescription className="text-xs">
-            Depuis n&apos;importe quelle app (même en jeu, en plein écran fenêtré), un raccourci ouvre une petite
-            fenêtre pour écrire ta demande et l&apos;envoyer à un nouveau chat ou à un chat récent.
+            {t("settings.quickDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex min-w-0 flex-col gap-4">
           <SettingRow
             id="quick-enabled"
-            label="Activer la demande rapide"
+            label={t("settings.quickEnable")}
             control={
               <SettingSwitch
                 id="quick-enabled"
@@ -154,11 +169,11 @@ export function BackgroundSection({ settings }: { settings: AppSettings }) {
           <Separator />
           <SettingRow
             id="quick-shortcut"
-            label="Raccourci global"
+            label={t("settings.quickShortcut")}
             description={
               IS_LINUX
-                ? "Clique puis appuie sur la combinaison. Sous Wayland, les raccourcis globaux n'existent pas : lie la commande « neuron --quick » à un raccourci de ton bureau (Hyprland, KDE, GNOME…)."
-                : "Clique puis appuie sur la combinaison (avec Ctrl, Alt ou Win). Échap pour annuler."
+                ? t("settings.quickShortcutLinux")
+                : t("settings.quickShortcutHint")
             }
             disabled={!quickLauncher.enabled}
             control={
@@ -174,8 +189,8 @@ export function BackgroundSection({ settings }: { settings: AppSettings }) {
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    aria-label="Raccourci par défaut"
-                    title={`Par défaut : ${DEFAULT_SHORTCUT}`}
+                    aria-label={t("settings.shortcutReset")}
+                    title={t("settings.shortcutDefault", { shortcut: DEFAULT_SHORTCUT })}
                     onClick={() =>
                       void patch((s) => ({ ...s, quickLauncher: { ...s.quickLauncher, shortcut: DEFAULT_SHORTCUT } }))
                     }

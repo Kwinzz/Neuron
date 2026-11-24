@@ -15,6 +15,7 @@ import { useNav } from "@/stores/nav";
 import { toast } from "@/stores/toast";
 import { useUi } from "@/stores/ui";
 import { Composer } from "./Composer";
+import { t } from "@/i18n";
 
 
 function folderName(path: string): string {
@@ -45,7 +46,7 @@ export function DraftChat({ projectId }: { projectId: string | null }) {
       const picked = await ipc.pickDirectory(cwd || undefined);
       if (picked) setCwd(picked);
     } catch (err) {
-      toast({ tone: "danger", title: "Dossier inaccessible", description: ipcErrorMessage(err) });
+      toast({ tone: "danger", title: t("chat.folderUnavailable"), description: ipcErrorMessage(err) });
     }
   }, [cwd]);
 
@@ -69,7 +70,7 @@ export function DraftChat({ projectId }: { projectId: string | null }) {
         useDashboard.getState().scheduleRefresh();
         return true;
       } catch (err) {
-        toast({ tone: "danger", title: "Impossible de démarrer le chat", description: ipcErrorMessage(err) });
+        toast({ tone: "danger", title: t("chat.startChatFailed"), description: ipcErrorMessage(err) });
         return false;
       }
     },
@@ -90,10 +91,10 @@ export function DraftChat({ projectId }: { projectId: string | null }) {
                 onClick={() => void browse()}
               >
                 <FolderOpen className="size-3.5" />
-                <span className="truncate">{cwd ? folderName(cwd) : "Dossier…"}</span>
+                <span className="truncate">{cwd ? folderName(cwd) : t("chat.folderButton")}</span>
               </Button>
             </TooltipTrigger>
-            <TooltipContent className="font-mono">{cwd || "Choisir le dossier de travail"}</TooltipContent>
+            <TooltipContent className="font-mono">{cwd || t("chat.pickWorkDir")}</TooltipContent>
           </Tooltip>
         )}
       </>
@@ -111,7 +112,7 @@ export function DraftChat({ projectId }: { projectId: string | null }) {
           className="text-2xl font-semibold tracking-tight animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-backwards duration-300 ease-snappy"
           style={{ animationDelay: "40ms" }}
         >
-          Nouveau chat
+          {t("chat.newChat")}
         </h2>
         <p
           className="max-w-md text-sm text-muted-foreground animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-backwards duration-300 ease-snappy"
@@ -120,10 +121,10 @@ export function DraftChat({ projectId }: { projectId: string | null }) {
           {project ? (
             <span className="inline-flex items-center gap-1.5">
               <FolderGit2 className="size-4" />
-              Dans le projet <span className="font-medium text-foreground">{project.name}</span>
+              {t("chat.inProject")} <span className="font-medium text-foreground">{project.name}</span>
             </span>
           ) : (
-            "Choisis le modèle (Claude, Codex, Antigravity…) et le niveau de raisonnement, puis écris ton premier message."
+            t("chat.draftHint")
           )}
         </p>
         {projectId && <DraftContextPreview projectId={projectId} />}
@@ -136,7 +137,7 @@ export function DraftChat({ projectId }: { projectId: string | null }) {
         slashCwd={project ? project.path : cwd || null}
         submit={submit}
         toolbar={toolbar}
-        placeholder="Que doit faire l'agent ? (Entrée pour démarrer le chat)"
+        placeholder={t("chat.draftPlaceholder")}
         active={false}
         onSent={noop}
         showPill={false}

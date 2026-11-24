@@ -2,6 +2,7 @@ import { CheckCircle2, X, XCircle } from "lucide-react";
 import type { GenericCliTest } from "@/bindings/GenericCliTest";
 import { Button } from "@/components/ui/button";
 import { formatTestDuration } from "./genericCliFormat";
+import { t } from "@/i18n";
 
 interface GenericCliTestResultProps {
   result: GenericCliTest | null;
@@ -31,7 +32,7 @@ export function GenericCliTestResult({
             <>
               <CheckCircle2 className="size-3.5 shrink-0 text-ok" aria-hidden />
               <span className="text-foreground">
-                Réponse reçue en{" "}
+                {t("settings.testReceivedIn")}{" "}
                 <span className="font-mono tabular-nums">
                   {formatTestDuration(durationMs ?? 0)}
                 </span>
@@ -41,7 +42,7 @@ export function GenericCliTestResult({
             <>
               <XCircle className="size-3.5 shrink-0 text-destructive" aria-hidden />
               <span className="text-destructive">
-                Échec du test
+                {t("settings.testFailed")}
                 {durationMs !== null && (
                   <>
                     {" "}
@@ -61,14 +62,14 @@ export function GenericCliTestResult({
           variant="ghost"
           size="icon-xs"
           onClick={onDismiss}
-          aria-label="Fermer le résultat du test"
+          aria-label={t("settings.closeTestResult")}
         >
           <X className="size-3.5" aria-hidden />
         </Button>
       </div>
 
       <pre className="max-h-48 overflow-auto rounded-md border bg-muted/30 p-2 font-mono text-xs whitespace-pre-wrap wrap-anywhere text-foreground">
-        {output.trim().length > 0 ? output : "(aucune sortie)"}
+        {output.trim().length > 0 ? output : t("settings.noOutput")}
       </pre>
     </div>
   );

@@ -1,5 +1,6 @@
 import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { t } from "@/i18n";
 
 interface DeltaBadgeProps {
   ratio: number | null;
@@ -8,7 +9,7 @@ interface DeltaBadgeProps {
 export function DeltaBadge({ ratio }: DeltaBadgeProps) {
   if (ratio === null || !Number.isFinite(ratio)) {
     return (
-      <Badge variant="outline" title="Pas de période précédente comparable">
+      <Badge variant="outline" title={t("home.deltaNoPrevious")}>
         —
       </Badge>
     );
@@ -22,7 +23,7 @@ export function DeltaBadge({ ratio }: DeltaBadgeProps) {
     <Badge variant="outline" className="tabular-nums">
       <Icon aria-hidden />
       <span>{text}</span>
-      <span className="sr-only">par rapport à la période précédente</span>
+      <span className="sr-only">{t("home.deltaVsPrevious")}</span>
     </Badge>
   );
 }

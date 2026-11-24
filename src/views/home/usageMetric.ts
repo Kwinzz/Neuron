@@ -1,15 +1,28 @@
 import type { UsageSums } from "@/bindings/UsageSums";
+import { locale, t } from "@/i18n";
 import { formatCost, formatInteger, formatTokens } from "@/lib/format";
 
 export type UsageMetric = "tokens" | "cost" | "turns";
 
-const usdAxis = new Intl.NumberFormat("fr-FR", {
-  style: "currency",
-  currency: "USD",
-  currencyDisplay: "narrowSymbol",
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
+let usdAxisCache: { locale: string; format: Intl.NumberFormat } | null = null;
+
+/** Compact dollar formatter for the Y axis, rebuilt when the interface language changes. */
+function usdAxis(): Intl.NumberFormat {
+  const current = locale();
+  if (usdAxisCache?.locale !== current) {
+    usdAxisCache = {
+      locale: current,
+      format: new Intl.NumberFormat(current, {
+        style: "currency",
+        currency: "USD",
+        currencyDisplay: "narrowSymbol",
+        notation: "compact",
+        maximumFractionDigits: 1,
+      }),
+    };
+  }
+  return usdAxisCache.format;
+}
 
 interface MetricSpec {
   /** Toggle label. */
@@ -26,8 +39,12 @@ interface MetricSpec {
 
 export const METRICS: Record<UsageMetric, MetricSpec> = {
   tokens: {
-    label: "Tokens",
-    unit: "tokens (cache compris)",
+    get label() {
+      return t("home.metricTokens");
+    },
+    get unit() {
+      return t("home.metricTokensUnit");
+    },
     // Same count as « Tokens au total » and the providers' dashboards: cache reads and writes included.
     value: (s) => s.input + s.output + s.cacheRead + s.cacheWrite,
     format: formatTokens,
@@ -35,16 +52,22 @@ export const METRICS: Record<UsageMetric, MetricSpec> = {
     integer: true,
   },
   cost: {
-    label: "Coût",
+    get label() {
+      return t("home.metricCost");
+    },
     unit: "",
     value: (s) => s.costUsd,
     format: formatCost,
-    axis: (n) => (n === 0 ? "0" : n < 1 ? formatCost(n) : usdAxis.format(n)),
+    axis: (n) => (n === 0 ? "0" : n < 1 ? formatCost(n) : usdAxis().format(n)),
     integer: false,
   },
   turns: {
-    label: "Requêtes",
-    unit: "requêtes",
+    get label() {
+      return t("home.metricTurns");
+    },
+    get unit() {
+      return t("home.metricTurnsUnit");
+    },
     value: (s) => s.turns,
     format: formatInteger,
     axis: formatTokens,

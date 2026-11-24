@@ -8,6 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { t } from "@/i18n";
 import { AGENTS } from "@/lib/agents";
 import { bucketTitle } from "@/lib/format";
 import { METRICS, type UsageMetric } from "./usageMetric";
@@ -25,16 +26,16 @@ export function UsageTable({ rows, presentAgents, range, metric }: UsageTablePro
   return (
     <div className="max-h-[260px] overflow-auto rounded-lg border">
       <Table>
-        <caption className="sr-only">Consommation par période</caption>
+        <caption className="sr-only">{t("home.tableCaption")}</caption>
         <TableHeader className="bg-muted/50">
           <TableRow>
-            <TableHead>Période</TableHead>
+            <TableHead>{t("home.colPeriod")}</TableHead>
             {presentAgents.map((agent) => (
               <TableHead key={agent} className="text-right">
                 {AGENTS[agent].label}
               </TableHead>
             ))}
-            <TableHead className="text-right">Total</TableHead>
+            <TableHead className="text-right">{t("home.total")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

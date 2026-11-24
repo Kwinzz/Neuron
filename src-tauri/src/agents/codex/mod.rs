@@ -90,7 +90,11 @@ impl AgentAdapter for CodexAdapter {
 
     fn start(&self, spec: &SessionSpec) -> AppResult<SessionHandle> {
         if !spec.cwd.is_dir() {
-            return Err(AppError::Invalid(format!("dossier de travail introuvable : {}", spec.cwd.display())));
+            return Err(AppError::Invalid(crate::tr!(
+                "dossier de travail introuvable : {}",
+                "working folder not found: {}",
+                spec.cwd.display()
+            )));
         }
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<SessionCommand>();
         let (ev_tx, ev_rx) = mpsc::unbounded_channel::<AdapterEvent>();
@@ -210,7 +214,11 @@ async fn session_loop(
                 usage: TokenUsage::default(),
                 duration_ms: Some(i64::try_from(started.elapsed().as_millis()).unwrap_or(i64::MAX)),
                 error: Some(if detail.is_empty() {
-                    format!("Codex s'est arrêté (code {}).", code.map_or("?".into(), |c| c.to_string()))
+                    crate::tr!(
+                        "Codex s'est arrêté (code {}).",
+                        "Codex stopped (code {}).",
+                        code.map_or("?".into(), |c| c.to_string())
+                    )
                 } else {
                     format!("Codex : {detail}")
                 }),

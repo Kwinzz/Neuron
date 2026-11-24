@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { t } from "@/i18n";
 import { useNav } from "@/stores/nav";
 import { useUi } from "@/stores/ui";
 import { ProjectChatRow } from "./ProjectChatRow";
@@ -32,9 +33,9 @@ export function ProjectChats({ projectId }: ProjectChatsProps) {
   return (
     <Card size="sm" className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
       <CardHeader>
-        <CardTitle>Chats du projet</CardTitle>
+        <CardTitle>{t("project.chatsTitle")}</CardTitle>
         <CardDescription className="text-xs">
-          Chaque nouveau chat reçoit le contexte du projet.
+          {t("project.chatsDescription")}
         </CardDescription>
         {projectChats.length > 0 && (
           <CardAction>
@@ -44,7 +45,7 @@ export function ProjectChats({ projectId }: ProjectChatsProps) {
               onClick={() => useUi.getState().startChat(projectId)}
             >
               <Plus aria-hidden />
-              <span>Nouveau chat</span>
+              <span>{t("shell.navNewChat")}</span>
             </Button>
           </CardAction>
         )}
@@ -57,14 +58,14 @@ export function ProjectChats({ projectId }: ProjectChatsProps) {
               <MessageSquare className="size-5" aria-hidden />
             </div>
             <div className="flex flex-col gap-1">
-              <p className="text-sm font-medium text-foreground">Aucun chat dans ce projet</p>
+              <p className="text-sm font-medium text-foreground">{t("project.chatsEmptyTitle")}</p>
               <p className="max-w-sm text-xs text-muted-foreground">
-                Démarre un chat : il recevra automatiquement le contexte du projet.
+                {t("project.chatsEmptyBody")}
               </p>
             </div>
             <Button size="sm" onClick={() => useUi.getState().startChat(projectId)}>
               <Plus aria-hidden />
-              <span>Nouveau chat</span>
+              <span>{t("shell.navNewChat")}</span>
             </Button>
           </div>
         ) : (
@@ -72,10 +73,10 @@ export function ProjectChats({ projectId }: ProjectChatsProps) {
             <Table>
               <TableHeader className="bg-muted/50">
                 <TableRow>
-                  <TableHead>Chat</TableHead>
-                  <TableHead>Agent</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead className="text-right">Mis à jour</TableHead>
+                  <TableHead>{t("project.colChat")}</TableHead>
+                  <TableHead>{t("project.colAgent")}</TableHead>
+                  <TableHead>{t("project.colStatus")}</TableHead>
+                  <TableHead className="text-right">{t("project.colUpdated")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

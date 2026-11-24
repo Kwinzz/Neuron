@@ -406,13 +406,16 @@ pub fn list_with_usage(conn: &Connection, now: i64) -> AppResult<Vec<ProviderUsa
 
 pub fn update(conn: &Connection, input: &ProviderUpdate, now: i64) -> AppResult<()> {
     if input.label.trim().is_empty() {
-        return Err(AppError::Invalid("le nom est requis".into()));
+        return Err(AppError::Invalid(crate::tr!("le nom est requis", "the name is required")));
     }
     if !(0.0..=1.0).contains(&input.alert_pct) {
-        return Err(AppError::Invalid("le seuil d'alerte doit être entre 0 et 100 %".into()));
+        return Err(AppError::Invalid(crate::tr!(
+            "le seuil d'alerte doit être entre 0 et 100 %",
+            "the alert threshold must be between 0 and 100%"
+        )));
     }
     if input.limit_value.is_some_and(|l| !l.is_finite() || l < 0.0) {
-        return Err(AppError::Invalid("la limite doit être positive".into()));
+        return Err(AppError::Invalid(crate::tr!("la limite doit être positive", "the limit must be positive")));
     }
     let changed = conn.execute(
         "UPDATE providers

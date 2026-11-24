@@ -59,8 +59,12 @@ pub async fn list(agent: AgentKind, cwd: &Path) -> Vec<SlashCommand> {
         AgentKind::Antigravity => {
             tokio::time::timeout(LIST_TIMEOUT, antigravity(cwd)).await.ok().flatten().map(|mut list| {
                 // Answered by the CLI itself (not listed by ACP): Neuron runs them with `agy --print`.
-                list.extend(crate::agents::antigravity::quota::LOCAL_COMMANDS.iter().map(|(name, description)| {
-                    SlashCommand { name: (*name).into(), description: (*description).into(), argument_hint: None }
+                list.extend(crate::agents::antigravity::quota::LOCAL_COMMANDS.iter().map(|(name, fr, en)| {
+                    SlashCommand {
+                        name: (*name).into(),
+                        description: crate::i18n::pick(fr, en).into(),
+                        argument_hint: None,
+                    }
                 }));
                 list
             })
@@ -261,8 +265,11 @@ pub fn codex_skills(cwd: &Path) -> Vec<Skill> {
 fn codex(cwd: &Path) -> Vec<SlashCommand> {
     let mut list = vec![SlashCommand {
         name: "review".into(),
-        description: "Revue de code des modifications non commitées (codex exec review), ou selon tes instructions"
-            .into(),
+        description: crate::i18n::pick(
+            "Revue de code des modifications non commitées (codex exec review), ou selon tes instructions",
+            "Code review of uncommitted changes (codex exec review), or following your instructions",
+        )
+        .into(),
         argument_hint: Some("[instructions]".into()),
     }];
     list.extend(codex_skills(cwd).into_iter().map(|s| SlashCommand {
@@ -289,10 +296,15 @@ pub fn codex_rewrite(cwd: &Path, text: &str) -> Option<CodexSlash> {
         return Some(CodexSlash::Review((!args.is_empty()).then(|| args.to_string())));
     }
     let skill = codex_skills(cwd).into_iter().find(|s| s.name == name)?;
-    let task = if args.is_empty() { "la tâche en cours".to_string() } else { args.to_string() };
-    Some(CodexSlash::Prompt(format!(
-        "${name} — Applique le skill « {name} » (instructions : {}) pour : {task}",
-        skill.file.display()
+    let task = if args.is_empty() {
+        crate::i18n::pick("la tâche en cours", "the current task").to_string()
+    } else {
+        args.to_string()
+    };
+    let file = skill.file.display();
+    Some(CodexSlash::Prompt(crate::tr!(
+        "${name} — Applique le skill « {name} » (instructions : {file}) pour : {task}",
+        "${name} — Apply the « {name} » skill (instructions: {file}) to: {task}"
     )))
 }
 

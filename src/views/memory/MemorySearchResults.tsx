@@ -13,6 +13,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { CardEmpty } from "@/views/project/CardEmpty";
 import { MemoryRow } from "./MemoryRow";
+import { t } from "@/i18n";
 
 interface MemorySearchResultsProps {
   query: string;
@@ -39,9 +40,9 @@ export function MemorySearchResults({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          <span>Résultats</span>
+          <span>{t("memory.results")}</span>
         </CardTitle>
-        <CardDescription>Classés par pertinence</CardDescription>
+        <CardDescription>{t("memory.byRelevance")}</CardDescription>
         <CardAction>
           <Badge variant="outline" className="font-mono tabular-nums">
             {hits.length}
@@ -63,7 +64,7 @@ export function MemorySearchResults({
           </div>
         ) : hits.length === 0 ? (
           <CardEmpty icon={SearchX}>
-            Aucun souvenir ne correspond à « {trimmed} ».
+            {t("memory.noMatch", { query: trimmed })}
           </CardEmpty>
         ) : (
           <ul

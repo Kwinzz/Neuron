@@ -1,22 +1,42 @@
 import type { ProviderUsage } from "@/bindings/ProviderUsage";
 import type { QuotaUnit } from "@/bindings/QuotaUnit";
 import type { WindowKind } from "@/bindings/WindowKind";
+import { t } from "@/i18n";
 import { formatCost, formatInteger, formatTokens } from "@/lib/format";
 
+/** Getters: the labels follow the interface language. */
 export const WINDOW_LABEL: Record<WindowKind, string> = {
-  rolling_5h: "Fenêtre 5h",
-  weekly: "7 jours",
-  monthly: "30 jours",
-  credits: "Crédits",
-  none: "Cumul",
+  get rolling_5h() {
+    return t("home.window5h");
+  },
+  get weekly() {
+    return t("home.range7d");
+  },
+  get monthly() {
+    return t("home.range30d");
+  },
+  get credits() {
+    return t("home.credits");
+  },
+  get none() {
+    return t("home.windowCumulative");
+  },
 };
 
 export const UNIT_LABEL: Record<QuotaUnit, string> = {
-  tokens: "Tokens",
-  messages: "Messages",
+  get tokens() {
+    return t("home.unitTokens");
+  },
+  get messages() {
+    return t("home.unitMessages");
+  },
   usd: "USD",
-  credits: "Crédits",
-  requests: "Requêtes",
+  get credits() {
+    return t("home.credits");
+  },
+  get requests() {
+    return t("home.unitRequests");
+  },
 };
 
 export const WINDOW_KINDS: readonly WindowKind[] = [

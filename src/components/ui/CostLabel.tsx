@@ -1,11 +1,7 @@
 import { memo } from "react";
 import type { AgentKind } from "@/bindings/AgentKind";
+import { t } from "@/i18n";
 import { formatCost } from "@/lib/format";
-
-const TITLE_REPORTED = "Coût au tarif API, communiqué par Claude Code (ton abonnement couvre l'usage réel).";
-const TITLE_ESTIMATED = "Estimation au tarif API public du modèle, à partir des tokens (ton abonnement couvre l'usage réel).";
-const TITLE_UNKNOWN = "Tarif inconnu pour ce modèle : coût non estimé.";
-const TITLE_GENERIC = "CLI générique : pas de comptage de tokens.";
 
 /**
  * Dollar cost of a request or a chat, for every provider. Claude Code reports it; Codex and Antigravity only
@@ -20,8 +16,8 @@ export const CostLabel = memo(function CostLabel({
   costUsd: number;
   tokens: number;
 }) {
-  if (agent === "generic") return <span title={TITLE_GENERIC}>—</span>;
-  if (agent === "claude_code") return <span title={TITLE_REPORTED}>{formatCost(costUsd)}</span>;
-  if (costUsd === 0 && tokens > 0) return <span title={TITLE_UNKNOWN}>—</span>;
-  return <span title={TITLE_ESTIMATED}>≈ {formatCost(costUsd)}</span>;
+  if (agent === "generic") return <span title={t("shell.costGeneric")}>—</span>;
+  if (agent === "claude_code") return <span title={t("shell.costReported")}>{formatCost(costUsd)}</span>;
+  if (costUsd === 0 && tokens > 0) return <span title={t("shell.costUnknown")}>—</span>;
+  return <span title={t("shell.costEstimated")}>≈ {formatCost(costUsd)}</span>;
 });

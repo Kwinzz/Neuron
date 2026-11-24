@@ -1,9 +1,10 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { t } from "@/i18n";
 
 export function SettingsSkeleton() {
   return (
-    <div className="flex min-w-0 flex-col gap-4" aria-busy="true" aria-label="Chargement des paramètres">
+    <div className="flex min-w-0 flex-col gap-4" aria-busy="true" aria-label={t("settings.loadingLabel")}>
       {[0, 1].map((i) => (
         <Card key={i} size="sm" className="min-w-0">
           <CardHeader>

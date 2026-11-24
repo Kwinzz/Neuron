@@ -16,6 +16,7 @@ import { isTauri, notify } from "@/lib/ipc";
 import { SettingRow } from "./SettingRow";
 import { SettingSwitch } from "./SettingSwitch";
 import { useSettingsPatch } from "./useSettingsPatch";
+import { t } from "@/i18n";
 
 const TEST_FEEDBACK_MS = 3000;
 
@@ -82,7 +83,7 @@ export function NotificationsSection({ settings }: NotificationsSectionProps) {
         return;
       }
       setPermissionBlocked(false);
-      notify.send("Neuron", "Les notifications fonctionnent.");
+      notify.send("Neuron", t("settings.notifTestBody"));
       setTestSent(true);
       if (feedbackTimerRef.current !== null) {
         window.clearTimeout(feedbackTimerRef.current);
@@ -101,18 +102,18 @@ export function NotificationsSection({ settings }: NotificationsSectionProps) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Bell className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          <span>Notifications</span>
+          <span>{t("settings.notifTitle")}</span>
         </CardTitle>
         <CardDescription className="text-xs">
-          Uniquement quand la fenêtre Neuron n&apos;est pas au premier plan.
+          {t("settings.notifDescription")}
         </CardDescription>
       </CardHeader>
 
       <CardContent className="flex min-w-0 flex-col gap-4">
         <SettingRow
           id="notif-enabled"
-          label="Activer les notifications"
-          description="Alertes système pour suivre l'activité des agents en arrière-plan"
+          label={t("settings.notifEnable")}
+          description={t("settings.notifEnableDescription")}
           control={
             <SettingSwitch
               id="notif-enabled"
@@ -126,11 +127,11 @@ export function NotificationsSection({ settings }: NotificationsSectionProps) {
         {permissionBlocked && (
           <Alert className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
             <BellOff className="text-warn!" aria-hidden />
-            <AlertTitle>Notifications bloquées</AlertTitle>
+            <AlertTitle>{t("settings.notifBlocked")}</AlertTitle>
             <AlertDescription className="text-xs">
               {IS_WINDOWS
-                ? "Windows a bloqué les notifications de Neuron. Autorise-les dans Paramètres Windows › Système › Notifications."
-                : "Le système a bloqué les notifications de Neuron. Autorise-les dans les réglages de notifications de ton bureau."}
+                ? t("settings.notifBlockedWindows")
+                : t("settings.notifBlockedOther")}
             </AlertDescription>
           </Alert>
         )}
@@ -140,8 +141,8 @@ export function NotificationsSection({ settings }: NotificationsSectionProps) {
         <div className="flex min-w-0 flex-col gap-3 pl-3">
           <SettingRow
             id="notif-permission"
-            label="Demande d'autorisation"
-            description="Un agent attend ton accord pour utiliser un outil"
+            label={t("settings.notifPermission")}
+            description={t("settings.notifPermissionDescription")}
             disabled={!notif.enabled}
             control={
               <SettingSwitch
@@ -155,8 +156,8 @@ export function NotificationsSection({ settings }: NotificationsSectionProps) {
           />
           <SettingRow
             id="notif-finished"
-            label="Fin de réponse"
-            description="Un agent a terminé sa réponse"
+            label={t("settings.notifFinished")}
+            description={t("settings.notifFinishedDescription")}
             disabled={!notif.enabled}
             control={
               <SettingSwitch
@@ -170,8 +171,8 @@ export function NotificationsSection({ settings }: NotificationsSectionProps) {
           />
           <SettingRow
             id="notif-error"
-            label="Erreur"
-            description="Un chat s'est arrêté sur une erreur"
+            label={t("common.error")}
+            description={t("settings.notifErrorDescription")}
             disabled={!notif.enabled}
             control={
               <SettingSwitch
@@ -193,11 +194,11 @@ export function NotificationsSection({ settings }: NotificationsSectionProps) {
             variant="outline"
             size="sm"
             disabled={!tauri || testing}
-            title={!tauri ? "Disponible dans l'application" : undefined}
+            title={!tauri ? t("settings.inAppOnly") : undefined}
             onClick={() => void handleTest()}
           >
             <BellRing className="size-3.5" aria-hidden />
-            <span>Tester</span>
+            <span>{t("settings.test")}</span>
           </Button>
           {testSent && (
             <span
@@ -205,7 +206,7 @@ export function NotificationsSection({ settings }: NotificationsSectionProps) {
               className="inline-flex items-center gap-1.5 text-xs text-ok animate-in fade-in-0 duration-150"
             >
               <CheckCircle2 className="size-3.5 shrink-0" aria-hidden />
-              <span>Notification envoyée</span>
+              <span>{t("settings.notifSent")}</span>
             </span>
           )}
         </div>

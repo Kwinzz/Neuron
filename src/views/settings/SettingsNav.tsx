@@ -9,22 +9,23 @@ import {
   SquareTerminal,
   type LucideIcon,
 } from "lucide-react";
+import { t, type MessageKey } from "@/i18n";
 import type { SettingsSection } from "@/stores/ui";
 
 interface SettingsNavItem {
   id: SettingsSection;
-  label: string;
+  label: MessageKey;
   icon: LucideIcon;
 }
 
 const NAV_ITEMS: readonly SettingsNavItem[] = [
-  { id: "general", label: "Général", icon: SlidersHorizontal },
-  { id: "background", label: "Arrière-plan & raccourci", icon: AppWindow },
-  { id: "agents", label: "Agents & MCP", icon: Plug },
-  { id: "notifications", label: "Notifications", icon: Bell },
-  { id: "context", label: "Contexte injecté", icon: Layers },
-  { id: "generic", label: "CLI génériques", icon: SquareTerminal },
-  { id: "shortcuts", label: "Raccourcis", icon: Keyboard },
+  { id: "general", label: "settings.navGeneral", icon: SlidersHorizontal },
+  { id: "background", label: "settings.navBackground", icon: AppWindow },
+  { id: "agents", label: "settings.navAgents", icon: Plug },
+  { id: "notifications", label: "settings.navNotifications", icon: Bell },
+  { id: "context", label: "settings.navContext", icon: Layers },
+  { id: "generic", label: "settings.navGeneric", icon: SquareTerminal },
+  { id: "shortcuts", label: "settings.navShortcuts", icon: Keyboard },
 ];
 
 interface SettingsNavProps {
@@ -35,7 +36,7 @@ interface SettingsNavProps {
 export function SettingsNav({ active, onSelect }: SettingsNavProps) {
   return (
     <nav
-      aria-label="Sections des paramètres"
+      aria-label={t("settings.navLabel")}
       className="min-w-0 min-[900px]:sticky min-[900px]:top-4 min-[900px]:self-start"
     >
       <ul className="flex gap-1 overflow-x-auto pb-1 min-[900px]:flex-col min-[900px]:overflow-visible min-[900px]:pb-0">
@@ -56,7 +57,7 @@ export function SettingsNav({ active, onSelect }: SettingsNavProps) {
                 )}
               >
                 <Icon className="size-4 shrink-0" aria-hidden />
-                <span className="truncate">{item.label}</span>
+                <span className="truncate">{t(item.label)}</span>
               </button>
             </li>
           );

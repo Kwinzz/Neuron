@@ -11,6 +11,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
+import { t } from "@/i18n";
 import { ipc } from "@/lib/ipc";
 import { useUi } from "@/stores/ui";
 import { ContextBundleView } from "./ContextBundleView";
@@ -55,7 +56,7 @@ export function DraftContextPreview({ projectId }: DraftContextPreviewProps) {
   }
 
   if (state.status === "error") {
-    return <p className="text-xs text-muted-foreground">Contexte indisponible</p>;
+    return <p className="text-xs text-muted-foreground">{t("project.ctxUnavailable")}</p>;
   }
 
   const { bundle } = state;
@@ -69,13 +70,13 @@ export function DraftContextPreview({ projectId }: DraftContextPreviewProps) {
     <div className="flex w-full max-w-2xl flex-wrap items-center gap-2 rounded-xl border bg-card px-3 py-2 text-left text-xs animate-in fade-in-0 slide-in-from-top-1 duration-200">
       <span className="inline-flex items-center gap-1.5 text-muted-foreground">
         <Layers className="size-3.5 shrink-0" aria-hidden />
-        <span>Contexte injecté au démarrage</span>
+        <span>{t("project.ctxInjectedAtStart")}</span>
       </span>
 
       {bundle.sources.length > 0 ? (
         <SourceList sources={bundle.sources} />
       ) : (
-        <span className="text-muted-foreground">aucune source</span>
+        <span className="text-muted-foreground">{t("project.ctxNoSourceLower")}</span>
       )}
 
       <div className="ml-auto flex shrink-0 items-center gap-1">
@@ -83,15 +84,15 @@ export function DraftContextPreview({ projectId }: DraftContextPreviewProps) {
           <PopoverTrigger asChild>
             <Button variant="ghost" size="xs">
               <Eye aria-hidden />
-              <span>Voir</span>
+              <span>{t("project.ctxView")}</span>
             </Button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-[460px] max-w-[calc(100vw-2rem)] gap-0 p-0">
             <PopoverHeader className="border-b p-3">
-              <PopoverTitle>Ce que recevra le chat</PopoverTitle>
+              <PopoverTitle>{t("project.ctxPreviewTitle")}</PopoverTitle>
               <PopoverDescription className="flex items-center gap-1.5 text-xs">
                 <Clock className="size-3 shrink-0" aria-hidden />
-                <span>Calculé maintenant, figé à l'envoi du premier message</span>
+                <span>{t("project.ctxPreviewFrozen")}</span>
               </PopoverDescription>
             </PopoverHeader>
 
@@ -102,7 +103,7 @@ export function DraftContextPreview({ projectId }: DraftContextPreviewProps) {
             <div className="flex justify-end border-t p-2">
               <Button variant="ghost" size="sm" onClick={handleEdit}>
                 <Pencil aria-hidden />
-                <span>Modifier context.md</span>
+                <span>{t("project.ctxEdit")}</span>
               </Button>
             </div>
           </PopoverContent>
@@ -114,7 +115,7 @@ export function DraftContextPreview({ projectId }: DraftContextPreviewProps) {
           onClick={() => useUi.getState().openProject(projectId, "context")}
         >
           <Pencil aria-hidden />
-          <span>Modifier</span>
+          <span>{t("common.edit")}</span>
         </Button>
       </div>
     </div>
