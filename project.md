@@ -98,6 +98,8 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
   (`~/.local/share/dev.neuron.app`, `~/.neuron`) supprimées seulement sur demande explicite, jamais avec `--yes`.
 - Testé ici par simulation (faux `uname` / `pacman` / `sudo`) : désinstallation et mise à jour jusqu'à `makepkg` ;
   à valider en vrai sur Arch.
+- README : section « Fonctionnalités », liens rapides d'installation, Node 20.19+, `.rpm`, avertissement sur le
+  retard possible de la release Windows.
 
 ### 2026-11-24 — README d'installation
 - `README.md` à la racine : présentation, installation Windows (installateur de la release, SmartScreen,

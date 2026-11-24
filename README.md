@@ -6,6 +6,24 @@ notifications et demande rapide depuis n'importe quelle app.
 
 Neuron ne contient pas d'IA : il lance les CLI installés sur ton ordinateur, avec ton propre abonnement.
 
+**Installer :** [Windows](#installation-sous-windows) · [Linux en une commande](#en-une-commande-arch-debian--ubuntu-fedora)
+· [Premier lancement](#premier-lancement--les-agents)
+
+## Fonctionnalités
+
+- **Chats multi-agents** : Claude Code, Codex, Antigravity et tes propres CLI, avec streaming, blocs de code, diffs
+  des fichiers modifiés, demandes d'autorisation, mode Plan, choix du modèle et du niveau de raisonnement.
+- **Plusieurs agents en parallèle** : chaque chat tourne en arrière-plan, suivi en direct dans « Threads live ».
+- **Projets** : un dossier = un projet, avec son contexte (`.neuron/context.md`, état git) donné à chaque agent.
+- **Mémoire globale** partagée par tous les agents (serveur MCP intégré), importable depuis claude.ai, ChatGPT,
+  Gemini ou les fichiers de tes CLI, avec reformulation optionnelle par une IA.
+- **Quotas et coûts** : utilisation de tes abonnements (fenêtres 5 h / semaine), tokens et coût estimé par agent
+  et par projet.
+- **Fournisseurs IA** : installe et connecte chaque CLI en un clic ; le chat te prévient si un agent n'est pas
+  connecté.
+- **Demande rapide** depuis n'importe quelle app (raccourci global), notifications de fin de tour, zone de
+  notification, démarrage avec la session.
+
 ---
 
 ## Installation sous Windows
@@ -20,9 +38,12 @@ Neuron ne contient pas d'IA : il lance les CLI installés sur ton ordinateur, av
 
 Mise à jour : télécharge la nouvelle version et lance-la, elle remplace l'ancienne (tes données sont gardées).
 
+> La release peut avoir un peu de retard sur le code du dépôt : pour la toute dernière version, compile-la
+> (ci-dessous).
+
 ### Compiler soi-même (Windows)
 
-Prérequis : [Rust](https://rustup.rs), [Node.js](https://nodejs.org) 20+, les
+Prérequis : [Rust](https://rustup.rs), [Node.js](https://nodejs.org) 20.19+, les
 [prérequis Tauri](https://v2.tauri.app/start/prerequisites/) (Microsoft C++ Build Tools, WebView2).
 
 ```powershell
@@ -90,14 +111,15 @@ Compile avec Tauri, qui produit un `.deb`, un `.rpm` ou un AppImage.
 ```bash
 # Debian / Ubuntu : dépendances de compilation
 sudo apt install build-essential curl git libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev
-# Rust (https://rustup.rs) et Node.js 20+ requis
+# Rust (https://rustup.rs) et Node.js 20.19+ requis
 git clone https://github.com/Kwinzz/Neuron
 cd Neuron
 npm ci
 npm run tauri build
 ```
 
-Les paquets sont dans `src-tauri/target/release/bundle/` (`deb/`, `appimage/`). Pour les autres distributions,
+Les paquets sont dans `src-tauri/target/release/bundle/` (`deb/`, `appimage/` ; `npm run tauri build -- --bundles rpm`
+pour un `.rpm`). Pour les autres distributions,
 voir les [prérequis Tauri pour Linux](https://v2.tauri.app/start/prerequisites/#linux).
 
 ### Spécificités Linux
@@ -163,7 +185,8 @@ La mémoire est partagée avec tous tes agents et reste éditable dans `~/.neuro
 | Mémoire | `%USERPROFILE%\.neuron\memory.md` | `~/.neuron/memory.md` |
 
 Neuron ne fait qu'un seul appel réseau à lui : la liste des prix publics des modèles (au plus une fois par jour),
-pour estimer les coûts. Tout le reste reste sur ton ordinateur.
+pour estimer les coûts. Tout le reste reste sur ton ordinateur ; seuls les agents que tu lances parlent à leur
+fournisseur, comme dans ton terminal.
 
 ## Développement
 
