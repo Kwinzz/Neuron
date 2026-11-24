@@ -109,7 +109,8 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
   carte d'erreur affiche le bouton adapté, puis « prêt : renvoie ton message » une fois réglé ; un bandeau au-dessus
   de la zone de saisie (chat et nouveau chat) prévient avant d'envoyer.
 - **UI** : carte « Fournisseurs IA » en tête de Paramètres → Agents & MCP (version, état, compte, bouton, commande
-  affichée) ; « agy introuvable » de la carte MCP propose aussi « Installer ». Composants
+  affichée, état de la mémoire Neuron — dont « Brancher la mémoire » pour Antigravity, `AgyMemoryLine`). La liste
+  « Agents » de la carte MCP est retirée (doublon) : cette carte ne garde que les outils exposés et la commande. Composants
   `components/agents/AgentAccessButton`, `components/chat/AgentAccessNotice`, store `stores/access.ts`.
 
 ### 2026-11-24 — Couleurs noires du graphe dans l'app installée (v0.1.2)

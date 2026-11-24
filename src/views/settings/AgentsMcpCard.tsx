@@ -1,18 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  Check,
-  ChevronRight,
-  CircleSlash,
-  Copy,
-  Info,
-  Loader2,
-  Plug,
-  TriangleAlert,
-} from "lucide-react";
-import { AgentAccessButton } from "@/components/agents/AgentAccessButton";
+import { Check, ChevronRight, Copy, Info, Plug } from "lucide-react";
 import { Alert, AlertTitle } from "@/components/ui/alert";
-import { AgentLogo } from "@/components/ui/AgentLogo";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,10 +16,12 @@ import {
 } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { AGENTS } from "@/lib/agents";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ipcErrorMessage } from "@/lib/ipc";
-import { useAccess } from "@/stores/access";
 import { useMemory } from "@/stores/memory";
 import { toast } from "@/stores/toast";
 import { CardSectionLabel } from "@/views/project/CardSectionLabel";
@@ -68,16 +58,7 @@ const MCP_TOOLS: ReadonlyArray<{ name: string; description: string }> = [
 ];
 
 export function AgentsMcpCard() {
-  const agy = useMemory((s) => s.agy);
   const info = useMemory((s) => s.info);
-  const agyInstalled = useAccess((s) => s.byAgent.antigravity?.installed);
-
-  // Antigravity installed from the card above: ask again whether it is connected to the memory.
-  useEffect(() => {
-    if (agyInstalled) void useMemory.getState().refreshAgy().catch(() => undefined);
-  }, [agyInstalled]);
-
-  const [pending, setPending] = useState<"connect" | "disconnect" | null>(null);
   const [copied, setCopied] = useState(false);
   const copyTimerRef = useRef<number | null>(null);
 
@@ -88,40 +69,6 @@ export function AgentsMcpCard() {
       }
     };
   }, []);
-
-  const handleConnect = async () => {
-    if (pending !== null) return;
-    setPending("connect");
-    try {
-      await useMemory.getState().connectAgy();
-      toast({ tone: "ok", title: "Antigravity connecté à la mémoire" });
-    } catch (err: unknown) {
-      toast({
-        tone: "danger",
-        title: "Impossible de connecter Antigravity",
-        description: ipcErrorMessage(err),
-      });
-    } finally {
-      setPending(null);
-    }
-  };
-
-  const handleDisconnect = async () => {
-    if (pending !== null) return;
-    setPending("disconnect");
-    try {
-      await useMemory.getState().disconnectAgy();
-      toast({ tone: "ok", title: "Antigravity déconnecté" });
-    } catch (err: unknown) {
-      toast({
-        tone: "danger",
-        title: "Impossible de déconnecter Antigravity",
-        description: ipcErrorMessage(err),
-      });
-    } finally {
-      setPending(null);
-    }
-  };
 
   const handleCopyCommand = async (command: string) => {
     try {
@@ -154,8 +101,8 @@ export function AgentsMcpCard() {
           <span>Agents & MCP</span>
         </CardTitle>
         <CardDescription>
-          Les agents lisent et enrichissent la mémoire en direct via le serveur MCP de
-          Neuron.
+          Les agents lisent et enrichissent la mémoire en direct via le serveur
+          MCP de Neuron (état par agent dans « Fournisseurs IA »).
         </CardDescription>
       </CardHeader>
 
@@ -180,130 +127,6 @@ export function AgentsMcpCard() {
                 </span>
               </li>
             ))}
-          </ul>
-        </div>
-
-        <Separator />
-
-        <div className="flex min-w-0 flex-col gap-2.5">
-          <CardSectionLabel>Agents</CardSectionLabel>
-
-          <ul className="flex min-w-0 flex-col gap-3">
-            <li className="flex min-w-0 items-start gap-3">
-              <AgentLogo agent="claude_code" size={16} className="mt-0.5 shrink-0" />
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-sm font-medium text-foreground">
-                  {AGENTS.claude_code.label}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  Connecté automatiquement à chaque session
-                </span>
-              </div>
-              <Badge variant="outline" className="shrink-0 gap-1">
-                <Check className="text-ok" aria-hidden />
-                <span>Actif</span>
-              </Badge>
-            </li>
-
-            <li className="flex min-w-0 items-start gap-3">
-              <AgentLogo agent="codex" size={16} className="mt-0.5 shrink-0" />
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-sm font-medium text-foreground">
-                  {AGENTS.codex.label}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  Connecté automatiquement à chaque session
-                </span>
-              </div>
-              <Badge variant="outline" className="shrink-0 gap-1">
-                <Check className="text-ok" aria-hidden />
-                <span>Actif</span>
-              </Badge>
-            </li>
-
-            <li className="flex min-w-0 flex-col gap-2">
-              <div className="flex min-w-0 items-start gap-3">
-                <AgentLogo agent="antigravity" size={16} className="mt-0.5 shrink-0" />
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className="text-sm font-medium text-foreground">
-                    {AGENTS.antigravity.label}
-                  </span>
-
-                  {agy === null ? (
-                    <Skeleton className="h-5 w-24" />
-                  ) : agy === "connected" ? (
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <Badge variant="outline" className="gap-1">
-                        <Check className="text-ok" aria-hidden />
-                        <span>Connecté</span>
-                      </Badge>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        disabled={pending !== null}
-                        onClick={() => void handleDisconnect()}
-                      >
-                        {pending === "disconnect" && (
-                          <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                        )}
-                        <span>Déconnecter</span>
-                      </Button>
-                    </div>
-                  ) : agy === "not_connected" ? (
-                    <div className="flex flex-col items-start gap-1.5">
-                      <span className="text-xs text-muted-foreground">Non connecté</span>
-                      <Button
-                        type="button"
-                        size="xs"
-                        disabled={pending !== null}
-                        onClick={() => void handleConnect()}
-                      >
-                        {pending === "connect" && (
-                          <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                        )}
-                        <span>Connecter Antigravity</span>
-                      </Button>
-                    </div>
-                  ) : agy === "outdated" ? (
-                    <div className="flex flex-col items-start gap-1.5">
-                      <span className="inline-flex items-start gap-1 text-xs text-warn">
-                        <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                        <span>À reconnecter (chemin de Neuron changé)</span>
-                      </span>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="xs"
-                        disabled={pending !== null}
-                        onClick={() => void handleConnect()}
-                      >
-                        {pending === "connect" && (
-                          <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                        )}
-                        <span>Reconnecter</span>
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-start gap-1.5">
-                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                        <CircleSlash className="size-3.5 shrink-0" aria-hidden />
-                        <span>agy introuvable</span>
-                      </span>
-                      <AgentAccessButton agent="antigravity" issue="not_installed" />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {agy === "not_connected" && (
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  Antigravity n'accepte pas de serveur MCP par session : Neuron
-                  l'inscrit une fois dans sa configuration (
-                  <code className="font-mono">agy mcp add neuron</code>).
-                </p>
-              )}
-            </li>
           </ul>
         </div>
 

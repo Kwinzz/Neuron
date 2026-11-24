@@ -8,7 +8,6 @@ export function AgentsSection() {
   useEffect(() => {
     const memory = useMemory.getState();
     if (!memory.loaded) void memory.load();
-    void memory.refreshAgy().catch(() => undefined);
   }, []);
   return (
     <div className="flex flex-col gap-4">

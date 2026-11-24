@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/tooltip";
 import { AGENTS } from "@/lib/agents";
 import { cn } from "cn";
+import { AgyMemoryLine } from "./AgyMemoryLine";
 import { accessIssue, MANAGED_AGENTS, useAccess } from "@/stores/access";
 
 /** Claude Code, Antigravity, Codex: installed? signed in? — with « Installer » / « Se connecter ». */
@@ -139,6 +140,19 @@ function ProviderRow({ agent, loaded }: { agent: AgentKind; loaded: boolean }) {
           </div>
         )}
       </div>
+      {/* Neuron memory (MCP): automatic for Claude / Codex sessions, registered once for Antigravity. */}
+      {access?.installed && (
+        <div className="min-w-0 pl-[30px]">
+          {agent === "antigravity" ? (
+            <AgyMemoryLine />
+          ) : (
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <Check className="size-3.5 shrink-0 text-ok" aria-hidden />
+              <span>Mémoire Neuron branchée à chaque session</span>
+            </span>
+          )}
+        </div>
+      )}
       {access && issue && (
         <p className="min-w-0 pl-[30px] text-xs text-muted-foreground">
           {issue === "not_installed" ? "Commande officielle : " : "Commande : "}
