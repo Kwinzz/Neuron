@@ -114,8 +114,15 @@ install_deps() {
   step "Dépendances de compilation"
   case "$FAMILY" in
     arch)
-      sudo pacman -S --needed --noconfirm base-devel git rust nodejs npm webkit2gtk-4.1 gtk3 \
-        libayatana-appindicator openssl
+      local deps=(base-devel git rust nodejs npm webkit2gtk-4.1 gtk3 libayatana-appindicator openssl)
+      if ! sudo pacman -S --needed --noconfirm "${deps[@]}"; then
+        # Base de paquets locale périmée (le miroir n'a plus ces versions → 404). Sur Arch, la seule bonne
+        # réponse est une mise à jour complète (-Syu), jamais -Sy seul (mise à jour partielle).
+        warn "pacman n'a pas pu télécharger certains paquets : la liste des paquets du système n'est plus à jour."
+        ask "Mettre à jour le système (sudo pacman -Syu) puis réessayer ?" o ||
+          die "Lance « sudo pacman -Syu », puis relance ce script."
+        sudo pacman -Syu --needed --noconfirm "${deps[@]}"
+      fi
       ;;
     debian)
       sudo apt-get update
