@@ -1,3 +1,4 @@
+import { IS_LINUX } from "@/lib/platform";
 import { useMemo } from "react";
 import { Bar, BarChart, type BarShapeProps, CartesianGrid, XAxis, YAxis } from "recharts";
 import type { AgentKind } from "@/bindings/AgentKind";
@@ -82,7 +83,8 @@ export function UsageBarChart({ rows, visibleAgents, config, range, metric }: Us
             fill={`var(--color-${agent})`}
             maxBarSize={MAX_BAR}
             shape={shapeFor(agent)}
-            isAnimationActive
+            // Linux (WebKitGTK): no tween, each frame redraws the whole SVG chart.
+            isAnimationActive={!IS_LINUX}
             animationDuration={350}
             animationEasing="ease-out"
           />

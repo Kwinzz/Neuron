@@ -1,3 +1,4 @@
+import { IS_LINUX } from "@/lib/platform";
 import { useMemo } from "react";
 import { Label, PolarAngleAxis, PolarRadiusAxis, RadialBar, RadialBarChart } from "recharts";
 import {
@@ -81,6 +82,7 @@ export function CacheCard() {
                     dataKey="value"
                     background
                     cornerRadius={10}
+                    isAnimationActive={!IS_LINUX}
                     animationDuration={600}
                     animationEasing="ease-out"
                   />

@@ -88,6 +88,11 @@ Windows 11 · Node 24.15 / npm 11.12 · Rust 1.99 (MSVC) · Git 2.54 · CLI : `c
 
 ## Journal des changements
 
+### 2026-11-24 — Survol à la souris saccadé sous Linux
+- Transitions CSS coupées sous Linux (`html.platform-linux`, durée 0) : chaque fondu de couleur de 150 ms au survol
+  pouvait redessiner toute la fenêtre dans WebKitGTK. Les animations d'entrée (`animate-in`, menus, dialogues)
+  restent. Animations des graphiques Recharts désactivées sous Linux (`UsageBarChart`, `CacheCard`).
+
 ### 2026-11-24 — Saccades pendant le travail des agents (surtout Linux)
 - **Rechargements** : chaque `ThreadStatusChanged` (outil lancé, approbation demandée…) relançait le tableau de bord
   complet + la liste de la barre latérale (toutes les 2,5–3 s pendant qu'un agent travaille) → seulement au

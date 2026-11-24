@@ -270,7 +270,8 @@ scripts/neon-bridge.sh -d . -f brief.md     # déléguer une tâche UI à Antigr
 - Front sous WebKitGTK (≈ Safari) : pas de `requestIdleCallback` (→ `lib/idle.ts`), pas de `field-sizing`
   (hauteur en JS ou `rows`). Toute API récente côté Chromium doit avoir un repli.
 - Perf WebKitGTK : pas de `backdrop-blur`, de `filter: blur` animé ni d'ombre animée sous Linux (classe
-  `html.platform-linux`, fin de `styles/index.css`). DMA-BUF désactivé uniquement avec NVIDIA propriétaire.
+  `html.platform-linux`, fin de `styles/index.css`), pas de transitions CSS (durée 0 sous Linux), graphiques sans
+  animation (`IS_LINUX`). DMA-BUF désactivé uniquement avec NVIDIA propriétaire.
 - Wayland : pas de raccourci global → `neuron --quick`. WebKitGTK : `WEBKIT_DISABLE_DMABUF_RENDERER=1` seulement avec NVIDIA.
 - Code `#[cfg(unix)]` non compilable depuis Windows (WebKitGTK) : le relire avec soin, le valider sur Arch.
 

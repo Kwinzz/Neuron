@@ -292,3 +292,12 @@ html.platform-linux .chat-working-logo {
     transform: scale(1.06);
   }
 }
+/* Hover / focus transitions: in WebKitGTK each frame of a 150 ms color fade can repaint the whole window, so
+   moving the mouse across buttons and cards made the UI stutter. Instant state changes on Linux (entrance
+   animations — `animate-in`, menus, dialogs — are animations, not transitions, and stay). */
+html.platform-linux *,
+html.platform-linux *::before,
+html.platform-linux *::after {
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+}
