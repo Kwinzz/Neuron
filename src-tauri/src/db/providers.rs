@@ -126,8 +126,12 @@ pub struct ProviderUsage {
     /// Start of the counted window (Unix ms).
     #[ts(type = "number")]
     pub window_start: i64,
-    /// Utilization reported by the provider itself (e.g. Claude subscription windows), when known.
+    /// Utilization reported by the provider itself (e.g. Claude subscription windows), when known. With several
+    /// quota groups, the most used one (alert level of the card).
     pub live: Option<LiveQuota>,
+    /// Every quota group of this window, in the provider's order, when it reports several (Antigravity:
+    /// « Gemini Models », « Claude and GPT models »…). Empty otherwise.
+    pub groups: Vec<LiveQuota>,
 }
 
 /// Provider-reported usage of a subscription window.
@@ -142,7 +146,7 @@ pub struct LiveQuota {
     /// When the agent last reported it (Unix ms).
     #[ts(type = "number")]
     pub reported_at: i64,
-    /// Quota group shown (Antigravity: the most used one, « Gemini Models »…).
+    /// Quota group (Antigravity: « Gemini Models »…; Claude: « Opus » for a model-specific weekly limit).
     pub group: Option<String>,
 }
 
@@ -192,70 +196,85 @@ pub struct AgentLiveQuotas {
     pub windows: Vec<LiveWindow>,
 }
 
-pub fn live_quotas(conn: &Connection) -> AppResult<Vec<AgentLiveQuotas>> {
+/// One stored window as it stands at `now`: once its reset time has passed, the window started over — 0 % until
+/// the agent reports again, never the utilization of a window that no longer exists.
+fn stored_window(w: &serde_json::Value, now: i64) -> Option<LiveWindow> {
+    let mut window = LiveWindow {
+        window: w.get("window")?.as_str()?.to_string(),
+        utilization: w.get("utilization")?.as_f64()?,
+        resets_at: w.get("resetsAt").and_then(serde_json::Value::as_i64),
+        group: w.get("group").and_then(serde_json::Value::as_str).map(str::to_string),
+        models: w
+            .get("models")
+            .and_then(serde_json::Value::as_array)
+            .map(|ms| ms.iter().filter_map(|m| m.as_str().map(str::to_string)).collect())
+            .unwrap_or_default(),
+    };
+    if window.resets_at.is_some_and(|at| at <= now) {
+        window.utilization = 0.0;
+        window.resets_at = None;
+    }
+    Some(window)
+}
+
+/// The windows an agent last reported (as they stand at `now`) and when it reported them.
+fn stored_windows(conn: &Connection, agent: AgentKind, now: i64) -> AppResult<Option<(i64, Vec<LiveWindow>)>> {
+    let Some(stored) = crate::db::settings::get(conn, &crate::db::settings::rate_limits_key(agent))? else {
+        return Ok(None);
+    };
+    let windows: Vec<LiveWindow> = stored
+        .get("windows")
+        .and_then(serde_json::Value::as_array)
+        .map(|ws| ws.iter().filter_map(|w| stored_window(w, now)).collect())
+        .unwrap_or_default();
+    if windows.is_empty() {
+        return Ok(None);
+    }
+    let reported_at = stored.get("updatedAt").and_then(serde_json::Value::as_i64).unwrap_or(0);
+    Ok(Some((reported_at, windows)))
+}
+
+/// When the agent last reported its windows (0 if never).
+pub fn live_reported_at(conn: &Connection, agent: AgentKind) -> AppResult<i64> {
+    Ok(crate::db::settings::get(conn, &crate::db::settings::rate_limits_key(agent))?
+        .and_then(|s| s.get("updatedAt").and_then(serde_json::Value::as_i64))
+        .unwrap_or(0))
+}
+
+pub fn live_quotas(conn: &Connection, now: i64) -> AppResult<Vec<AgentLiveQuotas>> {
     let mut out = Vec::new();
     for agent in [AgentKind::ClaudeCode, AgentKind::Codex, AgentKind::Antigravity] {
-        let Some(stored) = crate::db::settings::get(conn, &crate::db::settings::rate_limits_key(agent))? else {
-            continue;
-        };
-        let windows: Vec<LiveWindow> = stored
-            .get("windows")
-            .and_then(serde_json::Value::as_array)
-            .map(|ws| {
-                ws.iter()
-                    .filter_map(|w| {
-                        Some(LiveWindow {
-                            window: w.get("window")?.as_str()?.to_string(),
-                            utilization: w.get("utilization")?.as_f64()?,
-                            resets_at: w.get("resetsAt").and_then(serde_json::Value::as_i64),
-                            group: w.get("group").and_then(serde_json::Value::as_str).map(str::to_string),
-                            models: w
-                                .get("models")
-                                .and_then(serde_json::Value::as_array)
-                                .map(|ms| ms.iter().filter_map(|m| m.as_str().map(str::to_string)).collect())
-                                .unwrap_or_default(),
-                        })
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-        if !windows.is_empty() {
-            let reported_at = stored.get("updatedAt").and_then(serde_json::Value::as_i64).unwrap_or(0);
+        if let Some((reported_at, windows)) = stored_windows(conn, agent, now)? {
             out.push(AgentLiveQuotas { agent, reported_at, windows });
         }
     }
     Ok(out)
 }
 
-fn live_quota(conn: &Connection, provider: &Provider) -> AppResult<Option<LiveQuota>> {
-    let window = match provider.window_kind {
-        WindowKind::Rolling5h => "five_hour",
-        WindowKind::Weekly => "seven_day",
-        WindowKind::Monthly => "thirty_day",
-        _ => return Ok(None),
+/// Card kind of a reported window name.
+fn window_kind(window: &str) -> Option<WindowKind> {
+    match window {
+        "five_hour" => Some(WindowKind::Rolling5h),
+        "seven_day" => Some(WindowKind::Weekly),
+        "thirty_day" => Some(WindowKind::Monthly),
+        _ => None,
+    }
+}
+
+/// Provider-reported state of a card's window: the most used group (binding constraint) and, when the provider
+/// reports several groups for it, every one of them.
+fn live_quota(conn: &Connection, provider: &Provider, now: i64) -> AppResult<(Option<LiveQuota>, Vec<LiveQuota>)> {
+    let Some((reported_at, windows)) = stored_windows(conn, provider.agent, now)? else {
+        return Ok((None, Vec::new()));
     };
-    let Some(stored) = crate::db::settings::get(conn, &crate::db::settings::rate_limits_key(provider.agent))? else {
-        return Ok(None);
-    };
-    let reported_at = stored.get("updatedAt").and_then(serde_json::Value::as_i64).unwrap_or(0);
-    // Several quota groups (Antigravity): the most used one is the binding constraint.
-    Ok(stored
-        .get("windows")
-        .and_then(serde_json::Value::as_array)
-        .and_then(|ws| {
-            ws.iter().filter(|w| w.get("window").and_then(serde_json::Value::as_str) == Some(window)).max_by(|a, b| {
-                let u = |w: &serde_json::Value| w.get("utilization").and_then(serde_json::Value::as_f64).unwrap_or(0.0);
-                u(a).total_cmp(&u(b))
-            })
-        })
-        .and_then(|w| {
-            Some(LiveQuota {
-                utilization: w.get("utilization")?.as_f64()?,
-                resets_at: w.get("resetsAt").and_then(serde_json::Value::as_i64),
-                reported_at,
-                group: w.get("group").and_then(serde_json::Value::as_str).map(str::to_string),
-            })
-        }))
+    let all: Vec<LiveQuota> = windows
+        .into_iter()
+        .filter(|w| window_kind(&w.window) == Some(provider.window_kind))
+        .map(|w| LiveQuota { utilization: w.utilization, resets_at: w.resets_at, reported_at, group: w.group })
+        .collect();
+    let most_used = all.iter().max_by(|a, b| a.utilization.total_cmp(&b.utilization)).cloned();
+    let groups = if all.len() > 1 { all } else { Vec::new() };
+    Ok((most_used, groups))
 }
 
 /// Editable fields of a provider card.
@@ -330,24 +349,18 @@ pub fn usage(conn: &Connection, provider: Provider, now: i64) -> AppResult<Provi
         _ => None,
     };
 
-    let live = live_quota(conn, &provider)?;
-    Ok(ProviderUsage { provider, used, ratio, resets_at, window_start, live })
+    let (live, groups) = live_quota(conn, &provider, now)?;
+    Ok(ProviderUsage { provider, used, ratio, resets_at, window_start, live, groups })
 }
 
 /// Window kinds an agent's subscription reported (Claude 5 h / 7 j, Antigravity per tier, Codex free = 30 j).
 /// Empty when it reported nothing yet.
-fn reported_kinds(conn: &Connection, agent: AgentKind) -> AppResult<Vec<WindowKind>> {
-    let Some(stored) = crate::db::settings::get(conn, &crate::db::settings::rate_limits_key(agent))? else {
+fn reported_kinds(conn: &Connection, agent: AgentKind, now: i64) -> AppResult<Vec<WindowKind>> {
+    let Some((_, windows)) = stored_windows(conn, agent, now)? else {
         return Ok(Vec::new());
     };
     let mut kinds = Vec::new();
-    for w in stored.get("windows").and_then(serde_json::Value::as_array).into_iter().flatten() {
-        let kind = match w.get("window").and_then(serde_json::Value::as_str) {
-            Some("five_hour") => WindowKind::Rolling5h,
-            Some("seven_day") => WindowKind::Weekly,
-            Some("thirty_day") => WindowKind::Monthly,
-            _ => continue,
-        };
+    for kind in windows.iter().filter_map(|w| window_kind(&w.window)) {
         if !kinds.contains(&kind) {
             kinds.push(kind);
         }
@@ -373,7 +386,7 @@ pub fn list_with_usage(conn: &Connection, now: i64) -> AppResult<Vec<ProviderUsa
     let mut providers = list(conn)?;
     let mut reported: HashMap<AgentKind, Vec<WindowKind>> = HashMap::new();
     for agent in [AgentKind::ClaudeCode, AgentKind::Antigravity, AgentKind::Codex] {
-        let kinds = reported_kinds(conn, agent)?;
+        let kinds = reported_kinds(conn, agent, now)?;
         if kinds.is_empty() {
             continue;
         }
@@ -455,7 +468,7 @@ mod tests {
         crate::agents::RateLimitWindow {
             window: name.into(),
             utilization,
-            resets_at: Some(1),
+            resets_at: Some(200 * DAY_MS),
             group: group.map(str::to_string),
             models: Vec::new(),
         }
@@ -492,6 +505,10 @@ mod tests {
             assert_eq!(kinds(&cards, AgentKind::Antigravity), [WindowKind::Weekly]);
             let agy = cards.iter().find(|c| c.provider.agent == AgentKind::Antigravity).unwrap();
             assert_eq!(agy.live.as_ref().and_then(|l| l.group.as_deref()), Some("Claude and GPT models"));
+            // Every group gets its bar, in the order the provider gave them.
+            let groups: Vec<_> = agy.groups.iter().map(|g| (g.group.as_deref(), g.utilization)).collect();
+            assert_eq!(groups, [(Some("Gemini Models"), 0.1), (Some("Claude and GPT models"), 0.4)]);
+            assert!(codex.groups.is_empty(), "a single window has no group list");
 
             // Antigravity Pro: 5 h + weekly, in that order.
             store_live_windows(
@@ -504,6 +521,18 @@ mod tests {
             assert_eq!(kinds(&cards, AgentKind::Antigravity), [WindowKind::Rolling5h, WindowKind::Weekly]);
             // Claude reported nothing: its two configured cards stay.
             assert_eq!(kinds(&cards, AgentKind::ClaudeCode), [WindowKind::Rolling5h, WindowKind::Weekly]);
+
+            // Once a window's reset time has passed, it started over: 0 %, no stale utilization.
+            let later = 300 * DAY_MS;
+            let cards = list_with_usage(conn, later)?;
+            let weekly = cards
+                .iter()
+                .find(|c| c.provider.agent == AgentKind::Antigravity && c.provider.window_kind == WindowKind::Weekly)
+                .unwrap();
+            let live = weekly.live.as_ref().unwrap();
+            assert_eq!((live.utilization, live.resets_at), (0.0, None));
+            let all = live_quotas(conn, later)?;
+            assert!(all.iter().flat_map(|q| &q.windows).all(|w| w.utilization == 0.0));
             Ok(())
         })
         .await
@@ -572,9 +601,11 @@ mod tests {
             let weekly = usage(conn, get(conn, "claude-weekly")?.unwrap(), now)?.live.unwrap();
             assert_eq!((weekly.utilization, weekly.resets_at, weekly.reported_at), (0.15, None, 5));
             assert!(usage(conn, get(conn, "codex")?.unwrap(), now)?.live.is_none());
-            let all = live_quotas(conn)?;
+            let all = live_quotas(conn, now)?;
             assert_eq!(all.len(), 1);
             assert_eq!(all[0].windows.len(), 2);
+            // The 5-hour window reset at 99 ms: it shows 0 %, not the 55 % reported before.
+            assert_eq!(all[0].windows[0].utilization, 0.0);
             Ok(())
         })
         .await

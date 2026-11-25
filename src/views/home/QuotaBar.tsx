@@ -29,8 +29,13 @@ interface QuotaBarProps {
 }
 
 /** Quota bar with the percentage inside on the left and the time before reset inside on the right. */
-export const QuotaBar = memo(function QuotaBar({ ratio, resetsAt, level, label, className }: QuotaBarProps) {
+export const QuotaBar = memo(function QuotaBar(props: QuotaBarProps) {
+  const { level, label, className } = props;
   const now = useNow(60_000);
+  // Reset time passed: the window started over (the card reloads right after, see QuotasCard).
+  const expired = props.resetsAt != null && props.resetsAt <= now;
+  const ratio = expired ? 0 : props.ratio;
+  const resetsAt = expired ? null : props.resetsAt;
   const width = `${Math.min(100, Math.max(0, ratio * 100))}%`;
   return (
     <div

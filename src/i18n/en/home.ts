@@ -67,6 +67,9 @@ const home: Translation<typeof fr> = {
   quotaReportedBy: "Usage reported by {agent}",
   quotaReportedByGroup: "Usage reported by {agent} (most used group: {group})",
   quotaSubscriptionSource: "Subscription · source {agent}",
+  quotaUpdatedAgo: "updated {time}",
+  quotaAllModels: "All models",
+  quotaGroupBarAria: "{name} quota · {group}",
   quotaNoLimit: "No limit set ·",
   quotaConfigureShort: "Configure",
   // QuotasCard

@@ -20,6 +20,12 @@ resetsAt: number | null,
  */
 windowStart: number, 
 /**
- * Utilization reported by the provider itself (e.g. Claude subscription windows), when known.
+ * Utilization reported by the provider itself (e.g. Claude subscription windows), when known. With several
+ * quota groups, the most used one (alert level of the card).
  */
-live: LiveQuota | null, };
+live: LiveQuota | null, 
+/**
+ * Every quota group of this window, in the provider's order, when it reports several (Antigravity:
+ * « Gemini Models », « Claude and GPT models »…). Empty otherwise.
+ */
+groups: Array<LiveQuota>, };

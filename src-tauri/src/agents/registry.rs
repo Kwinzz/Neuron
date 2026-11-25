@@ -804,6 +804,8 @@ impl AgentRegistry {
                 AdapterEvent::RateLimits(windows) => {
                     let agent = rt.agent;
                     persist!(move |c| crate::db::providers::store_live_windows(c, agent, &windows, now_ms()));
+                    // The bars move during the turn, not only at its end.
+                    let _ = app.emit(crate::agents::antigravity::quota::QUOTAS_CHANGED_EVENT, ());
                 }
                 AdapterEvent::Subagent {
                     tool_call_id,

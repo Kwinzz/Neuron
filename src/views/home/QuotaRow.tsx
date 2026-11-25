@@ -17,6 +17,7 @@ import {
   WINDOW_LABEL,
 } from "./quotaFormat";
 import { QuotaBar } from "./QuotaBar";
+import { ReportedAgo } from "./ReportedAgo";
 import { ResetCountdown } from "./ResetCountdown";
 
 interface QuotaRowProps {
@@ -26,7 +27,7 @@ interface QuotaRowProps {
 export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
   const [open, setOpen] = useState(false);
 
-  const { provider, used, live } = usage;
+  const { provider, used, live, groups } = usage;
   const ratio = effectiveRatio(usage);
   const resetsAt = effectiveResetsAt(usage);
   const level = quotaLevel(ratio, provider.alertPct);
@@ -80,8 +81,28 @@ export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
         </Popover>
       </div>
 
-      {ratio != null && (
-        <QuotaBar ratio={ratio} resetsAt={resetsAt} level={level} label={t("home.quotaBarAria", { name: provider.label })} className="mt-3" />
+      {groups.length > 1 ? (
+        // One bar per quota group (Antigravity: « Gemini Models », « Claude and GPT models »…).
+        <div className="mt-3 flex flex-col gap-2.5">
+          {groups.map((g) => {
+            const name = g.group ?? t("home.quotaAllModels");
+            return (
+              <div key={name}>
+                <p className="mb-1 truncate text-xs text-muted-foreground">{name}</p>
+                <QuotaBar
+                  ratio={g.utilization}
+                  resetsAt={g.resetsAt}
+                  level={quotaLevel(g.utilization, provider.alertPct)}
+                  label={t("home.quotaGroupBarAria", { name: provider.label, group: name })}
+                />
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        ratio != null && (
+          <QuotaBar ratio={ratio} resetsAt={resetsAt} level={level} label={t("home.quotaBarAria", { name: provider.label })} className="mt-3" />
+        )
       )}
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -102,7 +123,7 @@ export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
             <span className="size-1.5 shrink-0 rounded-full bg-live" aria-hidden />
             <span className="truncate">
               {t("home.quotaSubscriptionSource", { agent: AGENTS[provider.agent].label })}
-              {live.group ? ` · ${live.group}` : ""}
+              {live.group && groups.length <= 1 ? ` · ${live.group}` : ""}
             </span>
           </span>
         ) : provider.limitValue == null ? (
@@ -122,8 +143,12 @@ export const QuotaRow = memo(function QuotaRow({ usage }: QuotaRowProps) {
           <span />
         )}
 
-        {/* Without a bar (no limit known), the reset time stays here. */}
-        {ratio == null && resetsAt != null && <ResetCountdown resetsAt={resetsAt} />}
+        {/* Provider-reported bars: how fresh they are. Without a bar (no limit known), the reset time stays here. */}
+        {live ? (
+          <ReportedAgo reportedAt={live.reportedAt} />
+        ) : (
+          ratio == null && resetsAt != null && <ResetCountdown resetsAt={resetsAt} />
+        )}
       </div>
     </div>
   );

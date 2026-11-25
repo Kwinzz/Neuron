@@ -29,7 +29,8 @@ async fn backfill(state: &AppState) {
 }
 
 /// Startup: cached prices immediately, a download when the cache is older than a day (never blocks the UI).
-/// Antigravity quotas: shortly after startup, then every 15 min (`agy --print /quota`, no token used).
+/// Antigravity quotas: shortly after startup, then every 5 min (`agy --print /quota`, no token used), so usage
+/// from outside Neuron (terminal, IDE) shows up too.
 pub fn spawn_agy_quota_refresh(app: &AppHandle) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
@@ -38,7 +39,7 @@ pub fn spawn_agy_quota_refresh(app: &AppHandle) {
             if let Some(state) = app.try_state::<AppState>() {
                 crate::agents::antigravity::quota::refresh(state.db.clone(), app.clone()).await;
             }
-            tokio::time::sleep(std::time::Duration::from_secs(15 * 60)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(5 * 60)).await;
         }
     });
 }

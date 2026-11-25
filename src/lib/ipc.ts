@@ -79,6 +79,8 @@ export const ipc = {
   // Accueil / dock / palette
   dashboardSnapshot: (range?: UsageRange) => invoke<DashboardSnapshot>("dashboard_snapshot", { range }),
   usageReport: (range: UsageRange) => invoke<UsageReport>("usage_report", { range }),
+  /** Ask the agents for fresh subscription windows (throttled; the answer arrives as `quotas://changed`). */
+  refreshQuotas: () => invoke<void>("refresh_quotas"),
   updateProvider: (update: ProviderUpdate) => invoke<ProviderUsage>("update_provider", { update }),
   listProjects: () => invoke<ProjectSummary[]>("list_projects"),
   listThreads: (limit?: number) => invoke<ThreadSummary[]>("list_threads", { limit }),

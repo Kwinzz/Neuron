@@ -100,6 +100,7 @@ pub fn run() {
             commands::system::show_new_chat,
             commands::dashboard::dashboard_snapshot,
             commands::dashboard::usage_report,
+            commands::dashboard::refresh_quotas,
             commands::dashboard::update_provider,
             commands::dashboard::list_projects,
             commands::dashboard::list_threads,

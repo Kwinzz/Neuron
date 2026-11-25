@@ -336,16 +336,31 @@ impl ClaudeParser {
         let list: Vec<RateLimitWindow> = windows
             .iter()
             .filter_map(|(name, w)| {
+                let (window, group) = claude_window(name);
                 Some(RateLimitWindow {
-                    window: name.clone(),
+                    window,
                     utilization: w.get("utilization").and_then(Value::as_f64)?,
                     resets_at: w.get("resetsAt").and_then(Value::as_i64).map(|secs| secs * 1000),
-                    ..Default::default()
+                    group,
+                    models: Vec::new(),
                 })
             })
             .collect();
         if list.is_empty() { Vec::new() } else { vec![AdapterEvent::RateLimits(list)] }
     }
+}
+
+/// `five_hour` / `seven_day` as they are; a model-specific limit (`seven_day_opus`, `seven_day_sonnet`) is the
+/// weekly window of a quota group (« Opus »), shown next to the all-models one.
+fn claude_window(name: &str) -> (String, Option<String>) {
+    for base in ["five_hour", "seven_day"] {
+        if let Some(model) = name.strip_prefix(base).and_then(|rest| rest.strip_prefix('_')).filter(|m| !m.is_empty()) {
+            let mut chars = model.chars();
+            let label = chars.next().map(|c| c.to_uppercase().chain(chars).collect::<String>()).unwrap_or_default();
+            return (base.to_string(), Some(label));
+        }
+    }
+    (name.to_string(), None)
 }
 
 fn truncate(text: &str, max: usize) -> String {
@@ -475,6 +490,14 @@ mod tests {
                 .iter()
                 .any(|e| matches!(e, AdapterEvent::RateLimits(w) if w.iter().any(|w| w.window == "five_hour")))
         );
+    }
+
+    #[test]
+    fn model_specific_weekly_limits_are_groups() {
+        assert_eq!(claude_window("seven_day"), ("seven_day".to_string(), None));
+        assert_eq!(claude_window("seven_day_opus"), ("seven_day".to_string(), Some("Opus".to_string())));
+        assert_eq!(claude_window("five_hour"), ("five_hour".to_string(), None));
+        assert_eq!(claude_window("overage"), ("overage".to_string(), None));
     }
 
     #[test]

@@ -66,6 +66,9 @@ const home = {
   quotaReportedBy: "Utilisation rapportée par {agent}",
   quotaReportedByGroup: "Utilisation rapportée par {agent} (groupe le plus utilisé : {group})",
   quotaSubscriptionSource: "Abonnement · source {agent}",
+  quotaUpdatedAgo: "mis à jour {time}",
+  quotaAllModels: "Tous les modèles",
+  quotaGroupBarAria: "Quota {name} · {group}",
   quotaNoLimit: "Aucune limite définie ·",
   quotaConfigureShort: "Configurer",
   // QuotasCard

@@ -5,8 +5,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useEffect } from "react";
+import type { ProviderUsage } from "@/bindings/ProviderUsage";
 import { Skeleton } from "@/components/ui/skeleton";
 import { t } from "@/i18n";
+import { ipc } from "@/lib/ipc";
 import { useDashboard } from "@/stores/dashboard";
 import { QuotaRow } from "./QuotaRow";
 
@@ -14,10 +17,38 @@ interface QuotasCardProps {
   className?: string;
 }
 
+/** Earliest reset still to come among the provider-reported windows. */
+function nextReset(providers: ProviderUsage[], now: number): number | null {
+  let next: number | null = null;
+  for (const p of providers) {
+    for (const q of [p.live, ...p.groups]) {
+      const at = q?.resetsAt;
+      if (at != null && at > now && (next === null || at < next)) next = at;
+    }
+  }
+  return next;
+}
+
 export function QuotasCard({ className }: QuotasCardProps) {
   const providers = useDashboard((s) => s.snapshot?.providers);
   const loading = useDashboard((s) => s.loading);
   const isLoading = loading && !providers;
+
+  // Home shown: fresh quotas from the agents (Antigravity /quota, Codex / Claude logs), not the last report.
+  useEffect(() => {
+    void ipc.refreshQuotas().catch(() => undefined);
+  }, []);
+
+  // A window that resets starts over: reload then, instead of showing its old utilization.
+  useEffect(() => {
+    if (!providers) return;
+    const at = nextReset(providers, Date.now());
+    if (at === null) return;
+    // setTimeout's limit is ~24.8 days; a later reset is caught by another reload before then.
+    const delay = Math.min(at - Date.now() + 1_000, 2 ** 31 - 1);
+    const timer = setTimeout(() => void useDashboard.getState().load(), delay);
+    return () => clearTimeout(timer);
+  }, [providers]);
 
   const count = providers?.length ?? 0;
 

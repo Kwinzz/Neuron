@@ -27,17 +27,19 @@ pub fn window_name(minutes: u64) -> String {
     }
 }
 
-/// Windows from a `rate_limits` object.
-pub fn parse_rate_limits(limits: &Value) -> Vec<RateLimitWindow> {
+/// Windows from a `rate_limits` object written at `at` (Unix ms, for relative reset times).
+pub fn parse_rate_limits(limits: &Value, at: i64) -> Vec<RateLimitWindow> {
     ["primary", "secondary"]
         .iter()
         .filter_map(|key| {
             let w = limits.get(*key)?;
             let used = w.get("used_percent")?.as_f64()?;
             let minutes = w.get("window_minutes")?.as_u64()?;
-            let resets_at = w.get("resets_at").and_then(Value::as_i64).map(|s| s * 1000).or_else(|| {
-                w.get("resets_in_seconds").and_then(Value::as_i64).map(|s| crate::util::now_ms() + s * 1000)
-            });
+            let resets_at = w
+                .get("resets_at")
+                .and_then(Value::as_i64)
+                .map(|s| s * 1000)
+                .or_else(|| w.get("resets_in_seconds").and_then(Value::as_i64).map(|s| at + s * 1000));
             Some(RateLimitWindow {
                 window: window_name(minutes),
                 utilization: (used / 100.0).clamp(0.0, 1.0),
@@ -72,15 +74,27 @@ fn find_session(root: &Path, thread_id: &str) -> Option<PathBuf> {
     None
 }
 
+/// Limits of one session-file line (`token_count` event) and when Codex wrote them (Unix ms).
+pub fn from_log_line(line: &str) -> Option<(i64, Vec<RateLimitWindow>)> {
+    if !line.contains("\"rate_limits\"") {
+        return None;
+    }
+    let value: Value = serde_json::from_str(line).ok()?;
+    let limits = value.pointer("/payload/rate_limits").or_else(|| value.get("rate_limits"))?;
+    let at = value
+        .get("timestamp")
+        .and_then(Value::as_str)
+        .and_then(crate::agents::antigravity::quota::parse_rfc3339)
+        .unwrap_or_else(crate::util::now_ms);
+    let windows = parse_rate_limits(limits, at);
+    (!windows.is_empty()).then_some((at, windows))
+}
+
 /// Latest limits recorded for a Codex thread, if any.
 pub fn read_for_thread(thread_id: &str) -> Option<Vec<RateLimitWindow>> {
     let file = find_session(&codex_home()?.join("sessions"), thread_id)?;
     let text = std::fs::read_to_string(file).ok()?;
-    let line = text.lines().rev().find(|l| l.contains("\"rate_limits\""))?;
-    let value: Value = serde_json::from_str(line).ok()?;
-    let limits = value.pointer("/payload/rate_limits").or_else(|| value.get("rate_limits"))?;
-    let windows = parse_rate_limits(limits);
-    (!windows.is_empty()).then_some(windows)
+    text.lines().rev().find_map(from_log_line).map(|(_, windows)| windows)
 }
 
 #[cfg(test)]
@@ -94,7 +108,7 @@ mod tests {
                 "secondary":{"used_percent":7.5,"window_minutes":10080,"resets_at":1800500000},"credits":null}"#,
         )
         .unwrap();
-        let w = parse_rate_limits(&v);
+        let w = parse_rate_limits(&v, 0);
         assert_eq!(w.len(), 2);
         assert_eq!((w[0].window.as_str(), w[0].resets_at), ("five_hour", Some(1_800_000_000_000)));
         assert!((w[0].utilization - 0.42).abs() < 1e-9);
@@ -103,7 +117,19 @@ mod tests {
             r#"{"primary":{"used_percent":1.0,"window_minutes":43200,"resets_at":1},"secondary":null}"#,
         )
         .unwrap();
-        assert_eq!(parse_rate_limits(&free)[0].window, "thirty_day");
+        assert_eq!(parse_rate_limits(&free, 0)[0].window, "thirty_day");
+        let relative: Value =
+            serde_json::from_str(r#"{"primary":{"used_percent":5,"window_minutes":300,"resets_in_seconds":60}}"#)
+                .unwrap();
+        assert_eq!(parse_rate_limits(&relative, 1_000)[0].resets_at, Some(61_000));
+    }
+
+    #[test]
+    fn limits_of_a_log_line() {
+        let line = r#"{"timestamp":"1970-01-01T00:00:10Z","type":"event_msg","payload":{"type":"token_count","info":null,"rate_limits":{"primary":{"used_percent":20,"window_minutes":10080,"resets_in_seconds":5}}}}"#;
+        let (at, w) = from_log_line(line).unwrap();
+        assert_eq!((at, w[0].window.as_str(), w[0].resets_at), (10_000, "seven_day", Some(15_000)));
+        assert!(from_log_line(r#"{"type":"event_msg","payload":{"type":"agent_message"}}"#).is_none());
     }
 
     #[test]

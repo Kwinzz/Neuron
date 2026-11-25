@@ -3,7 +3,7 @@
 use std::time::Instant;
 
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, State};
 use ts_rs::TS;
 
 use crate::db::projects::{self, ProjectSummary};
@@ -46,7 +46,7 @@ pub async fn dashboard_snapshot(state: State<'_, AppState>, range: Option<UsageR
             let active_threads = threads::list_active(conn)?;
             let recent_threads = threads::list_recent(conn, RECENT_LIMIT)?;
             let projects = projects::list(conn)?;
-            let live_quotas = providers::live_quotas(conn)?;
+            let live_quotas = providers::live_quotas(conn, now)?;
             Ok(DashboardSnapshot {
                 providers,
                 usage,
@@ -58,6 +58,15 @@ pub async fn dashboard_snapshot(state: State<'_, AppState>, range: Option<UsageR
             })
         })
         .await
+}
+
+/// Home screen shown: ask for fresh subscription windows (Antigravity `/quota`, Codex / Claude logs). Both are
+/// throttled; the dashboard reloads on `quotas://changed` / `usage://changed`.
+#[tauri::command]
+pub async fn refresh_quotas(app: AppHandle, state: State<'_, AppState>) -> AppResult<()> {
+    crate::usage_import::trigger(&app);
+    tauri::async_runtime::spawn(crate::agents::antigravity::quota::refresh(state.db.clone(), app));
+    Ok(())
 }
 
 #[tauri::command]

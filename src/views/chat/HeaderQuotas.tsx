@@ -31,16 +31,17 @@ function tone(utilization: number): string {
 
 /**
  * Providers with several quota groups (Antigravity: « Gemini Models », « Claude and GPT models »…): the group
- * whose models match the chat's model label, else the first one (the CLI's default model is a Gemini).
+ * whose models match the chat's model label, else the all-models windows (Claude, Codex), else the first group
+ * (Antigravity's default model is a Gemini). `null` = the windows without a group.
  */
 function groupFor(windows: LiveWindow[], modelLabel: string | null): string | null {
-  const groups = windows.map((w) => w.group).filter((g): g is string => g !== null);
-  if (groups.length === 0) return null;
   const label = modelLabel?.toLowerCase() ?? "";
   const match = label
     ? windows.find((w) => w.models.some((m) => label.startsWith(m.toLowerCase())))?.group
     : undefined;
-  return match ?? groups[0] ?? null;
+  if (match) return match;
+  if (windows.some((w) => w.group === null)) return null;
+  return windows[0]?.group ?? null;
 }
 
 const QuotaChip = memo(function QuotaChip({ window: w, now }: { window: LiveWindow; now: number }) {
@@ -75,7 +76,7 @@ export const HeaderQuotas = memo(function HeaderQuotas({ agent, model }: { agent
   if (!quotas) return null;
   const group = groupFor(quotas.windows, modelLabel);
   const shown = ORDER.map((name) =>
-    quotas.windows.find((w) => w.window === name && (group === null || w.group === group)),
+    quotas.windows.find((w) => w.window === name && w.group === group),
   ).filter(
     (w): w is LiveWindow => w !== undefined,
   );

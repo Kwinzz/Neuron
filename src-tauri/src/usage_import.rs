@@ -18,6 +18,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager};
 
+use crate::agents::RateLimitWindow;
 use crate::agents::antigravity::quota::parse_rfc3339;
 use crate::agents::events::{AgentKind, TokenUsage};
 use crate::state::AppState;
@@ -169,8 +170,19 @@ fn codex_row(line: &str, state: &mut FileState) -> Option<Row> {
     }
 }
 
+/// Subscription windows found in a log and when the CLI wrote them (Unix ms).
+type Limits = (i64, Vec<RateLimitWindow>);
+
+/// What one pass over a file found.
+struct FileRead {
+    rows: Vec<Row>,
+    state: FileState,
+    /// Codex: the newest `rate_limits` of the lines read (terminal sessions included).
+    limits: Option<Limits>,
+}
+
 /// Complete lines of `path` after `state.offset` → rows and the state after them.
-fn read_file(path: &Path, source: Source, mut state: FileState) -> std::io::Result<(Vec<Row>, FileState)> {
+fn read_file(path: &Path, source: Source, mut state: FileState) -> std::io::Result<FileRead> {
     let mut file = std::fs::File::open(path)?;
     let size = file.metadata()?.len();
     if size < state.offset {
@@ -178,23 +190,38 @@ fn read_file(path: &Path, source: Source, mut state: FileState) -> std::io::Resu
         state = FileState::default();
     }
     if size == state.offset {
-        return Ok((Vec::new(), state));
+        return Ok(FileRead { rows: Vec::new(), state, limits: None });
     }
     file.seek(SeekFrom::Start(state.offset))?;
     let mut buf = Vec::new();
     file.take(MAX_READ).read_to_end(&mut buf)?;
     // Only complete lines: a line being written is read next time.
-    let Some(end) = buf.iter().rposition(|b| *b == b'\n') else { return Ok((Vec::new(), state)) };
+    let Some(end) = buf.iter().rposition(|b| *b == b'\n') else {
+        return Ok(FileRead { rows: Vec::new(), state, limits: None });
+    };
+    let text = String::from_utf8_lossy(&buf[..=end]);
     let mut rows = Vec::new();
-    for line in String::from_utf8_lossy(&buf[..=end]).lines() {
+    for line in text.lines() {
         let row = match source {
             Source::Claude => claude_row(line),
             Source::Codex => codex_row(line, &mut state),
         };
         rows.extend(row);
     }
+    let limits = match source {
+        Source::Codex => text.lines().rev().find_map(crate::agents::codex::limits::from_log_line),
+        Source::Claude => None,
+    };
     state.offset += end as u64 + 1;
-    Ok((rows, state))
+    Ok(FileRead { rows, state, limits })
+}
+
+/// Keep the most recent of two reports.
+fn newest(a: Option<Limits>, b: Option<Limits>) -> Option<Limits> {
+    match (a, b) {
+        (Some(a), Some(b)) => Some(if b.0 > a.0 { b } else { a }),
+        (a, b) => a.or(b),
+    }
 }
 
 fn jsonl_files(dir: &Path, out: &mut Vec<PathBuf>) {
@@ -318,14 +345,17 @@ async fn import_once(app: &AppHandle) -> usize {
     let Ok(home) = app.path().home_dir() else { return 0 };
     let files = tokio::task::spawn_blocking(move || log_files(&home)).await.unwrap_or_default();
     let mut added = 0;
+    let mut codex_limits: Option<Limits> = None;
     for (source, path) in files {
         let key = path.display().to_string();
         let k = key.clone();
         let Ok(previous) = state.db.call(move |c| Ok(load_state(c, &k)?)).await else { continue };
         let before = previous.clone();
-        let Ok(Ok((rows, next))) = tokio::task::spawn_blocking(move || read_file(&path, source, previous)).await else {
+        let Ok(Ok(read)) = tokio::task::spawn_blocking(move || read_file(&path, source, previous)).await else {
             continue;
         };
+        let FileRead { rows, state: next, limits } = read;
+        codex_limits = newest(codex_limits, limits);
         if next == before {
             continue;
         }
@@ -334,7 +364,32 @@ async fn import_once(app: &AppHandle) -> usize {
             Err(err) => tracing::warn!(%err, "usage import: file not stored"),
         }
     }
+    if let Some((at, windows)) = codex_limits {
+        store_codex_limits(&state, app, at, windows).await;
+    }
     added
+}
+
+/// Codex limits read in its logs replace the stored ones when they are more recent (a Codex session run in a
+/// terminal moves the dashboard's bars too).
+async fn store_codex_limits(state: &AppState, app: &AppHandle, at: i64, windows: Vec<RateLimitWindow>) {
+    let saved = state
+        .db
+        .call(move |c| {
+            if crate::db::providers::live_reported_at(c, AgentKind::Codex)? >= at {
+                return Ok(false);
+            }
+            crate::db::providers::store_live_windows(c, AgentKind::Codex, &windows, at)?;
+            Ok(true)
+        })
+        .await;
+    match saved {
+        Ok(true) => {
+            let _ = app.emit(crate::agents::antigravity::quota::QUOTAS_CHANGED_EVENT, ());
+        }
+        Ok(false) => {}
+        Err(err) => tracing::warn!(%err, "codex limits not saved"),
+    }
 }
 
 /// Runs an import pass unless one is already running; the dashboard is told when usage was added.
@@ -433,7 +488,7 @@ mod tests {
         // First pass: the duplicate line counts once, the unfinished last line waits.
         let added = db
             .call(move |c| {
-                let (rows, next) = read_file(&f1, Source::Claude, load_state(c, &p1)?).unwrap();
+                let FileRead { rows, state: next, .. } = read_file(&f1, Source::Claude, load_state(c, &p1)?).unwrap();
                 Ok(store(c, Source::Claude, &p1, &rows, &next)?)
             })
             .await
@@ -444,7 +499,7 @@ mod tests {
         let f2 = file.clone();
         let added = db
             .call(move |c| {
-                let (rows, next) = read_file(&f2, Source::Claude, load_state(c, &p2)?).unwrap();
+                let FileRead { rows, state: next, .. } = read_file(&f2, Source::Claude, load_state(c, &p2)?).unwrap();
                 Ok(store(c, Source::Claude, &p2, &rows, &next)?)
             })
             .await

@@ -128,7 +128,8 @@ pub fn windows(result: &Value) -> Vec<RateLimitWindow> {
             out.push(RateLimitWindow {
                 window: window_name(window),
                 utilization: (1.0 - remaining).clamp(0.0, 1.0),
-                resets_at: bucket.get("reset_time").and_then(Value::as_str).and_then(parse_rfc3339),
+                // An unused group reports `1970-01-01T00:00:00Z`: no window running, no reset time.
+                resets_at: bucket.get("reset_time").and_then(Value::as_str).and_then(parse_rfc3339).filter(|t| *t > 0),
                 group: (!name.is_empty()).then(|| name.clone()),
                 models: models.clone(),
             });
@@ -286,6 +287,14 @@ mod tests {
         let text = render("quota", &v, gemini_5h.resets_at.unwrap() - 3_600_000);
         assert!(text.contains("Gemini Models · Limite 5 h: "), "{text}");
         assert!(text.contains("% utilisé · reset dans 1 h 00 min"), "{text}");
+    }
+
+    #[test]
+    fn unused_group_has_no_reset_time() {
+        let v = serde_json::json!({"command":{"data":{"groups":[{"name":"Claude and GPT models","buckets":[
+            {"window":"weekly","remaining_fraction":1,"reset_time":"1970-01-01T00:00:00Z"}]}]}}});
+        let w = windows(&v);
+        assert_eq!((w[0].window.as_str(), w[0].utilization, w[0].resets_at), ("seven_day", 0.0, None));
     }
 
     #[test]

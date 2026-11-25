@@ -13,6 +13,6 @@ utilization: number, resetsAt: number | null,
  */
 reportedAt: number, 
 /**
- * Quota group shown (Antigravity: the most used one, « Gemini Models »…).
+ * Quota group (Antigravity: « Gemini Models »…; Claude: « Opus » for a model-specific weekly limit).
  */
 group: string | null, };
