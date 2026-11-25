@@ -278,8 +278,7 @@ html.platform-linux .chat-reveal > * {
   animation: none !important;
 }
 /* Hover / focus transitions: in WebKitGTK each frame of a 150 ms color fade can repaint the whole window, so
-   moving the mouse across buttons and cards made the UI stutter. Instant state changes on Linux (entrance
-   animations — `animate-in`, menus, dialogs — are animations, not transitions, and stay). */
+   moving the mouse across buttons and cards made the UI stutter. Instant state changes on Linux. */
 html.platform-linux *,
 html.platform-linux *::before,
 html.platform-linux *::after {
@@ -288,8 +287,17 @@ html.platform-linux *::after {
 }
 /* Menus, selects, popovers, tooltips, dialogs: no closing animation on Linux. Radix waits for the end of the exit
    animation before removing them, and under WebKitGTK the menu could snap back for a moment after a choice
-   (disappear, reappear ~1 s, disappear). Opening animations stay. */
+   (disappear, reappear ~1 s, disappear). */
 html.platform-linux [data-state="closed"] {
+  animation: none !important;
+}
+/* Entrance animations — `animate-in` (menus, selects, popovers, tooltips, dialogs, sheets, cards of the chat,
+   sidebar rows) and the view change: they animate opacity with a 3D transform and a blur filter, so WebKitGTK gives
+   each a compositing layer of its own, and the whole window flickered for a moment whenever an interface popped up.
+   Everything appears at once on Linux. (`[class*=…]`: also the variant classes, `data-open:animate-in`…) */
+html.platform-linux [class*="animate-in"],
+html.platform-linux .view-enter,
+html.platform-linux .view-fade {
   animation: none !important;
 }
 
