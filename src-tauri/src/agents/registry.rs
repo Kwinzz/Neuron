@@ -684,7 +684,14 @@ impl AgentRegistry {
                     emit(&app, &id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::AwaitingApproval, detail });
                 }
                 AdapterEvent::TurnComplete { mut usage, duration_ms, error } => {
-                    let (stopped, _) = self.take_flags(&id, generation);
+                    let (stopped, shutdown) = self.take_flags(&id, generation);
+                    // Neuron ended this process itself (idle reaper, settings changed, chat deleted): agy then
+                    // answers stdin's EOF with a failed `result` (« stream input cancelled: context canceled »).
+                    // Not a turn of the user's — and with a restart, the new process may already be working.
+                    if shutdown {
+                        tracing::debug!(thread = %id, ?error, "turn end of a terminated session ignored");
+                        continue;
+                    }
                     // The CLI logged this turn: bring it into the dashboard now (logs are its source of truth).
                     if matches!(rt.agent, AgentKind::ClaudeCode | AgentKind::Codex) {
                         crate::usage_import::trigger(&app);

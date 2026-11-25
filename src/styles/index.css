@@ -271,14 +271,11 @@ html.platform-linux [class*="backdrop-blur"] {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
 }
+/* No fade-in of a fresh answer's blocks on Linux: WebKitGTK could leave the animation on its first frame
+   (opacity 0), so the answer stayed invisible until the chat was reopened — all of it at the end of a turn, when the
+   message is re-rendered whole. The text still appears progressively (useSmoothText). */
 html.platform-linux .chat-reveal > * {
-  animation-name: chat-rise-lite;
-}
-@keyframes chat-rise-lite {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
+  animation: none !important;
 }
 /* Hover / focus transitions: in WebKitGTK each frame of a 150 ms color fade can repaint the whole window, so
    moving the mouse across buttons and cards made the UI stutter. Instant state changes on Linux (entrance

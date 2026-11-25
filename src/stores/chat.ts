@@ -9,6 +9,7 @@ import { create } from "zustand";
 import type { AgentEventEnvelope } from "@/bindings/AgentEventEnvelope";
 import type { Attachment } from "@/bindings/Attachment";
 import type { ChatItem } from "@/bindings/ChatItem";
+import { nextFrame } from "@/lib/frame";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { toast } from "@/stores/toast";
 import { t } from "@/i18n";
@@ -155,7 +156,7 @@ function reduce(items: ChatItem[], { ts, event }: AgentEventEnvelope): ChatItem[
 
 // ---- per-frame batching -----------------------------------------------------------------------
 const queue = new Map<string, AgentEventEnvelope[]>();
-let frame: number | null = null;
+let frame: (() => void) | null = null;
 
 export const useChat = create<ChatState>((set, get) => {
   const patch = (threadId: string, fn: (t: ChatThread) => ChatThread) =>
@@ -170,7 +171,11 @@ export const useChat = create<ChatState>((set, get) => {
       const threads = { ...s.threads };
       for (const [threadId, events] of pending) {
         const t = threads[threadId];
-        if (!t?.loaded) continue; // history (loaded later) already contains persisted items
+        if (!t?.loaded) {
+          // History still loading (another chat's events triggered this frame): `load` replays them once done.
+          if (t?.loading) queue.set(threadId, events);
+          continue;
+        }
         let items = t.items;
         for (const e of events) items = reduce(items, e);
         if (items !== t.items) threads[threadId] = { ...t, items };
@@ -243,7 +248,7 @@ export const useChat = create<ChatState>((set, get) => {
       const list = queue.get(envelope.threadId);
       if (list) list.push(envelope);
       else queue.set(envelope.threadId, [envelope]);
-      if (t.loaded && frame === null) frame = requestAnimationFrame(flush);
+      if (t.loaded && frame === null) frame = nextFrame(flush);
     },
   };
 });

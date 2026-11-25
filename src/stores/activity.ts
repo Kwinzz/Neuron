@@ -6,6 +6,7 @@
 import { create } from "zustand";
 import type { AgentEventEnvelope } from "@/bindings/AgentEventEnvelope";
 import type { SubagentStatus } from "@/bindings/SubagentStatus";
+import { nextFrame } from "@/lib/frame";
 
 export type TermLineKind = "tool" | "text" | "thinking" | "permission" | "status" | "error";
 export type TermLineState = "running" | "ok" | "error";
@@ -96,11 +97,11 @@ function upsert(list: TermLine[], line: TermLine): TermLine[] {
 // Streaming text arrives in many small deltas: accumulate them and publish at most once per frame.
 const pendingText = new Map<string, { threadId: string; messageId: string; thinking: boolean; text: string }>();
 const fullText = new Map<string, string>();
-let frame = 0;
+let frame: (() => void) | null = null;
 
 export const useActivity = create<ActivityState>((set, get) => {
   const flush = () => {
-    frame = 0;
+    frame = null;
     if (pendingText.size === 0) return;
     const batch = [...pendingText.values()];
     pendingText.clear();
@@ -150,7 +151,7 @@ export const useActivity = create<ActivityState>((set, get) => {
           const p = pendingText.get(key);
           if (p) p.text += event.text;
           else pendingText.set(key, { threadId, messageId: event.messageId, thinking: event.channel === "thinking", text: event.text });
-          if (!frame) frame = requestAnimationFrame(flush);
+          if (!frame) frame = nextFrame(flush);
           return;
         }
         case "MessageCompleted":

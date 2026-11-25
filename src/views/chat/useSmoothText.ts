@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { nextFrame } from "@/lib/frame";
 import { IS_LINUX } from "@/lib/platform";
 
 /**
@@ -30,14 +31,14 @@ export function useSmoothText(target: string, animate: boolean): { text: string;
       lengthRef.current = target.length; // text was replaced by something shorter
       setLength(target.length);
     }
-    let frame = 0;
+    let cancel = () => {};
     let last = 0;
     const tick = (now: number) => {
       const backlog = target.length - lengthRef.current;
       if (backlog <= 0) return;
       const elapsed = last === 0 ? FRAME_MS : now - last;
       if (elapsed < MIN_UPDATE_MS) {
-        frame = requestAnimationFrame(tick);
+        cancel = nextFrame(tick);
         return;
       }
       last = now;
@@ -46,10 +47,10 @@ export function useSmoothText(target: string, animate: boolean): { text: string;
       const step = Math.max(2, Math.ceil(backlog / 14)) * frames;
       lengthRef.current = Math.min(target.length, lengthRef.current + step);
       setLength(lengthRef.current);
-      frame = requestAnimationFrame(tick);
+      cancel = nextFrame(tick);
     };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
+    cancel = nextFrame(tick);
+    return () => cancel();
   }, [target, animate]);
 
   const shown = Math.min(length, target.length);
