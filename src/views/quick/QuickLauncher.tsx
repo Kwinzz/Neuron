@@ -5,6 +5,7 @@ import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useRef, use
 import type { AgentKind } from "@/bindings/AgentKind";
 import type { ThreadSummary } from "@/bindings/ThreadSummary";
 import neuronMark from "@/assets/neuron-mark.png";
+import { EffortPicker } from "@/components/chat/EffortPicker";
 import { ModelPicker } from "@/components/chat/ModelPicker";
 import { AgentLogo } from "@/components/ui/AgentLogo";
 import {
@@ -57,6 +58,7 @@ export function QuickLauncher() {
   const [selected, setSelected] = useState(0);
   const [choice, setChoiceState] = useState<QuickModel>(initialChoice);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [effortOpen, setEffortOpen] = useState(false);
   const agent = choice.agent;
   const setChoice = (next: QuickModel) => {
     setChoiceState(next);
@@ -72,6 +74,7 @@ export function QuickLauncher() {
     setSelected(0);
     setChoiceState(initialChoice());
     setPickerOpen(false);
+    setEffortOpen(false);
     setProjectOpen(false);
     setProjectIdState(readQuickProject());
     setState("idle");
@@ -196,6 +199,11 @@ export function QuickLauncher() {
       e.preventDefault();
       setSelected(0);
       setPickerOpen(true);
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "r") {
+      // Ctrl+R: reasoning level (the browser reload is disabled anyway, see browserKeys).
+      e.preventDefault();
+      setSelected(0);
+      setEffortOpen(true);
     } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
       e.preventDefault();
       setProjectOpen(true);
@@ -299,6 +307,23 @@ export function QuickLauncher() {
                     setChoice({ agent: nextAgent, model: resolveModelId(next, effort), effort });
                   }}
                 />
+                <EffortPicker
+                  agent={agent}
+                  model={choice.model}
+                  effort={choice.effort}
+                  open={effortOpen}
+                  onOpenChange={(open) => {
+                    setEffortOpen(open);
+                    if (open) setSelected(0);
+                  }}
+                  // Back to the request field, not to the menu's button.
+                  onCloseAutoFocus={(e) => {
+                    e.preventDefault();
+                    inputRef.current?.focus();
+                  }}
+                  className="h-7 gap-1.5 px-2 text-xs font-normal text-muted-foreground transition-colors duration-150 hover:text-foreground"
+                  onChange={(effort, model) => setChoice({ ...choice, effort, model })}
+                />
               </span>
             </Row>
           </li>
@@ -326,10 +351,11 @@ export function QuickLauncher() {
           ))}
         </ul>
 
-        <footer className="flex items-center gap-3 border-t px-4 py-2 text-xs whitespace-nowrap text-muted-foreground">
+        <footer className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t px-4 py-2 text-xs whitespace-nowrap text-muted-foreground">
           <Hint keys="↑ ↓">{t("quick.hintChat")}</Hint>
           <Hint keys="Tab">{t("quick.hintAgent")}</Hint>
           <Hint keys="Ctrl M">{t("quick.hintModel")}</Hint>
+          <Hint keys="Ctrl R">{t("quick.hintEffort")}</Hint>
           <Hint keys="Ctrl P">{t("quick.hintProject")}</Hint>
           <Hint keys="Ctrl ↵">{t("quick.hintSendOpen")}</Hint>
           <span className="ml-auto flex items-center gap-1.5 text-foreground">

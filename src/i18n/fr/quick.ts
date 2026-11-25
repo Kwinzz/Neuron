@@ -16,6 +16,7 @@ const quick = {
   hintChat: "chat",
   hintAgent: "agent",
   hintModel: "modèle",
+  hintEffort: "raisonnement",
   hintProject: "projet",
   hintSendOpen: "envoyer + ouvrir",
   send: "Envoyer",

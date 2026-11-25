@@ -17,6 +17,7 @@ const quick: Translation<typeof fr> = {
   hintChat: "chat",
   hintAgent: "agent",
   hintModel: "model",
+  hintEffort: "reasoning",
   hintProject: "project",
   hintSendOpen: "send + open",
   send: "Send",
