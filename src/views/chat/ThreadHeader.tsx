@@ -2,10 +2,17 @@ import { IS_LINUX } from "@/lib/platform";
 import { type KeyboardEvent, memo, useEffect, useRef, useState } from "react";
 import { cn } from "cn";
 import { ContextIndicator } from "@/components/context/ContextIndicator";
-import { FolderOpen, Pencil, Square } from "lucide-react";
+import { FolderOpen, MoreHorizontal, Pencil, Square, Trash2 } from "lucide-react";
 import { AgentLogo } from "@/components/ui/AgentLogo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { LiveTimer } from "@/components/ui/LiveTimer";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,6 +30,7 @@ import { formatTokens } from "@/lib/format";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { describeStatus, STATUS, TONE_TEXT } from "@/lib/status";
 import { useChat } from "@/stores/chat";
+import { useChatDeletion } from "@/stores/chatDeletion";
 import { useLive } from "@/stores/live";
 import { effortLabel } from "@/lib/models";
 import { findModel, useModels } from "@/stores/models";
@@ -182,6 +190,25 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
               {t("chat.stop")}
             </Button>
           )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label={t("chat.chatActions")}>
+                <MoreHorizontal />
+              </Button>
+            </DropdownMenuTrigger>
+            {/* No focus back to the trigger on close: it would blur the rename field right away (= commit). */}
+            <DropdownMenuContent align="end" className="w-48" onCloseAutoFocus={(e) => e.preventDefault()}>
+              <DropdownMenuItem onClick={startEdit}>
+                <Pencil />
+                {t("chat.rename")}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onClick={() => useChatDeletion.getState().request(threadId)}>
+                <Trash2 />
+                {t("chat.deleteChat")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>

@@ -36,6 +36,13 @@ const chat: Translation<typeof fr> = {
   renameFailed: "Couldn't rename",
   chatName: "Chat name",
   rename: "Rename",
+  chatActions: "Chat actions",
+  deleteChat: "Delete chat",
+  deleteChatTitle: "Delete this chat?",
+  deleteChatDescription:
+    "“{title}” and its whole history will be permanently deleted. Tokens and costs already counted stay in the dashboard.",
+  deleteChatFailed: "Chat not deleted",
+  chatDeleted: "Chat deleted",
   defaultModel: "default model",
   tokens: "{n} tokens",
   // TurnMarker

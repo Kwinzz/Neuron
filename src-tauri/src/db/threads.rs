@@ -280,4 +280,29 @@ mod tests {
         .await
         .unwrap();
     }
+
+    #[tokio::test]
+    async fn delete_drops_history_but_keeps_usage() {
+        let db = Db::open_in_memory().unwrap();
+        db.call(|conn| {
+            conn.execute_batch(
+                "INSERT INTO threads (id, project_id, agent, title, status, created_at, updated_at)
+                   VALUES ('t1', NULL, 'claude_code', 'Old', 'done', 1, 5);
+                 INSERT INTO messages (id, thread_id, seq, role, content, created_at) VALUES ('m1', 't1', 1, 'user', 'hi', 1);
+                 INSERT INTO tool_calls (id, thread_id, name, started_at) VALUES ('c1', 't1', 'Bash', 1);
+                 INSERT INTO token_usage (thread_id, agent, input_tokens, output_tokens, cost_usd, ts)
+                   VALUES ('t1', 'claude_code', 100, 20, 0.1, 1);",
+            )?;
+            delete(conn, "t1")?;
+            assert!(get(conn, "t1")?.is_none());
+            let count = |sql: &str| conn.query_row(sql, [], |r| r.get::<_, i64>(0));
+            assert_eq!(count("SELECT COUNT(*) FROM messages")?, 0);
+            assert_eq!(count("SELECT COUNT(*) FROM tool_calls")?, 0);
+            // The dashboard keeps what the chat cost.
+            assert_eq!(count("SELECT COUNT(*) FROM token_usage WHERE thread_id IS NULL")?, 1);
+            Ok(())
+        })
+        .await
+        .unwrap();
+    }
 }

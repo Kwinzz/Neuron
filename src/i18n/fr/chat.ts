@@ -37,6 +37,13 @@ const chat = {
   renameFailed: "Renommage impossible",
   chatName: "Nom du chat",
   rename: "Renommer",
+  chatActions: "Actions du chat",
+  deleteChat: "Supprimer le chat",
+  deleteChatTitle: "Supprimer ce chat ?",
+  deleteChatDescription:
+    "« {title} » et tout son historique seront supprimés définitivement. Les tokens et coûts déjà comptés restent dans le tableau de bord.",
+  deleteChatFailed: "Chat non supprimé",
+  chatDeleted: "Chat supprimé",
   defaultModel: "modèle par défaut",
   tokens: "{n} tokens",
   // TurnMarker

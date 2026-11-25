@@ -36,6 +36,8 @@ interface ChatState {
   stop: (threadId: string) => Promise<void>;
   /** Called by the agent-event bridge for every event. */
   enqueue: (envelope: AgentEventEnvelope) => void;
+  /** Drop a deleted chat's timeline. */
+  forget: (threadId: string) => void;
 }
 
 const EMPTY: ChatThread = { items: [], loaded: false, loading: false, error: null };
@@ -249,6 +251,16 @@ export const useChat = create<ChatState>((set, get) => {
       if (list) list.push(envelope);
       else queue.set(envelope.threadId, [envelope]);
       if (t.loaded && frame === null) frame = nextFrame(flush);
+    },
+
+    forget: (threadId) => {
+      queue.delete(threadId);
+      set((s) => {
+        if (!(threadId in s.threads)) return s;
+        const threads = { ...s.threads };
+        delete threads[threadId];
+        return { threads };
+      });
     },
   };
 });

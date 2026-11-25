@@ -50,6 +50,7 @@ import { STATUS } from "@/lib/status";
 import { useDashboard } from "@/stores/dashboard";
 import { useLive } from "@/stores/live";
 import { useNav } from "@/stores/nav";
+import { useChatDeletion } from "@/stores/chatDeletion";
 import { toast } from "@/stores/toast";
 import { useUi } from "@/stores/ui";
 import neuronMark from "@/assets/neuron-mark.png";
@@ -357,6 +358,35 @@ function LooseChatsNav() {
   );
 }
 
+/** "…" menu of a chat row (shown on hover): delete, after confirmation (`DeleteChatDialog`). */
+function ChatActions({ chatId, sub }: { chatId: string; sub: boolean }) {
+  const trigger = sub ? (
+    <button
+      type="button"
+      className="absolute top-1/2 right-1 flex size-5 -translate-y-1/2 items-center justify-center rounded-md text-sidebar-foreground opacity-0 outline-hidden group-focus-within/menu-sub-item:opacity-100 group-hover/menu-sub-item:opacity-100 hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring aria-expanded:opacity-100 [&>svg]:size-4"
+    >
+      <MoreHorizontal />
+      <span className="sr-only">{t("chat.chatActions")}</span>
+    </button>
+  ) : (
+    <SidebarMenuAction showOnHover>
+      <MoreHorizontal />
+      <span className="sr-only">{t("chat.chatActions")}</span>
+    </SidebarMenuAction>
+  );
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent side="right" align="start" className="w-48">
+        <DropdownMenuItem variant="destructive" onClick={() => useChatDeletion.getState().request(chatId)}>
+          <Trash2 />
+          {t("chat.deleteChat")}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 /** A chat entry; title and status come from the live store when available. */
 const ChatLink = memo(function ChatLink({ chat, sub = false }: { chat: ThreadSummary; sub?: boolean }) {
   const title = useLive((s) => s.threads[chat.id]?.title ?? chat.title);
@@ -368,10 +398,24 @@ const ChatLink = memo(function ChatLink({ chat, sub = false }: { chat: ThreadSum
 
   if (sub) {
     return (
-      <SidebarMenuSubButton isActive={active} onClick={open} title={label}>
-        <span className="min-w-0 flex-1 truncate">{label}</span>
-        {working && <StatusDot status={status} className="shrink-0 animate-in fade-in-0 zoom-in-50 duration-200" />}
-      </SidebarMenuSubButton>
+      <>
+        {/* On hover the "…" button takes the status dot's place, at the row's right edge. */}
+        <SidebarMenuSubButton
+          isActive={active}
+          onClick={open}
+          title={label}
+          className="group-focus-within/menu-sub-item:pr-7 group-hover/menu-sub-item:pr-7"
+        >
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+          {working && (
+            <StatusDot
+              status={status}
+              className="shrink-0 animate-in fade-in-0 zoom-in-50 duration-200 group-focus-within/menu-sub-item:hidden group-hover/menu-sub-item:hidden"
+            />
+          )}
+        </SidebarMenuSubButton>
+        <ChatActions chatId={chat.id} sub />
+      </>
     );
   }
   return (
@@ -382,10 +426,11 @@ const ChatLink = memo(function ChatLink({ chat, sub = false }: { chat: ThreadSum
         <span>{label}</span>
       </SidebarMenuButton>
       {working && (
-        <SidebarMenuBadge>
+        <SidebarMenuBadge className="group-focus-within/menu-item:opacity-0 group-hover/menu-item:opacity-0">
           <StatusDot status={status} className="animate-in fade-in-0 zoom-in-50 duration-200" />
         </SidebarMenuBadge>
       )}
+      <ChatActions chatId={chat.id} sub={false} />
     </>
   );
 });

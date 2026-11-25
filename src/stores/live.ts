@@ -33,6 +33,8 @@ interface LiveState {
   applyEvent: (envelope: AgentEventEnvelope, focusedThreadId: string | null) => void;
   markSeen: (id: string) => void;
   clearAttention: () => void;
+  /** A deleted chat leaves the dock and every live view. */
+  remove: (id: string) => void;
 }
 
 function fromSummary(s: ThreadSummary, previous?: LiveThread): LiveThread {
@@ -169,6 +171,16 @@ export const useLive = create<LiveState>((set, get) => ({
     }),
 
   clearAttention: () => set({ attention: {} }),
+
+  remove: (id) =>
+    set((state) => {
+      if (!(id in state.threads) && !(id in state.attention)) return state;
+      const threads = { ...state.threads };
+      const attention = { ...state.attention };
+      delete threads[id];
+      delete attention[id];
+      return { threads, attention };
+    }),
 }));
 
 /** Ids shown in the dock: active threads first (newest run first), then recently finished. */
