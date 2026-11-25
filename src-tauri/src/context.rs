@@ -361,11 +361,9 @@ pub fn neuron_intro(memory_file: Option<&Path>, project: Option<&Path>) -> Strin
          ## Mémoire globale\n\
          Neuron tient une mémoire partagée par tous les agents de l'utilisateur — profil, préférences techniques, \
          style de code, règles strictes —, comme la mémoire d'un assistant web. Elle t'est donnée au démarrage du \
-         chat quand elle n'est pas vide, et tu y accèdes avec les outils MCP du serveur `neuron` :\n\
-         - `neuron_memory_read` / `neuron_memory_search` pour la consulter (chaque souvenir a un identifiant) ;\n\
-         - `neuron_memory_save` pour ajouter un souvenir durable ;\n\
-         - `neuron_memory_update` / `neuron_memory_delete` pour corriger ou retirer un souvenir devenu faux.\n\
-         Quand l'utilisateur te demande de retenir, corriger ou oublier quelque chose, fais-le avec ces outils et \
+         chat quand elle n'est pas vide, et tu y accèdes avec l'outil MCP `neuron_memory` (actions read, search, \
+         save, update, delete).\n\
+         Quand l'utilisateur te demande de retenir, corriger ou oublier quelque chose, fais-le avec cet outil et \
          dis-le-lui en une phrase. Enregistre aussi de toi-même une préférence ou une règle permanente qu'il exprime \
          clairement ; jamais d'information passagère ni de secret.\n",
         "# Neuron\n\
@@ -382,11 +380,8 @@ pub fn neuron_intro(memory_file: Option<&Path>, project: Option<&Path>) -> Strin
          ## Global memory\n\
          Neuron keeps a memory shared by all the user's agents — profile, tech preferences, code style, strict \
          rules —, like a web assistant's memory. It is given to you when the chat starts if it isn't empty, and \
-         you reach it with the MCP tools of the `neuron` server:\n\
-         - `neuron_memory_read` / `neuron_memory_search` to look it up (each memory has an id);\n\
-         - `neuron_memory_save` to add a lasting memory;\n\
-         - `neuron_memory_update` / `neuron_memory_delete` to fix or remove a memory that became wrong.\n\
-         When the user asks you to remember, correct or forget something, do it with these tools and tell them in \
+         you reach it with the MCP tool `neuron_memory` (actions read, search, save, update, delete).\n\
+         When the user asks you to remember, correct or forget something, do it with this tool and tell them in \
          one sentence. Also save on your own a lasting preference or rule they state clearly; never passing \
          information nor secrets.\n"
     );
@@ -406,13 +401,13 @@ pub fn neuron_intro(memory_file: Option<&Path>, project: Option<&Path>) -> Strin
              Ce chat appartient à un projet Neuron. Son fichier de contexte `{CONTEXT_REL}` (dans `{root}`) est injecté \
              dans chaque nouveau chat du projet. Tiens-le à jour quand tu apprends ou décides quelque chose de durable : \
              objectif, architecture, décisions, conventions, commandes utiles. Utilise \
-             `neuron_project_context_read` / `neuron_project_context_update` (ou tes outils de fichiers). Lis-le \
+             l'outil `neuron_project_context` (ou tes outils de fichiers). Lis-le \
              avant de le modifier, garde ce qui reste vrai et reste concis.\n",
             "\n## Project context\n\
              This chat belongs to a Neuron project. Its context file `{CONTEXT_REL}` (in `{root}`) is injected into \
              every new chat of the project. Keep it up to date when you learn or decide something lasting: goal, \
-             architecture, decisions, conventions, useful commands. Use `neuron_project_context_read` / \
-             `neuron_project_context_update` (or your file tools). Read it before changing it, keep what is still \
+             architecture, decisions, conventions, useful commands. Use the \
+             `neuron_project_context` tool (or your file tools). Read it before changing it, keep what is still \
              true and stay concise.\n"
         ));
     }

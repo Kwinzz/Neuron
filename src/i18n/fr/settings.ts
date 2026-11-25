@@ -118,13 +118,8 @@ const settings = {
   shortcutsDescription: "Ctrl correspond à ⌘ sur macOS.",
 
   // AgentsMcpCard
-  toolMemoryRead: "Lit toute la mémoire, groupée par catégorie.",
-  toolMemorySearch: "Recherche plein texte dans les souvenirs.",
-  toolMemorySave: "Enregistre un nouveau souvenir durable.",
-  toolMemoryUpdate: "Corrige un souvenir (texte ou catégorie).",
-  toolMemoryDelete: "Retire un souvenir devenu faux.",
-  toolContextRead: "Lit le .neuron/context.md du projet du chat.",
-  toolContextUpdate: "Met à jour le .neuron/context.md du projet.",
+  toolMemory: "Lit, cherche, enregistre, corrige ou retire des souvenirs.",
+  toolContext: "Lit ou met à jour le .neuron/context.md du projet du chat.",
   copyCommandFailed: "Impossible de copier la commande",
   mcpTitle: "Agents & MCP",
   mcpDescription:

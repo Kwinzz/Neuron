@@ -329,13 +329,13 @@ pub fn context_section(items: &[Memory]) -> Option<(String, ContextSource)> {
     if md.chars().count() > MAX_INJECTED_CHARS {
         md = md.chars().take(MAX_INJECTED_CHARS).collect();
         md.push_str(&crate::tr!(
-            "\n[… tronqué — utilise neuron_memory_search pour le reste]\n",
-            "\n[… truncated — use neuron_memory_search for the rest]\n"
+            "\n[… tronqué — utilise neuron_memory (action search) pour le reste]\n",
+            "\n[… truncated — use neuron_memory (action search) for the rest]\n"
         ));
     }
     md.push_str(
-        "\nCette mémoire est aussi accessible via les outils MCP `neuron_memory_read`, `neuron_memory_search` \
-         et `neuron_memory_save` (n'enregistre que des préférences durables, quand l'utilisateur le demande ou \
+        "\nCette mémoire est aussi accessible via l'outil MCP `neuron_memory` \
+         (n'enregistre que des préférences durables, quand l'utilisateur le demande ou \
          l'exprime clairement).\n",
     );
     let source = ContextSource {

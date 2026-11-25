@@ -20,16 +20,11 @@ use crate::util::now_ms;
 
 /// Name under which agents see the server (tools appear as `mcp__neuron__…` in Claude Code).
 pub const SERVER_NAME: &str = "neuron";
-/// Every tool (pre-approved for the agents Neuron launches).
-pub const TOOL_NAMES: [&str; 7] = [
-    "neuron_memory_read",
-    "neuron_memory_search",
-    "neuron_memory_save",
-    "neuron_memory_update",
-    "neuron_memory_delete",
-    "neuron_project_context_read",
-    "neuron_project_context_update",
-];
+/// Every tool (pre-approved for the agents Neuron launches). Two tools with an `action` rather than one per
+/// operation: their definitions sit in every request of every chat (≈ 2.2k tokens for 7 tools, a few hundred now).
+pub const TOOL_NAMES: [&str; 2] = [MEMORY_TOOL, CONTEXT_TOOL];
+pub const MEMORY_TOOL: &str = "neuron_memory";
+pub const CONTEXT_TOOL: &str = "neuron_project_context";
 const FLAG: &str = "--mcp-memory";
 const DEFAULT_PROTOCOL: &str = "2025-06-18";
 /// Short memory ids shown to agents (UUID prefix, resolved back when unique).
@@ -151,17 +146,11 @@ pub fn handle(db: &Db, server: &Server, message: &Value) -> Option<Value> {
             "protocolVersion": params.get("protocolVersion").and_then(Value::as_str).unwrap_or(DEFAULT_PROTOCOL),
             "capabilities": { "tools": { "listChanged": false } },
             "serverInfo": { "name": SERVER_NAME, "title": crate::i18n::pick("Neuron — mémoire et contexte de projet", "Neuron — memory and project context"), "version": env!("CARGO_PKG_VERSION") },
-            "instructions": crate::i18n::pick("Tu es lancé par Neuron, l'application qui pilote les agents IA de l'utilisateur. \
-                Mémoire globale partagée par tous ses agents : consulte-la (neuron_memory_read / neuron_memory_search) \
-                pour respecter ses préférences ; ajoute (neuron_memory_save), corrige (neuron_memory_update) ou retire \
-                (neuron_memory_delete) des souvenirs quand il le demande ou exprime clairement une préférence ou une \
-                règle durable. Dans un projet, neuron_project_context_read / neuron_project_context_update donnent \
-                accès à son fichier .neuron/context.md (architecture, décisions, conventions).", "You are run by Neuron, the app that drives the user's AI agents. \
-                Global memory shared by all their agents: look it up (neuron_memory_read / neuron_memory_search) \
-                to follow their preferences; add (neuron_memory_save), fix (neuron_memory_update) or remove \
-                (neuron_memory_delete) memories when they ask or clearly state a lasting preference or rule. In a \
-                project, neuron_project_context_read / neuron_project_context_update give access to its \
-                .neuron/context.md file (architecture, decisions, conventions)."),
+            // One line: agents launched by Neuron get the full explanation in their instructions.
+            "instructions": crate::i18n::pick(
+                "Mémoire globale de l'utilisateur (partagée par ses agents IA) et contexte de projet Neuron.",
+                "The user's global memory (shared by their AI agents) and Neuron project context.",
+            ),
         })),
         "ping" => Ok(json!({})),
         "tools/list" => Ok(json!({ "tools": tool_definitions(server.project.is_some()) })),
@@ -174,121 +163,60 @@ pub fn handle(db: &Db, server: &Server, message: &Value) -> Option<Value> {
     })
 }
 
-fn category_schema() -> Value {
-    json!({
-        "type": "string",
-        "enum": MemoryCategory::ALL.iter().map(|c| c.as_db()).collect::<Vec<_>>(),
-        "description": crate::i18n::pick("profile = qui est l'utilisateur ; tech_preferences = outils/stack préférés ; \
-            code_style = conventions de code ; strict_rules = règles à respecter impérativement ; other = divers", "profile = who the user is; tech_preferences = preferred tools/stack; \
-            code_style = code conventions; strict_rules = rules that must be followed; other = misc"),
-    })
-}
-
-/// Tool list; the project tools only when the server knows the project.
+/// Tool list; the project tool only when the server knows the project.
 pub fn tool_definitions(with_project: bool) -> Value {
-    let mut tools = vec![
-        json!({
-            "name": "neuron_memory_read",
-            "title": crate::i18n::pick("Lire la mémoire", "Read the memory"),
-            "description": crate::i18n::pick("Lit la mémoire globale de l'utilisateur (profil, préférences techniques, style de code, \
-                règles strictes), éventuellement limitée à une catégorie. Chaque souvenir est précédé de son \
-                identifiant [id] (pour neuron_memory_update / neuron_memory_delete).", "Reads the user's global memory (profile, tech preferences, code style, strict rules), \
-                optionally limited to one category. Each memory is preceded by its id [id] (for \
-                neuron_memory_update / neuron_memory_delete)."),
-            "inputSchema": { "type": "object", "properties": { "category": category_schema() } },
-            "annotations": { "readOnlyHint": true },
-        }),
-        json!({
-            "name": "neuron_memory_search",
-            "title": crate::i18n::pick("Chercher dans la mémoire", "Search the memory"),
-            "description": crate::i18n::pick("Recherche plein texte (préfixes, insensible aux accents) dans la mémoire globale. \
-                Renvoie les souvenirs avec leur identifiant [id].", "Full-text search (prefixes, accent-insensitive) in the global memory. \
-                Returns the memories with their id [id]."),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "query": { "type": "string", "description": crate::i18n::pick("Mots à chercher", "Words to search for") },
-                    "limit": { "type": "integer", "minimum": 1, "maximum": 50, "default": 10 },
-                },
-                "required": ["query"],
+    let categories: Vec<&str> = MemoryCategory::ALL.iter().map(|c| c.as_db()).collect();
+    let mut tools = vec![json!({
+        "name": MEMORY_TOOL,
+        "description": crate::i18n::pick(
+            "Mémoire globale de l'utilisateur, partagée par tous ses agents. action : read (tout, ou une category),              search (query), save (category + content : une info courte et autonome, seulement si l'utilisateur le              demande ou exprime une préférence/règle durable ; jamais de secret), update (id + content et/ou              category), delete (id). Les souvenirs sont listés avec leur [id].",
+            "The user's global memory, shared by all their agents. action: read (all, or one category), search              (query), save (category + content: one short self-contained fact, only when the user asks or states a              lasting preference/rule; never secrets), update (id + content and/or category), delete (id). Memories              are listed with their [id].",
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "action": { "type": "string", "enum": ["read", "search", "save", "update", "delete"] },
+                "category": { "type": "string", "enum": categories },
+                "query": { "type": "string" },
+                "content": { "type": "string" },
+                "id": { "type": "string" },
             },
-            "annotations": { "readOnlyHint": true },
-        }),
-        json!({
-            "name": "neuron_memory_save",
-            "title": crate::i18n::pick("Enregistrer un souvenir", "Save a memory"),
-            "description": crate::i18n::pick("Ajoute un souvenir durable à la mémoire globale (visible par tous les agents et dans \
-                ~/.neuron/memory.md). Une information courte et autonome par appel. N'enregistre que ce que \
-                l'utilisateur demande de retenir ou exprime clairement comme préférence/règle permanente ; jamais \
-                de secret.", "Adds a lasting memory to the global memory (seen by every agent and in ~/.neuron/memory.md). \
-                One short, self-contained piece of information per call. Only save what the user asks you to \
-                remember or clearly states as a lasting preference/rule; never secrets."),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "category": category_schema(),
-                    "content": { "type": "string", "description": crate::i18n::pick("Le souvenir, formulé de façon autonome", "The memory, written to stand on its own") },
-                },
-                "required": ["category", "content"],
-            },
-            "annotations": { "readOnlyHint": false, "destructiveHint": false, "idempotentHint": false },
-        }),
-        json!({
-            "name": "neuron_memory_update",
-            "title": crate::i18n::pick("Modifier un souvenir", "Update a memory"),
-            "description": crate::i18n::pick("Corrige un souvenir existant (texte et/ou catégorie), par exemple quand une préférence \
-                a changé. `id` = l'identifiant affiché par neuron_memory_read / neuron_memory_search.", "Fixes an existing memory (text and/or category), for example when a preference changed. \
-                `id` = the id shown by neuron_memory_read / neuron_memory_search."),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "id": { "type": "string", "description": crate::i18n::pick("Identifiant du souvenir (ses premiers caractères suffisent)", "Id of the memory (its first characters are enough)") },
-                    "content": { "type": "string", "description": crate::i18n::pick("Nouveau texte (inchangé si absent)", "New text (unchanged if absent)") },
-                    "category": category_schema(),
-                },
-                "required": ["id"],
-            },
-            "annotations": { "readOnlyHint": false, "destructiveHint": false, "idempotentHint": true },
-        }),
-        json!({
-            "name": "neuron_memory_delete",
-            "title": crate::i18n::pick("Supprimer un souvenir", "Delete a memory"),
-            "description": crate::i18n::pick("Retire un souvenir devenu faux ou que l'utilisateur veut oublier.", "Removes a memory that became wrong or that the user wants forgotten."),
-            "inputSchema": {
-                "type": "object",
-                "properties": { "id": { "type": "string", "description": crate::i18n::pick("Identifiant du souvenir", "Id of the memory") } },
-                "required": ["id"],
-            },
-            "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": true },
-        }),
-    ];
+            "required": ["action"],
+        },
+    })];
     if with_project {
         tools.push(json!({
-            "name": "neuron_project_context_read",
-            "title": crate::i18n::pick("Lire le contexte du projet", "Read the project context"),
-            "description": crate::i18n::pick("Lit .neuron/context.md, le contexte du projet que Neuron injecte dans chaque nouveau chat \
-                du projet (objectif, architecture, décisions, conventions, commandes).", "Reads .neuron/context.md, the project context Neuron injects into every new chat of the \
-                project (goal, architecture, decisions, conventions, commands)."),
-            "inputSchema": { "type": "object", "properties": {} },
-            "annotations": { "readOnlyHint": true },
-        }));
-        tools.push(json!({
-            "name": "neuron_project_context_update",
-            "title": crate::i18n::pick("Mettre à jour le contexte du projet", "Update the project context"),
-            "description": crate::i18n::pick("Réécrit .neuron/context.md avec le contenu Markdown COMPLET fourni (lis-le d'abord et \
-                garde ce qui reste vrai). À utiliser pour consigner ce qui est durable sur le projet : architecture, \
-                décisions, conventions, commandes utiles. Reste concis.", "Rewrites .neuron/context.md with the COMPLETE Markdown content given (read it first and \
-                keep what is still true). Use it to record what is lasting about the project: architecture, \
-                decisions, conventions, useful commands. Stay concise."),
+            "name": CONTEXT_TOOL,
+            "description": crate::i18n::pick(
+                "Fichier .neuron/context.md du projet, injecté dans chaque nouveau chat. action : read, ou write                  (content = fichier Markdown COMPLET ; lis-le d'abord, garde ce qui reste vrai, reste concis).",
+                "The project's .neuron/context.md, injected into every new chat. action: read, or write (content =                  the COMPLETE Markdown file; read it first, keep what is still true, stay concise).",
+            ),
             "inputSchema": {
                 "type": "object",
-                "properties": { "content": { "type": "string", "description": crate::i18n::pick("Nouveau contenu complet du fichier", "New complete content of the file") } },
-                "required": ["content"],
+                "properties": {
+                    "action": { "type": "string", "enum": ["read", "write"] },
+                    "content": { "type": "string" },
+                },
+                "required": ["action"],
             },
-            "annotations": { "readOnlyHint": false, "destructiveHint": false, "idempotentHint": true },
         }));
     }
     Value::Array(tools)
+}
+
+/// `(tool, action)` → the operation. The former one-tool-per-operation names are still accepted.
+fn operation(name: &str, args: &Value) -> Option<&'static str> {
+    let action = args.get("action").and_then(Value::as_str).unwrap_or_default();
+    Some(match (name, action) {
+        (MEMORY_TOOL, "read") | ("neuron_memory_read", _) => "read",
+        (MEMORY_TOOL, "search") | ("neuron_memory_search", _) => "search",
+        (MEMORY_TOOL, "save") | ("neuron_memory_save", _) => "save",
+        (MEMORY_TOOL, "update") | ("neuron_memory_update", _) => "update",
+        (MEMORY_TOOL, "delete") | ("neuron_memory_delete", _) => "delete",
+        (CONTEXT_TOOL, "read") | ("neuron_project_context_read", _) => "context_read",
+        (CONTEXT_TOOL, "write" | "update") | ("neuron_project_context_update", _) => "context_write",
+        _ => return None,
+    })
 }
 
 fn text_result(text: String, is_error: bool) -> Value {
@@ -331,10 +259,20 @@ fn render_with_ids(items: &[Memory]) -> String {
 }
 
 fn call_tool(db: &Db, server: &Server, params: &Value) -> Value {
-    let name = params.get("name").and_then(Value::as_str).unwrap_or_default().to_string();
+    let name = params.get("name").and_then(Value::as_str).unwrap_or_default();
     let args = params.get("arguments").cloned().unwrap_or_else(|| json!({}));
-    if name.starts_with("neuron_project_context") {
-        return match project_tool(server.project.as_deref(), &name, &args) {
+    let Some(op) = operation(name, &args) else {
+        let action = args.get("action").and_then(Value::as_str).unwrap_or_default();
+        return text_result(
+            crate::tr!(
+                "Erreur : outil ou action inconnus ({name} {action})",
+                "Error: unknown tool or action ({name} {action})"
+            ),
+            true,
+        );
+    };
+    if op.starts_with("context_") {
+        return match project_tool(server.project.as_deref(), op, &args) {
             Ok(text) => text_result(text, false),
             Err(err) => text_result(format!("Erreur : {err}"), true),
         };
@@ -344,8 +282,8 @@ fn call_tool(db: &Db, server: &Server, params: &Value) -> Value {
     let outcome: AppResult<String> = db.blocking(move |c| {
         // Edits made in memory.md since the last sync are seen by the agent.
         import_if_changed(c, &file, now_ms())?;
-        match name.as_str() {
-            "neuron_memory_read" => {
+        match op {
+            "read" => {
                 let all = memories::list(c)?;
                 let filtered: Vec<_> = match args.get("category").and_then(Value::as_str) {
                     Some(cat) => all.into_iter().filter(|m| m.category.as_db() == cat).collect(),
@@ -356,7 +294,7 @@ fn call_tool(db: &Db, server: &Server, params: &Value) -> Value {
                 }
                 Ok(render_with_ids(&filtered))
             }
-            "neuron_memory_search" => {
+            "search" => {
                 let query = args.get("query").and_then(Value::as_str).unwrap_or_default();
                 let limit = args.get("limit").and_then(Value::as_u64).unwrap_or(10);
                 let hits = memories::search(c, query, usize::try_from(limit).unwrap_or(10))?;
@@ -379,13 +317,17 @@ fn call_tool(db: &Db, server: &Server, params: &Value) -> Value {
                     .collect::<Vec<_>>()
                     .join("\n"))
             }
-            "neuron_memory_save" => {
+            "save" => {
                 let category = args
                     .get("category")
                     .and_then(Value::as_str)
                     .map(MemoryCategory::from_db)
                     .unwrap_or(MemoryCategory::Other);
                 let content = args.get("content").and_then(Value::as_str).unwrap_or_default();
+                // `content` is no longer required by the schema (one tool for every action).
+                if content.trim().is_empty() {
+                    return Err(AppError::Invalid(crate::tr!("content manquant", "missing content")));
+                }
                 let duplicate =
                     memories::list(c)?.into_iter().any(|m| m.content.trim().eq_ignore_ascii_case(content.trim()));
                 if duplicate {
@@ -401,7 +343,7 @@ fn call_tool(db: &Db, server: &Server, params: &Value) -> Value {
                     saved.content
                 ))
             }
-            "neuron_memory_update" => {
+            "update" => {
                 let id = resolve_id(c, args.get("id").and_then(Value::as_str).unwrap_or_default())?;
                 let current = memories::get(c, &id)?.ok_or_else(|| AppError::NotFound(id.clone()))?;
                 let category = args
@@ -420,7 +362,7 @@ fn call_tool(db: &Db, server: &Server, params: &Value) -> Value {
                     saved.content
                 ))
             }
-            "neuron_memory_delete" => {
+            "delete" => {
                 let id = resolve_id(c, args.get("id").and_then(Value::as_str).unwrap_or_default())?;
                 let current = memories::get(c, &id)?.ok_or_else(|| AppError::NotFound(id.clone()))?;
                 memories::delete(c, &id)?;
@@ -444,7 +386,7 @@ fn project_tool(project: Option<&Path>, name: &str, args: &Value) -> AppResult<S
         ))
     })?;
     match name {
-        "neuron_project_context_read" => {
+        "context_read" => {
             Ok(crate::context::read_context(root)?.filter(|s| !s.trim().is_empty()).unwrap_or_else(|| {
                 crate::tr!(
                     "Le fichier .neuron/context.md est vide ou absent.",
@@ -452,7 +394,7 @@ fn project_tool(project: Option<&Path>, name: &str, args: &Value) -> AppResult<S
                 )
             }))
         }
-        "neuron_project_context_update" => {
+        "context_write" => {
             let content = args.get("content").and_then(Value::as_str).unwrap_or_default();
             if content.trim().is_empty() {
                 return Err(AppError::Invalid(crate::tr!(
@@ -518,17 +460,17 @@ mod tests {
                 json!({"jsonrpc":"2.0","id":2,"method":"tools/list"}),
                 call(
                     3,
-                    "neuron_memory_save",
-                    json!({"category":"strict_rules","content":"Ne jamais pousser sans demande"}),
+                    "neuron_memory",
+                    json!({"action":"save","category":"strict_rules","content":"Ne jamais pousser sans demande"}),
                 ),
-                call(4, "neuron_memory_search", json!({"query":"pousser"})),
-                call(5, "neuron_memory_read", json!({})),
+                call(4, "neuron_memory", json!({"action":"search","query":"pousser"})),
+                call(5, "neuron_memory", json!({"action":"read"})),
                 json!({"jsonrpc":"2.0","id":6,"method":"nope"}),
             ],
         );
         assert_eq!(replies.len(), 6, "no reply to the notification");
         assert_eq!(replies[0]["result"]["protocolVersion"], "2025-03-26");
-        assert_eq!(replies[1]["result"]["tools"].as_array().unwrap().len(), 5, "no project tools outside a project");
+        assert_eq!(replies[1]["result"]["tools"].as_array().unwrap().len(), 1, "no project tool outside a project");
         assert_eq!(replies[2]["result"]["isError"], false);
         assert!(text(&replies[3]).contains("Ne jamais pousser"));
         assert!(text(&replies[4]).contains("## Règles strictes"));
@@ -543,15 +485,20 @@ mod tests {
             &[
                 call(
                     7,
-                    "neuron_memory_update",
-                    json!({"id": id, "content": "Ne jamais pousser sans accord explicite"}),
+                    "neuron_memory",
+                    json!({"action":"update","id": id, "content": "Ne jamais pousser sans accord explicite"}),
                 ),
-                call(8, "neuron_memory_read", json!({})),
+                call(8, "neuron_memory", json!({"action":"read"})),
+                // The former one-tool-per-operation names still work.
                 call(9, "neuron_memory_delete", json!({"id": id})),
-                call(10, "neuron_memory_read", json!({})),
-                call(11, "neuron_memory_delete", json!({"id": "zzzz"})),
+                call(10, "neuron_memory", json!({"action":"read"})),
+                call(11, "neuron_memory", json!({"action":"delete","id": "zzzz"})),
+                call(12, "neuron_memory", json!({"action":"save","category":"other"})),
+                call(13, "neuron_memory", json!({"action":"fly"})),
             ],
         );
+        assert_eq!(replies[5]["result"]["isError"], true, "save without content refused");
+        assert_eq!(replies[6]["result"]["isError"], true, "unknown action");
         assert!(text(&replies[0]).starts_with("Modifié"), "{}", text(&replies[0]));
         assert!(text(&replies[1]).contains("accord explicite"));
         assert!(text(&replies[2]).starts_with("Supprimé"));
@@ -572,12 +519,16 @@ mod tests {
             &s,
             &[
                 json!({"jsonrpc":"2.0","id":1,"method":"tools/list"}),
-                call(2, "neuron_project_context_read", json!({})),
-                call(3, "neuron_project_context_update", json!({"content": "# proj\n\nArchitecture : Tauri.\n"})),
-                call(4, "neuron_project_context_update", json!({"content": "  "})),
+                call(2, "neuron_project_context", json!({"action":"read"})),
+                call(
+                    3,
+                    "neuron_project_context",
+                    json!({"action":"write","content": "# proj\n\nArchitecture : Tauri.\n"}),
+                ),
+                call(4, "neuron_project_context", json!({"action":"write","content": "  "})),
             ],
         );
-        assert_eq!(replies[0]["result"]["tools"].as_array().unwrap().len(), 7);
+        assert_eq!(replies[0]["result"]["tools"].as_array().unwrap().len(), 2);
         assert!(text(&replies[1]).contains("proj"));
         assert_eq!(replies[2]["result"]["isError"], false);
         assert_eq!(replies[3]["result"]["isError"], true, "empty content refused");

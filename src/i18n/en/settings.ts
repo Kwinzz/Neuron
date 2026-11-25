@@ -117,13 +117,8 @@ const settings: Translation<typeof fr> = {
   shortcutsDescription: "Ctrl stands for ⌘ on macOS.",
 
   // AgentsMcpCard
-  toolMemoryRead: "Reads the whole memory, grouped by category.",
-  toolMemorySearch: "Full-text search in memories.",
-  toolMemorySave: "Saves a new lasting memory.",
-  toolMemoryUpdate: "Fixes a memory (text or category).",
-  toolMemoryDelete: "Removes a memory that is no longer true.",
-  toolContextRead: "Reads the chat project's .neuron/context.md.",
-  toolContextUpdate: "Updates the project's .neuron/context.md.",
+  toolMemory: "Reads, searches, saves, fixes or removes memories.",
+  toolContext: "Reads or updates the chat project's .neuron/context.md.",
   copyCommandFailed: "Couldn't copy the command",
   mcpTitle: "Agents & MCP",
   mcpDescription:

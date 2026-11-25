@@ -142,7 +142,7 @@ async fn ask_with_memory(adapter: &dyn AgentAdapter, mut spec: SessionSpec, agen
     handle
         .commands
         .send(SessionCommand::Prompt(
-            "Appelle l'outil MCP neuron_memory_search avec la requête « mot de code », puis réponds uniquement \
+            "Appelle l'outil MCP neuron_memory (action search) avec la requête « mot de code », puis réponds uniquement \
              avec le mot de code trouvé."
                 .into(),
         ))

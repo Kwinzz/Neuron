@@ -29,13 +29,8 @@ import { t, type MessageKey } from "@/i18n";
 
 /** Tool names are never translated; their descriptions are. */
 const MCP_TOOLS: ReadonlyArray<{ name: string; description: MessageKey }> = [
-  { name: "neuron_memory_read", description: "settings.toolMemoryRead" },
-  { name: "neuron_memory_search", description: "settings.toolMemorySearch" },
-  { name: "neuron_memory_save", description: "settings.toolMemorySave" },
-  { name: "neuron_memory_update", description: "settings.toolMemoryUpdate" },
-  { name: "neuron_memory_delete", description: "settings.toolMemoryDelete" },
-  { name: "neuron_project_context_read", description: "settings.toolContextRead" },
-  { name: "neuron_project_context_update", description: "settings.toolContextUpdate" },
+  { name: "neuron_memory", description: "settings.toolMemory" },
+  { name: "neuron_project_context", description: "settings.toolContext" },
 ];
 
 export function AgentsMcpCard() {
