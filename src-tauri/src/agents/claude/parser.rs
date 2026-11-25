@@ -27,6 +27,9 @@ pub struct ClaudeParser {
     /// Text of `<synthetic>` messages (written by the CLI, not the model), held until the `result` says whether
     /// it was a local command's output (`local_command`) or an ordinary notice. `(item id, text)`.
     synthetic: Vec<(String, String)>,
+    /// `total_cost_usd` of the previous `result`: the CLI reports the cost of the whole process so far (it starts
+    /// again from zero in a new process, `--resume` included), a turn costs the difference.
+    cost_so_far: f64,
 }
 
 fn s(v: &Value, key: &str) -> Option<String> {
@@ -299,7 +302,7 @@ impl ClaudeParser {
             output: u(&usage, "output_tokens"),
             cache_read: u(&usage, "cache_read_input_tokens"),
             cache_write: u(&usage, "cache_creation_input_tokens"),
-            cost_usd: v.get("total_cost_usd").and_then(Value::as_f64).unwrap_or(0.0),
+            cost_usd: self.turn_cost(v.get("total_cost_usd").and_then(Value::as_f64)),
         };
         let is_error = v.get("is_error").and_then(Value::as_bool).unwrap_or(false)
             || v.get("subtype").and_then(Value::as_str).is_some_and(|st| st != "success");
@@ -315,6 +318,14 @@ impl ClaudeParser {
             error,
         });
         out
+    }
+
+    /// Cost of this turn from the process' running total.
+    fn turn_cost(&mut self, total: Option<f64>) -> f64 {
+        let Some(total) = total else { return 0.0 };
+        let turn = (total - self.cost_so_far).max(0.0);
+        self.cost_so_far = total;
+        turn
     }
 
     fn on_rate_limit(&mut self, v: &Value) -> Vec<AdapterEvent> {
@@ -455,6 +466,9 @@ mod tests {
             .collect();
         assert_eq!(turns.len(), 2);
         assert!(turns[0].cache_read > 0 && turns[0].output > 0 && turns[0].cost_usd > 0.0);
+        // `total_cost_usd` is the process' running total (0.00426553 then 0.0046316): each turn its own share.
+        assert!((turns[0].cost_usd - 0.00426553).abs() < 1e-9);
+        assert!((turns[1].cost_usd - (0.0046316 - 0.00426553)).abs() < 1e-9);
 
         assert!(
             events

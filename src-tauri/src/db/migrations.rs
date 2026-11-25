@@ -13,6 +13,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ("0005_thread_context", include_str!("../../migrations/0005_thread_context.sql")),
     ("0006_tool_changes", include_str!("../../migrations/0006_tool_changes.sql")),
     ("0007_cli_usage_logs", include_str!("../../migrations/0007_cli_usage_logs.sql")),
+    ("0008_claude_turn_costs", include_str!("../../migrations/0008_claude_turn_costs.sql")),
 ];
 
 /// Schema version after all embedded migrations are applied.
@@ -110,6 +111,46 @@ mod tests {
 
         conn.execute("DELETE FROM memories WHERE id = 'm1'", []).unwrap();
         assert_eq!(search("typescript"), 0);
+    }
+
+    #[test]
+    fn claude_turn_costs_become_per_turn() {
+        // Schema v7, with costs stored as Claude's running totals.
+        let mut conn = Connection::open_in_memory().unwrap();
+        for (_, sql) in &MIGRATIONS[..7] {
+            conn.execute_batch(sql).unwrap();
+        }
+        conn.pragma_update(None, "user_version", 7).unwrap();
+        conn.execute_batch(
+            r#"INSERT INTO threads (id, agent, title, status, created_at, updated_at)
+                 VALUES ('c', 'claude_code', '', 'done', 0, 0), ('x', 'codex', '', 'done', 0, 0);
+               INSERT INTO token_usage (thread_id, agent, cost_usd, ts) VALUES
+                 ('c', 'claude_code', 1.0, 1), ('c', 'claude_code', 1.5, 2), ('c', 'claude_code', 0.25, 3),
+                 ('c', 'claude_code', 0.75, 4), ('x', 'codex', 1.0, 1), ('x', 'codex', 2.0, 2);
+               INSERT INTO messages (id, thread_id, seq, role, meta_json, created_at) VALUES
+                 ('t1', 'c', 1, 'turn', '{"usage":{"costUsd":1.0},"durationMs":5}', 1),
+                 ('t2', 'c', 2, 'turn', '{"usage":{"costUsd":1.5},"durationMs":5}', 2),
+                 ('u3', 'c', 3, 'user', NULL, 3),
+                 ('t4', 'c', 4, 'turn', '{"usage":{"costUsd":0.25},"durationMs":5}', 4);"#,
+        )
+        .unwrap();
+        apply(&mut conn).unwrap();
+
+        let costs = |sql: &str| -> Vec<f64> {
+            let mut stmt = conn.prepare(sql).unwrap();
+            stmt.query_map([], |r| r.get(0)).unwrap().collect::<Result<_, _>>().unwrap()
+        };
+        // 0.25 < 1.5: a new process, kept; then its own running total again.
+        assert_eq!(costs("SELECT cost_usd FROM token_usage WHERE thread_id = 'c' ORDER BY ts"), [1.0, 0.5, 0.25, 0.5]);
+        assert_eq!(costs("SELECT cost_usd FROM token_usage WHERE thread_id = 'x' ORDER BY ts"), [1.0, 2.0]);
+        assert_eq!(
+            costs("SELECT json_extract(meta_json, '$.usage.costUsd') FROM messages WHERE role = 'turn' ORDER BY seq"),
+            [1.0, 0.5, 0.25]
+        );
+        let duration: i64 = conn
+            .query_row("SELECT json_extract(meta_json, '$.durationMs') FROM messages WHERE id = 't2'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(duration, 5);
     }
 
     #[test]
