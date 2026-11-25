@@ -61,8 +61,8 @@ const OptionRow = memo(function OptionRow({
         {selected && (multi ? <Check className="size-3" /> : <span className="size-1.5 rounded-full bg-current" />)}
       </span>
       <span className="flex min-w-0 flex-col">
-        <span className="text-sm text-foreground">{label}</span>
-        {description && <span className="text-xs text-muted-foreground">{description}</span>}
+        <span className="wrap-anywhere text-sm text-foreground">{label}</span>
+        {description && <span className="wrap-anywhere text-xs text-muted-foreground">{description}</span>}
       </span>
     </button>
   );
@@ -124,7 +124,7 @@ export const QuestionCard = memo(function QuestionCard({ item, threadId }: { ite
           <fieldset key={q.question} className="flex min-w-0 flex-col gap-2">
             <legend className="mb-2 flex flex-wrap items-center gap-2">
               {q.header && <Badge variant="secondary">{q.header}</Badge>}
-              <span className="text-sm text-foreground">{q.question}</span>
+              <span className="min-w-0 wrap-anywhere text-sm text-foreground">{q.question}</span>
               <span className="text-xs text-muted-foreground">
                 {q.multiSelect ? t("chat.multipleChoices") : t("chat.singleChoice")}
               </span>

@@ -23,8 +23,8 @@ export const QuestionSummary = memo(function QuestionSummary({ item }: { item: T
       <dl className="flex flex-col gap-1.5">
         {questions.map((q) => (
           <div key={q.question} className="flex min-w-0 flex-col gap-0.5">
-            <dt className="text-xs text-muted-foreground">{q.question}</dt>
-            <dd className="text-sm text-foreground select-text">{answers.get(q.question) ?? "—"}</dd>
+            <dt className="wrap-anywhere text-xs text-muted-foreground">{q.question}</dt>
+            <dd className="wrap-anywhere text-sm text-foreground select-text">{answers.get(q.question) ?? "—"}</dd>
           </div>
         ))}
       </dl>

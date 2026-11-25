@@ -83,7 +83,7 @@ function renderInput(name: string, input: JsonValue): ReactNode {
       const description = str(obj, "description");
       return (
         <div className="flex flex-col gap-1.5">
-          {description && <p className="text-xs text-muted-foreground">{description}</p>}
+          {description && <p className="wrap-anywhere text-xs text-muted-foreground">{description}</p>}
           <pre className="rounded-md border bg-muted/40 px-3 py-2 font-mono text-xs text-foreground whitespace-pre-wrap break-all select-text">
             <span className="select-none text-muted-foreground">$ </span>
             {command}
@@ -100,7 +100,7 @@ function renderInput(name: string, input: JsonValue): ReactNode {
       const limit = num(obj, "limit");
       return (
         <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
-          <span className="text-foreground select-text">{filePath}</span>
+          <span className="min-w-0 wrap-anywhere text-foreground select-text">{filePath}</span>
           {offset !== null && (
             <Badge variant="secondary" className="h-auto max-w-full font-mono whitespace-normal wrap-anywhere text-left">
               offset {offset}
@@ -125,7 +125,7 @@ function renderInput(name: string, input: JsonValue): ReactNode {
           <Badge variant="secondary" className="h-auto max-w-full font-mono whitespace-normal wrap-anywhere text-left select-text">
             {pattern}
           </Badge>
-          {path && <span className="text-muted-foreground select-text">{path}</span>}
+          {path && <span className="min-w-0 wrap-anywhere text-muted-foreground select-text">{path}</span>}
         </div>
       );
     }
@@ -141,7 +141,7 @@ function renderInput(name: string, input: JsonValue): ReactNode {
           <Badge variant="secondary" className="h-auto max-w-full font-mono whitespace-normal wrap-anywhere text-left select-text">
             {pattern}
           </Badge>
-          {path && <span className="text-muted-foreground select-text">{path}</span>}
+          {path && <span className="min-w-0 wrap-anywhere text-muted-foreground select-text">{path}</span>}
           {glob && (
             <Badge variant="secondary" className="h-auto max-w-full font-mono whitespace-normal wrap-anywhere text-left">
               {glob}

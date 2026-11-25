@@ -34,8 +34,10 @@ struct ActiveSession {
     pid: Option<u32>,
     /// Unique per spawn, so a late `Exited` from an old process never removes a newer session.
     generation: u64,
-    /// Pending permission requests: request id → tool input (echoed back on allow).
-    pending: HashMap<String, Value>,
+    /// Pending permission requests: request id → (tool name, tool input echoed back on allow).
+    pending: HashMap<String, (String, Value)>,
+    /// Events Neuron itself feeds into the pump, in order with the CLI's (status after an approval).
+    inject: mpsc::UnboundedSender<AdapterEvent>,
     stop_requested: bool,
     shutdown_requested: bool,
     /// Model/effort/permissions changed: restart (with --resume) before the next prompt.
@@ -366,6 +368,7 @@ impl AgentRegistry {
         *generation += 1;
         let gen_id = *generation;
         let commands = handle.commands.clone();
+        let (inject, injected) = mpsc::unbounded_channel();
         self.lock().insert(
             runtime.id.clone(),
             ActiveSession {
@@ -373,6 +376,7 @@ impl AgentRegistry {
                 pid: handle.pid,
                 generation: gen_id,
                 pending: HashMap::new(),
+                inject,
                 stop_requested: false,
                 shutdown_requested: false,
                 stale: false,
@@ -386,7 +390,7 @@ impl AgentRegistry {
         let registry = Arc::clone(self);
         let (app, db, rt) = (app.clone(), db.clone(), runtime.clone());
         tauri::async_runtime::spawn(async move {
-            registry.pump(app, db, rt, handle.events, gen_id).await;
+            registry.pump(app, db, rt, handle.events, injected, gen_id).await;
         });
         Ok(commands)
     }
@@ -405,9 +409,15 @@ impl AgentRegistry {
         let session = sessions.get_mut(thread_id).ok_or_else(|| {
             AppError::NotFound(crate::tr!("aucune session active pour ce thread", "no active session for this chat"))
         })?;
-        let mut input = session.pending.remove(request_id).ok_or_else(|| {
+        let (tool_name, mut input) = session.pending.remove(request_id).ok_or_else(|| {
             AppError::NotFound(crate::tr!("demande de permission expirée", "permission request expired"))
         })?;
+        // Answered: the chat no longer waits on the user (the approved tool may run for a long time before the
+        // CLI reports anything else). Other cards still pending keep it waiting.
+        let resumed = session
+            .pending
+            .is_empty()
+            .then(|| if allow { tool_activity(&tool_name, &input) } else { (ThreadStatus::Thinking, None) });
         if let (true, Some(answers), Some(obj)) = (allow, answers, input.as_object_mut()) {
             obj.insert("answers".into(), json!(answers));
         }
@@ -428,7 +438,11 @@ impl AgentRegistry {
             }))
             .map_err(|_| {
                 AppError::Other(crate::tr!("la session de l'agent est arrêtée", "the agent session is stopped"))
-            })
+            })?;
+        if let Some((status, detail)) = resumed {
+            let _ = session.inject.send(AdapterEvent::Status { status, detail });
+        }
+        Ok(())
     }
 
     /// Switch a running Claude Code session's permission mode without restarting it. False when there is no
@@ -451,7 +465,7 @@ impl AgentRegistry {
             let Some(session) = sessions.get_mut(thread_id) else { return Ok(()) };
             session.stop_requested = true;
             // Deny pending permissions so the agent is not left waiting.
-            for (request_id, input) in session.pending.drain() {
+            for (request_id, (_, input)) in session.pending.drain() {
                 let _ = session.commands.send(SessionCommand::Permission(PermissionDecision {
                     request_id,
                     allow: false,
@@ -551,6 +565,7 @@ impl AgentRegistry {
         db: Db,
         rt: ThreadRuntime,
         mut events: mpsc::UnboundedReceiver<AdapterEvent>,
+        mut injected: mpsc::UnboundedReceiver<AdapterEvent>,
         generation: u64,
     ) {
         let id = rt.id.clone();
@@ -583,7 +598,15 @@ impl AgentRegistry {
                 (changed, status_changed, detail)
             };
 
-        while let Some(event) = events.recv().await {
+        loop {
+            // The CLI's channel ends the pump; Neuron's own closes with the session (branch then disabled).
+            let event = tokio::select! {
+                event = events.recv() => match event {
+                    Some(event) => event,
+                    None => break,
+                },
+                Some(event) = injected.recv() => event,
+            };
             match event {
                 AdapterEvent::SessionInit { session_ref, model: m } => {
                     if model.is_none() {
@@ -671,7 +694,7 @@ impl AgentRegistry {
                 }
                 AdapterEvent::PermissionRequest { request_id, tool_name, description, input, .. } => {
                     if let Some(s) = self.lock().get_mut(&id) {
-                        s.pending.insert(request_id.clone(), input.clone());
+                        s.pending.insert(request_id.clone(), (tool_name.clone(), input.clone()));
                     }
                     let detail = Some(tool_name.clone());
                     let (_, status_changed, detail) =
@@ -915,5 +938,43 @@ mod tests {
         assert_eq!(title_from_prompt("   "), "Nouveau thread");
         let long = "a".repeat(80);
         assert_eq!(title_from_prompt(&long).chars().count(), 60);
+    }
+
+    #[test]
+    fn answered_approval_leaves_the_waiting_status() {
+        let registry = AgentRegistry::default();
+        let (commands, mut sent) = mpsc::unbounded_channel();
+        let (inject, mut injected) = mpsc::unbounded_channel();
+        let pending = HashMap::from([
+            ("r1".to_string(), ("Bash".to_string(), json!({ "command": "cargo build" }))),
+            ("r2".to_string(), ("Read".to_string(), json!({ "file_path": "/a.rs" }))),
+        ]);
+        registry.lock().insert(
+            "t".into(),
+            ActiveSession {
+                commands,
+                pid: None,
+                generation: 1,
+                pending,
+                inject,
+                stop_requested: false,
+                shutdown_requested: false,
+                stale: false,
+                busy: true,
+                turn_started: None,
+                idle_since: Instant::now(),
+            },
+        );
+        // Another card still pending: the chat keeps waiting.
+        registry.respond_permission("t", "r2", true, None, None).unwrap();
+        assert!(matches!(sent.try_recv(), Ok(SessionCommand::Permission(d)) if d.allow && d.request_id == "r2"));
+        assert!(injected.try_recv().is_err());
+        // Last one approved: the approved tool's activity.
+        registry.respond_permission("t", "r1", true, None, None).unwrap();
+        assert!(matches!(
+            injected.try_recv(),
+            Ok(AdapterEvent::Status { status: ThreadStatus::Running, detail: Some(d) }) if d == "cargo build"
+        ));
+        assert!(registry.respond_permission("t", "r1", true, None, None).is_err());
     }
 }

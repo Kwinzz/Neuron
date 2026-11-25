@@ -37,7 +37,9 @@ export const ToolBlock = memo(function ToolBlock({ item, defaultOpen = false }: 
               item.status === "running" && "chat-pulse text-live",
             )}
           />
-          <span className="shrink-0 font-medium text-foreground">{item.name}</span>
+          <span className="max-w-[50%] shrink-0 truncate font-medium text-foreground" title={item.name}>
+            {item.name}
+          </span>
           <span
             className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground"
             title={item.activity ?? undefined}

@@ -61,7 +61,9 @@ export const PermissionCard = memo(function PermissionCard({
     return (
       <div className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm animate-in fade-in-0 duration-200">
         <ShieldAlert className="size-4 shrink-0 text-muted-foreground" />
-        <span className="shrink-0 font-medium text-foreground">{item.toolName}</span>
+        <span className="max-w-[50%] shrink-0 truncate font-medium text-foreground" title={item.toolName}>
+          {item.toolName}
+        </span>
         <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={item.description}>
           {item.description}
         </span>
@@ -87,7 +89,7 @@ export const PermissionCard = memo(function PermissionCard({
       className="border-warn/50 px-4 py-3 outline-none"
     >
       <ShieldAlert className="text-warn" />
-      <AlertTitle className="font-semibold text-foreground">
+      <AlertTitle className="font-semibold wrap-anywhere text-foreground">
         {t("chat.permissionRequired", { tool: item.toolName })}
       </AlertTitle>
       {item.description && (
@@ -95,7 +97,7 @@ export const PermissionCard = memo(function PermissionCard({
           {item.description}
         </AlertDescription>
       )}
-      <div className="col-start-2 mt-2">
+      <div className="col-start-2 mt-2 min-w-0">
         <ToolBody name={item.toolName} input={item.input} output={null} />
       </div>
       <div className="col-start-2 mt-3 flex flex-wrap items-center gap-2">

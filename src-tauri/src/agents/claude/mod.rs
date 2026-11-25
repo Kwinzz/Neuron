@@ -52,10 +52,9 @@ pub fn build_args(spec: &SessionSpec) -> Vec<String> {
         m @ ("manual" | "acceptEdits" | "auto" | "plan" | "bypassPermissions" | "dontAsk") => m,
         _ => "manual",
     };
-    args.extend(["--permission-mode".into(), mode.into()]);
-    if mode == "bypassPermissions" {
-        args.push("--allow-dangerously-skip-permissions".into());
-    }
+    // Only makes « Tout autoriser » available: without it, switching a chat to it live (`set_permission_mode`) is
+    // refused (`bypass_not_launched`) and the session kept asking for approvals. The mode itself stays the above.
+    args.extend(["--permission-mode".into(), mode.into(), "--allow-dangerously-skip-permissions".into()]);
     if let Some(model) = spec.model.as_deref().filter(|m| !m.trim().is_empty()) {
         args.extend(["--model".into(), model.trim().into()]);
     }
@@ -210,11 +209,9 @@ mod tests {
         let mut bad = spec();
         bad.effort = Some("ultra; rm".into());
         assert!(!build_args(&bad).contains(&"--effort".to_string()));
-        assert!(!joined.contains("--allow-dangerously-skip-permissions"));
-
-        let mut bypass = spec();
-        bypass.permission_mode = "bypassPermissions".into();
-        assert!(build_args(&bypass).contains(&"--allow-dangerously-skip-permissions".to_string()));
+        // Always there, so a chat started in another mode can switch to bypass live.
+        assert!(joined.contains("--allow-dangerously-skip-permissions"));
+        assert!(!joined.contains("--permission-mode bypassPermissions"));
         let mut weird = spec();
         weird.permission_mode = "rm -rf".into();
         assert!(build_args(&weird).join(" ").contains("--permission-mode manual"));
