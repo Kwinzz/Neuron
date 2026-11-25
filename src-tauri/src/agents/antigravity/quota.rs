@@ -248,6 +248,7 @@ pub async fn store(db: &Db, app: &AppHandle, windows: Vec<RateLimitWindow>) {
     match saved {
         Ok(()) => {
             let _ = app.emit(QUOTAS_CHANGED_EVENT, ());
+            crate::remote::hub::forward(QUOTAS_CHANGED_EVENT, &());
         }
         Err(err) => tracing::warn!(%err, "agy quota not saved"),
     }

@@ -14,6 +14,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ("0006_tool_changes", include_str!("../../migrations/0006_tool_changes.sql")),
     ("0007_cli_usage_logs", include_str!("../../migrations/0007_cli_usage_logs.sql")),
     ("0008_claude_turn_costs", include_str!("../../migrations/0008_claude_turn_costs.sql")),
+    ("0009_remote_devices", include_str!("../../migrations/0009_remote_devices.sql")),
 ];
 
 /// Schema version after all embedded migrations are applied.
@@ -63,6 +64,8 @@ mod tests {
         "agent_configs",
         "settings",
         "prompt_history",
+        "remote_clients",
+        "remote_hosts",
     ];
 
     fn fresh() -> Connection {

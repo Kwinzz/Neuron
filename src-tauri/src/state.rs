@@ -29,6 +29,8 @@ pub struct AppState {
     pub db: Db,
     /// Running agent sessions (one process per active thread).
     pub agents: Arc<AgentRegistry>,
+    /// Other devices: pairing, hosting paired clients, controlling paired hosts (see `crate::remote`).
+    pub remote: Arc<crate::remote::Remote>,
     pub paths: AppPaths,
     /// Time from process start to the end of `setup` (includes window/WebView creation), in ms.
     pub setup_ms: u64,
@@ -89,6 +91,7 @@ impl AppState {
         Ok(Self {
             db,
             agents: Arc::new(AgentRegistry::new(mcp)),
+            remote: Arc::new(crate::remote::Remote::new(data_dir.clone())),
             paths: AppPaths { data_dir, db_path, neuron_home, memory_file },
             setup_ms: as_u64(started.elapsed().as_millis()),
             db_open_us,

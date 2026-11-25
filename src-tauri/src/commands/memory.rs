@@ -125,6 +125,7 @@ pub fn spawn_memory_watcher(app: &AppHandle) {
             let f = file.clone();
             match db.call(move |c| memory::import_if_changed(c, &f, now_ms())).await {
                 Ok(_) => {
+                    crate::remote::hub::forward(MEMORY_CHANGED_EVENT, &());
                     if let Err(err) = app.emit(MEMORY_CHANGED_EVENT, ()) {
                         tracing::warn!(%err, "emit memory change failed");
                     }

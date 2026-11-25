@@ -386,6 +386,7 @@ async fn store_codex_limits(state: &AppState, app: &AppHandle, at: i64, windows:
     match saved {
         Ok(true) => {
             let _ = app.emit(crate::agents::antigravity::quota::QUOTAS_CHANGED_EVENT, ());
+            crate::remote::hub::forward(crate::agents::antigravity::quota::QUOTAS_CHANGED_EVENT, &());
         }
         Ok(false) => {}
         Err(err) => tracing::warn!(%err, "codex limits not saved"),
@@ -404,6 +405,7 @@ pub fn trigger(app: &AppHandle) {
         if added > 0 {
             tracing::info!(added, "usage imported from CLI logs");
             let _ = app.emit(USAGE_CHANGED_EVENT, ());
+            crate::remote::hub::forward(USAGE_CHANGED_EVENT, &());
         }
     });
 }

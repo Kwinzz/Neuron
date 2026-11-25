@@ -13,6 +13,7 @@ pub mod i18n;
 pub mod memory;
 pub mod notifications;
 pub mod pricing;
+pub mod remote;
 pub mod state;
 pub mod usage_import;
 pub mod util;
@@ -89,6 +90,7 @@ pub fn run() {
             commands::pricing::spawn_price_refresh(app.handle());
             commands::pricing::spawn_agy_quota_refresh(app.handle());
             usage_import::spawn_periodic(app.handle());
+            remote::spawn_start(app.handle());
             Ok(())
         })
         .on_window_event(desktop::on_window_event)
@@ -152,6 +154,18 @@ pub fn run() {
             commands::memory::disconnect_antigravity_mcp,
             commands::threads::create_project,
             commands::threads::delete_project,
+            commands::remote::remote_status,
+            commands::remote::remote_set_enabled,
+            commands::remote::remote_set_device_name,
+            commands::remote::remote_start_pairing,
+            commands::remote::remote_cancel_pairing,
+            commands::remote::remote_nearby,
+            commands::remote::remote_pair,
+            commands::remote::remote_devices,
+            commands::remote::remote_set_level,
+            commands::remote::remote_revoke,
+            commands::remote::remote_forget,
+            commands::remote::remote_call,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Neuron");
@@ -161,6 +175,11 @@ pub fn run() {
             // Never leave orphan agent processes behind.
             if let Some(state) = handle.try_state::<AppState>() {
                 state.agents.shutdown_all();
+                // Tell the connected devices we are leaving (bounded: never hold the exit).
+                let remote = state.remote.clone();
+                tauri::async_runtime::block_on(async move {
+                    let _ = tokio::time::timeout(std::time::Duration::from_secs(1), remote.shutdown()).await;
+                });
             }
         }
     });
