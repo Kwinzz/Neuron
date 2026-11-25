@@ -1,0 +1,149 @@
+import { useEffect, useState, type KeyboardEvent } from "react";
+import { MonitorSmartphone } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { t } from "@/i18n";
+import { ipcErrorMessage, isTauri } from "@/lib/ipc";
+import { useDevices } from "@/stores/devices";
+import { toast } from "@/stores/toast";
+import { SettingRow } from "./SettingRow";
+import { SettingSwitch } from "./SettingSwitch";
+
+export function DeviceAccessCard() {
+  const status = useDevices((s) => s.status);
+  const tauri = isTauri();
+  const enabled = status?.settings.enabled ?? false;
+  const savedName = status?.settings.deviceName ?? "";
+  const nodeId = status?.nodeId ?? null;
+
+  const [nameDraft, setNameDraft] = useState(savedName);
+  const [savingEnabled, setSavingEnabled] = useState(false);
+  const [savingName, setSavingName] = useState(false);
+
+  useEffect(() => {
+    setNameDraft(savedName);
+  }, [savedName]);
+
+  const handleToggleEnabled = async (next: boolean) => {
+    if (!tauri || savingEnabled) return;
+    setSavingEnabled(true);
+    try {
+      await useDevices.getState().setEnabled(next);
+    } catch (err: unknown) {
+      toast({
+        tone: "danger",
+        title: t("settings.devicesUpdateFailed"),
+        description: ipcErrorMessage(err),
+      });
+    } finally {
+      setSavingEnabled(false);
+    }
+  };
+
+  const commitName = async () => {
+    if (!tauri || savingName) return;
+    const trimmed = nameDraft.trim();
+    if (!trimmed) {
+      setNameDraft(savedName);
+      return;
+    }
+    if (trimmed === savedName) {
+      if (nameDraft !== savedName) setNameDraft(savedName);
+      return;
+    }
+    setSavingName(true);
+    try {
+      await useDevices.getState().setDeviceName(trimmed);
+    } catch (err: unknown) {
+      setNameDraft(savedName);
+      toast({
+        tone: "danger",
+        title: t("settings.devicesUpdateFailed"),
+        description: ipcErrorMessage(err),
+      });
+    } finally {
+      setSavingName(false);
+    }
+  };
+
+  const handleNameKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.currentTarget.blur();
+    } else if (e.key === "Escape") {
+      setNameDraft(savedName);
+      e.currentTarget.blur();
+    }
+  };
+
+  return (
+    <Card size="sm" className="min-w-0">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <MonitorSmartphone className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <span>{t("settings.devicesAccessTitle")}</span>
+        </CardTitle>
+      </CardHeader>
+
+      <CardContent className="flex min-w-0 flex-col gap-4">
+        <SettingRow
+          id="devices-allow-control"
+          label={t("settings.devicesAllowControl")}
+          description={t("settings.devicesAllowControlDescription")}
+          disabled={!tauri}
+          control={
+            <SettingSwitch
+              id="devices-allow-control"
+              checked={enabled}
+              disabled={!tauri || savingEnabled}
+              onCheckedChange={(checked) => void handleToggleEnabled(checked)}
+              aria-describedby="devices-allow-control-desc"
+            />
+          }
+        />
+
+        <Separator />
+
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <Label htmlFor="devices-device-name" className="leading-snug text-foreground">
+              {t("settings.devicesNameLabel")}
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              {t("settings.devicesNameDescription")}
+            </p>
+          </div>
+          <Input
+            id="devices-device-name"
+            value={nameDraft}
+            disabled={!tauri || savingName}
+            title={!tauri ? t("settings.inAppOnly") : undefined}
+            placeholder={t("settings.devicesNamePlaceholder")}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onBlur={() => void commitName()}
+            onKeyDown={handleNameKeyDown}
+            className="sm:w-56 sm:shrink-0"
+          />
+        </div>
+
+        {nodeId && (
+          <>
+            <Separator />
+            <div className="flex min-w-0 items-center justify-between gap-4">
+              <span className="text-xs text-muted-foreground">{t("settings.devicesIdLabel")}</span>
+              <span className="font-mono text-xs text-muted-foreground" title={nodeId}>
+                {nodeId.slice(0, 8)}
+              </span>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

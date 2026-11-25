@@ -20,6 +20,7 @@ export type SettingsSection =
   | "general"
   | "background"
   | "agents"
+  | "devices"
   | "notifications"
   | "context"
   | "generic"

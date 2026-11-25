@@ -9,6 +9,7 @@ import { useUi, type SettingsSection } from "@/stores/ui";
 import { AgentsSection } from "./AgentsSection";
 import { BackgroundSection } from "./BackgroundSection";
 import { ContextSection } from "./ContextSection";
+import { DevicesSection } from "./DevicesSection";
 import { GeneralSection } from "./GeneralSection";
 import { PricingCard } from "./PricingCard";
 import { GenericClisSection } from "./GenericClisSection";
@@ -75,6 +76,8 @@ export function SettingsView({ section }: SettingsViewProps) {
             <ShortcutsSection />
           ) : active === "agents" ? (
             <AgentsSection />
+          ) : active === "devices" ? (
+            <DevicesSection />
           ) : loadError !== null && settings === null ? (
             <Alert variant="destructive" className="has-data-[slot=alert-action]:pr-28">
               <AlertCircle aria-hidden />
