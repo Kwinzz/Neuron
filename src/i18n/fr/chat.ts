@@ -46,19 +46,23 @@ const chat = {
   chatDeleted: "Chat supprimé",
   defaultModel: "modèle par défaut",
   tokens: "{n} tokens",
+  openProject: "Voir le projet",
+  openFolderOf: "Ouvrir le dossier {path}",
+  // HeaderUsage / UsageDetails
+  usageButton: "Consommation et quotas",
+  usageThisChat: "Ce chat",
+  usageTokens: "Tokens",
+  usageCost: "Coût",
+  usageSubscription: "Abonnement {agent}",
+  usageResetIn: "Reset dans {time}",
+  usageUpdated: "Mis à jour {time}",
   // TurnMarker
   requestTotalTime: "Temps total de la requête",
 
-  // HeaderQuotas
-  quotaShort5h: "5 h",
-  quotaShort7d: "7 j",
-  quotaShort30d: "30 j",
+  // Subscription quotas
   quota5h: "Quota 5 h",
   quotaWeekly: "Quota hebdomadaire",
   quota30d: "Quota 30 jours",
-  /** `{group}` = « (Gemini Models) » or empty, `{reset}` = quotaReset or empty. */
-  quotaTitle: "{name}{group} : {percent} utilisé{reset}",
-  quotaReset: " · reset dans {time}",
   subscriptionQuotas: "Quotas de l'abonnement",
 
   // ErrorItem

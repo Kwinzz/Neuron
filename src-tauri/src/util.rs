@@ -18,3 +18,15 @@ pub fn neuron_exe() -> std::io::Result<std::path::PathBuf> {
     }
     std::env::current_exe()
 }
+
+/// Open a file or folder with the system's default application (Explorer, Finder, file manager).
+pub fn open_with_system(path: &std::path::Path) -> std::io::Result<()> {
+    let opener = if cfg!(windows) {
+        "explorer"
+    } else if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    std::process::Command::new(opener).arg(path).spawn().map(|_| ())
+}

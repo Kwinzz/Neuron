@@ -5,7 +5,7 @@ use tauri::State;
 use ts_rs::TS;
 
 use crate::db::migrations;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 
 #[derive(Debug, Clone, Serialize, TS)]
@@ -53,6 +53,18 @@ pub async fn app_info(state: State<'_, AppState>) -> AppResult<AppInfo> {
         data_dir: state.paths.data_dir.display().to_string(),
         neuron_home: state.paths.neuron_home.display().to_string(),
     })
+}
+
+/// Open a folder (a project's, a chat's working directory) in the system file manager.
+#[tauri::command]
+pub async fn open_folder(path: String) -> AppResult<()> {
+    let dir = std::path::PathBuf::from(&path);
+    // Folders only: never hand an arbitrary file or URL to the system opener.
+    if !tokio::fs::metadata(&dir).await.is_ok_and(|m| m.is_dir()) {
+        return Err(AppError::NotFound(crate::tr!("dossier introuvable : {path}", "folder not found: {path}")));
+    }
+    crate::util::open_with_system(&dir)?;
+    Ok(())
 }
 
 /// Frontend diagnostics (uncaught errors, error boundary) forwarded to the backend log.

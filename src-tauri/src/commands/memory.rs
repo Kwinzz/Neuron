@@ -99,15 +99,7 @@ pub async fn memory_info(state: State<'_, AppState>) -> AppResult<MemoryInfo> {
 /// Open `memory.md` with the default editor.
 #[tauri::command]
 pub async fn open_memory_file(state: State<'_, AppState>) -> AppResult<()> {
-    let path = state.paths.memory_file.clone();
-    let opener = if cfg!(windows) {
-        "explorer"
-    } else if cfg!(target_os = "macos") {
-        "open"
-    } else {
-        "xdg-open"
-    };
-    std::process::Command::new(opener).arg(&path).spawn()?;
+    crate::util::open_with_system(&state.paths.memory_file)?;
     Ok(())
 }
 

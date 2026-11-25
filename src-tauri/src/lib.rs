@@ -93,6 +93,7 @@ pub fn run() {
         })
         .on_window_event(desktop::on_window_event)
         .invoke_handler(tauri::generate_handler![
+            commands::system::open_folder,
             commands::system::app_info,
             commands::system::frontend_log,
             commands::system::send_notification,

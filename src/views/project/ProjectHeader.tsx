@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { t } from "@/i18n";
+import { openFolder } from "@/lib/openFolder";
 import { useUi } from "@/stores/ui";
 
 interface ProjectHeaderProps {
@@ -119,6 +120,12 @@ export function ProjectHeader({
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {path && (
+            <Button variant="outline" size="sm" onClick={() => void openFolder(path)}>
+              <FolderOpen aria-hidden />
+              <span>{t("common.openFolder")}</span>
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"

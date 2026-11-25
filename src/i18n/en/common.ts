@@ -22,6 +22,8 @@ const common: Translation<typeof fr> = {
   yes: "Yes",
   no: "No",
   untitledChat: "Untitled chat",
+  openFolder: "Open folder",
+  openFolderFailed: "Couldn't open the folder",
   justNow: "just now",
   error: "Error",
 };

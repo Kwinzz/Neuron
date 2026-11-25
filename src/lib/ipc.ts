@@ -149,6 +149,8 @@ export const ipc = {
   searchMemories: (query: string, limit?: number) => invoke<MemoryHit[]>("search_memories", { query, limit }),
   memoryInfo: () => invoke<MemoryInfo>("memory_info"),
   openMemoryFile: () => invoke<void>("open_memory_file"),
+  /** Open a folder (project, chat working directory) in the system file manager. */
+  openFolder: (path: string) => invoke<void>("open_folder", { path }),
   memoryImportSources: () => invoke<LocalMemorySource[]>("memory_import_sources"),
   readMemoryImportFile: (path: string) => invoke<string>("read_memory_import_file", { path }),
   splitMemoryImport: (text: string) => invoke<ImportedMemory[]>("split_memory_import", { text }),

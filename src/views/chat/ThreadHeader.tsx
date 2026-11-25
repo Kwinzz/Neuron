@@ -2,7 +2,7 @@ import { IS_LINUX } from "@/lib/platform";
 import { type KeyboardEvent, memo, useEffect, useRef, useState } from "react";
 import { cn } from "cn";
 import { ContextIndicator } from "@/components/context/ContextIndicator";
-import { FolderOpen, MoreHorizontal, Pencil, Square, Trash2 } from "lucide-react";
+import { FolderKanban, FolderOpen, MoreHorizontal, Pencil, Square, Trash2 } from "lucide-react";
 import { AgentLogo } from "@/components/ui/AgentLogo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,10 +24,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { AGENTS } from "@/lib/agents";
-import { CostLabel } from "@/components/ui/CostLabel";
-import { HeaderQuotas } from "./HeaderQuotas";
-import { formatTokens } from "@/lib/format";
+import { HeaderUsage } from "./HeaderUsage";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
+import { openFolder } from "@/lib/openFolder";
 import { describeStatus, STATUS, TONE_TEXT } from "@/lib/status";
 import { useChat } from "@/stores/chat";
 import { useChatDeletion } from "@/stores/chatDeletion";
@@ -35,6 +34,7 @@ import { useLive } from "@/stores/live";
 import { effortLabel } from "@/lib/models";
 import { findModel, useModels } from "@/stores/models";
 import { toast } from "@/stores/toast";
+import { useUi } from "@/stores/ui";
 import { t } from "@/i18n";
 
 /** Sticky bar: full-bleed inside the scroll container, content aligned with the timeline. */
@@ -164,20 +164,19 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
           <HeaderMeta agentLabel={agentMeta.label} agent={live.agent} model={live.model} effort={live.effort} cwd={live.cwd} />
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          <HeaderQuotas agent={live.agent} model={live.model} />
-          <Badge
-            variant="outline"
-            className={cn("hidden max-w-60 gap-1.5 bg-card sm:inline-flex", TONE_TEXT[statusMeta.tone])}
-          >
-            <StatusDot status={live.status} />
-            <span className="truncate">{describeStatus(live.status, live.detail)}</span>
-            {statusMeta.active && <LiveTimer startedAt={live.runStartedAt} className="font-sans text-muted-foreground" />}
-          </Badge>
-          <span className="hidden text-xs text-muted-foreground tabular-nums lg:inline">
-            {t("chat.tokens", { n: formatTokens(live.tokens) })} ·{" "}
-            <CostLabel agent={live.agent} costUsd={live.costUsd} tokens={live.tokens} />
-          </span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {/* Status only while it says something: working, waiting for an approval, failed (not « Terminé »). */}
+          {(statusMeta.active || live.status === "error") && (
+            <Badge
+              variant="outline"
+              className={cn("hidden max-w-60 gap-1.5 bg-card sm:inline-flex", TONE_TEXT[statusMeta.tone])}
+            >
+              <StatusDot status={live.status} />
+              <span className="truncate">{describeStatus(live.status, live.detail)}</span>
+              {statusMeta.active && <LiveTimer startedAt={live.runStartedAt} className="font-sans text-muted-foreground" />}
+            </Badge>
+          )}
+          <HeaderUsage agent={live.agent} model={live.model} tokens={live.tokens} costUsd={live.costUsd} />
           {live.hasContext && <ContextIndicator threadId={threadId} projectId={live.projectId} />}
           {statusMeta.active && (
             <Button
@@ -202,6 +201,18 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
                 <Pencil />
                 {t("chat.rename")}
               </DropdownMenuItem>
+              {live.cwd && (
+                <DropdownMenuItem onClick={() => live.cwd && void openFolder(live.cwd)}>
+                  <FolderOpen />
+                  {t("common.openFolder")}
+                </DropdownMenuItem>
+              )}
+              {live.projectId && (
+                <DropdownMenuItem onClick={() => live.projectId && useUi.getState().openProject(live.projectId)}>
+                  <FolderKanban />
+                  {t("chat.openProject")}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem variant="destructive" onClick={() => useChatDeletion.getState().request(threadId)}>
                 <Trash2 />
@@ -244,16 +255,21 @@ const HeaderMeta = memo(function HeaderMeta({
         <TooltipProvider delayDuration={300}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span
-                tabIndex={0}
-                className="inline-flex min-w-0 shrink items-center gap-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              <button
+                type="button"
+                onClick={() => void openFolder(cwd)}
+                aria-label={t("chat.openFolderOf", { path: cwd })}
+                className="inline-flex min-w-0 shrink items-center gap-1 rounded-sm outline-none transition-colors duration-150 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
               >
                 <span aria-hidden>·</span>
                 <FolderOpen className="size-3 shrink-0" />
                 <span className="truncate font-mono">{folderName(cwd)}</span>
-              </span>
+              </button>
             </TooltipTrigger>
-            <TooltipContent className="max-w-md break-all font-mono">{cwd}</TooltipContent>
+            <TooltipContent className="max-w-md flex-col items-start gap-0.5 break-all">
+              <span className="font-mono">{cwd}</span>
+              <span className="block opacity-70">{t("common.openFolder")}</span>
+            </TooltipContent>
           </Tooltip>
         </TooltipProvider>
       )}

@@ -22,6 +22,8 @@ const common = {
   yes: "Oui",
   no: "Non",
   untitledChat: "Chat sans titre",
+  openFolder: "Ouvrir le dossier",
+  openFolderFailed: "Dossier non ouvert",
   justNow: "à l'instant",
   error: "Erreur",
 } satisfies Record<string, Message>;

@@ -45,18 +45,23 @@ const chat: Translation<typeof fr> = {
   chatDeleted: "Chat deleted",
   defaultModel: "default model",
   tokens: "{n} tokens",
+  openProject: "View project",
+  openFolderOf: "Open folder {path}",
+  // HeaderUsage / UsageDetails
+  usageButton: "Usage and quotas",
+  usageThisChat: "This chat",
+  usageTokens: "Tokens",
+  usageCost: "Cost",
+  usageSubscription: "{agent} subscription",
+  usageResetIn: "Resets in {time}",
+  usageUpdated: "Updated {time}",
   // TurnMarker
   requestTotalTime: "Total request time",
 
-  // HeaderQuotas
-  quotaShort5h: "5h",
-  quotaShort7d: "7d",
-  quotaShort30d: "30d",
+  // Subscription quotas
   quota5h: "5-hour quota",
   quotaWeekly: "Weekly quota",
   quota30d: "30-day quota",
-  quotaTitle: "{name}{group}: {percent} used{reset}",
-  quotaReset: " · resets in {time}",
   subscriptionQuotas: "Subscription quotas",
 
   // ErrorItem
