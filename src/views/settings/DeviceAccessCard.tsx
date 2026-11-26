@@ -22,6 +22,7 @@ export function DeviceAccessCard() {
   const enabled = status?.settings.enabled ?? false;
   const savedName = status?.settings.deviceName ?? "";
   const nodeId = status?.nodeId ?? null;
+  const port = status?.port ?? null;
 
   const [nameDraft, setNameDraft] = useState(savedName);
   const [savingEnabled, setSavingEnabled] = useState(false);
@@ -139,6 +140,23 @@ export function DeviceAccessCard() {
               <span className="text-xs text-muted-foreground">{t("settings.devicesIdLabel")}</span>
               <span className="font-mono text-xs text-muted-foreground" title={nodeId}>
                 {nodeId.slice(0, 8)}
+              </span>
+            </div>
+          </>
+        )}
+
+        {enabled && port !== null && (
+          <>
+            <Separator />
+            <div className="flex min-w-0 items-center justify-between gap-4">
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <span className="text-xs text-muted-foreground">{t("settings.devicesPortLabel")}</span>
+                <span className="text-xs text-muted-foreground/80">
+                  {t("settings.devicesPortHint", { port })}
+                </span>
+              </div>
+              <span className="select-all font-mono text-xs tabular-nums text-muted-foreground">
+                {port}
               </span>
             </div>
           </>

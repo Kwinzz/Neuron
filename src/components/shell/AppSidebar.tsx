@@ -10,12 +10,14 @@ import {
   FolderPlus,
   Home,
   MessageSquare,
+  Monitor,
   MoreHorizontal,
   Plus,
   Search,
   Trash2,
 } from "lucide-react";
 import type { ProjectSummary } from "@/bindings/ProjectSummary";
+import type { RemoteHost } from "@/bindings/RemoteHost";
 import type { ThreadSummary } from "@/bindings/ThreadSummary";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -45,9 +47,11 @@ import {
 } from "@/components/ui/sidebar";
 import { AgentLogo } from "@/components/ui/AgentLogo";
 import { StatusDot } from "@/components/ui/StatusDot";
+import { deviceOfProject, deviceOfThread } from "@/lib/deviceRouting";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { STATUS } from "@/lib/status";
 import { useDashboard } from "@/stores/dashboard";
+import { useDevices } from "@/stores/devices";
 import { useLive } from "@/stores/live";
 import { useNav } from "@/stores/nav";
 import { useChatDeletion } from "@/stores/chatDeletion";
@@ -92,8 +96,7 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 
       <SidebarContent>
         <MainNav />
-        <ProjectsNav />
-        <LooseChatsNav />
+        <SidebarSections />
       </SidebarContent>
 
       <SidebarResizer />
@@ -154,28 +157,79 @@ function MainNav() {
   );
 }
 
-/** Chats grouped by project id ("" = no project), newest first. */
-function useChatsByProject(): Map<string, ThreadSummary[]> {
+const EMPTY: ThreadSummary[] = [];
+const EMPTY_PROJECTS: ProjectSummary[] = [];
+const EMPTY_HOSTS: readonly RemoteHost[] = [];
+
+/** Projects and chats split between this device and each paired host. */
+function SidebarSections() {
+  const projects = useNav((s) => s.projects);
   const chats = useNav((s) => s.chats);
-  return useMemo(() => {
-    const map = new Map<string, ThreadSummary[]>();
-    for (const c of chats) {
-      const key = c.projectId ?? "";
-      const list = map.get(key);
-      if (list) list.push(c);
-      else map.set(key, [c]);
+  const hosts = useDevices((s) => s.devices?.hosts) ?? EMPTY_HOSTS;
+
+  const partitioned = useMemo(() => {
+    const localProjects: ProjectSummary[] = [];
+    const projectsByDevice = new Map<string, ProjectSummary[]>();
+    for (const p of projects) {
+      const device = deviceOfProject(p.id);
+      if (device === null) {
+        localProjects.push(p);
+      } else {
+        const list = projectsByDevice.get(device);
+        if (list) list.push(p);
+        else projectsByDevice.set(device, [p]);
+      }
     }
-    return map;
-  }, [chats]);
+
+    const chatsByProject = new Map<string, ThreadSummary[]>();
+    const localLooseChats: ThreadSummary[] = [];
+    const looseChatsByDevice = new Map<string, ThreadSummary[]>();
+    const chatsByDevice = new Map<string, ThreadSummary[]>();
+    for (const c of chats) {
+      const device = deviceOfThread(c.id) ?? deviceOfProject(c.projectId);
+      if (device !== null) {
+        const all = chatsByDevice.get(device);
+        if (all) all.push(c);
+        else chatsByDevice.set(device, [c]);
+      }
+      if (c.projectId !== null) {
+        const list = chatsByProject.get(c.projectId);
+        if (list) list.push(c);
+        else chatsByProject.set(c.projectId, [c]);
+      } else if (device === null) {
+        localLooseChats.push(c);
+      } else {
+        const list = looseChatsByDevice.get(device);
+        if (list) list.push(c);
+        else looseChatsByDevice.set(device, [c]);
+      }
+    }
+
+    return { localProjects, projectsByDevice, chatsByProject, localLooseChats, looseChatsByDevice, chatsByDevice };
+  }, [projects, chats]);
+
+  return (
+    <>
+      <ProjectsNav projects={partitioned.localProjects} byProject={partitioned.chatsByProject} />
+      <LooseChatsNav chats={partitioned.localLooseChats} />
+      <RemoteDevicesNav
+        hosts={hosts}
+        projectsByDevice={partitioned.projectsByDevice}
+        looseChatsByDevice={partitioned.looseChatsByDevice}
+        chatsByDevice={partitioned.chatsByDevice}
+        byProject={partitioned.chatsByProject}
+      />
+    </>
+  );
 }
 
 async function addProject() {
   try {
     const path = await ipc.pickDirectory();
     if (!path) return;
-    const projects = await ipc.createProject(path);
-    useNav.getState().setProjects(projects);
-    const created = projects.find((p) => p.path === path);
+    const localProjects = await ipc.createProject(path);
+    const created = localProjects.find((p) => p.path === path);
+    await useNav.getState().load();
     if (created) useNav.getState().setProjectOpen(created.id, true);
     void useDashboard.getState().load();
   } catch (err) {
@@ -183,9 +237,13 @@ async function addProject() {
   }
 }
 
-function ProjectsNav() {
-  const projects = useNav((s) => s.projects);
-  const byProject = useChatsByProject();
+function ProjectsNav({
+  projects,
+  byProject,
+}: {
+  projects: ProjectSummary[];
+  byProject: Map<string, ThreadSummary[]>;
+}) {
   return (
     <SidebarGroup>
       <SidebarGroupLabel>{t("shell.projects")}</SidebarGroupLabel>
@@ -210,9 +268,15 @@ function ProjectsNav() {
   );
 }
 
-const EMPTY: ThreadSummary[] = [];
-
-const ProjectFolder = memo(function ProjectFolder({ project, chats }: { project: ProjectSummary; chats: ThreadSummary[] }) {
+const ProjectFolder = memo(function ProjectFolder({
+  project,
+  chats,
+  nested = false,
+}: {
+  project: ProjectSummary;
+  chats: ThreadSummary[];
+  nested?: boolean;
+}) {
   const open = useNav((s) => s.openProjects[project.id] ?? false);
   const [showAll, setShowAll] = useState(false);
   const draftHere = useUi((s) => s.view.kind === "draft" && s.view.projectId === project.id);
@@ -222,8 +286,8 @@ const ProjectFolder = memo(function ProjectFolder({ project, chats }: { project:
 
   const remove = async () => {
     try {
-      useNav.getState().setProjects(await ipc.deleteProject(project.id));
-      void useNav.getState().load();
+      await ipc.deleteProject(project.id);
+      await useNav.getState().load();
       void useDashboard.getState().load();
     } catch (err) {
       toast({ tone: "danger", title: t("shell.projectRemoveFailed"), description: ipcErrorMessage(err) });
@@ -234,7 +298,7 @@ const ProjectFolder = memo(function ProjectFolder({ project, chats }: { project:
     <Collapsible asChild open={open} onOpenChange={(o) => useNav.getState().setProjectOpen(project.id, o)}>
       <SidebarMenuItem>
         <CollapsibleTrigger asChild>
-          <SidebarMenuButton tooltip={project.path}>
+          <SidebarMenuButton tooltip={project.path} className={nested ? "h-7" : undefined}>
             <ChevronRight
               className={`size-3.5! text-muted-foreground transition-transform duration-200 ${open ? "rotate-90" : ""}`}
             />
@@ -251,7 +315,7 @@ const ProjectFolder = memo(function ProjectFolder({ project, chats }: { project:
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <SidebarMenuAction showOnHover>
+            <SidebarMenuAction showOnHover className={nested ? "top-1" : undefined}>
               <MoreHorizontal />
               <span className="sr-only">{t("shell.projectActions")}</span>
             </SidebarMenuAction>
@@ -283,7 +347,7 @@ const ProjectFolder = memo(function ProjectFolder({ project, chats }: { project:
         </DropdownMenu>
 
         <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-          <SidebarMenuSub>
+          <SidebarMenuSub className={nested ? "mr-0 pr-0" : undefined}>
             <SidebarMenuSubItem>
               <SidebarMenuSubButton
                 isActive={draftHere}
@@ -327,9 +391,7 @@ const ProjectFolder = memo(function ProjectFolder({ project, chats }: { project:
   );
 });
 
-function LooseChatsNav() {
-  const byProject = useChatsByProject();
-  const chats = byProject.get("") ?? EMPTY;
+function LooseChatsNav({ chats }: { chats: ThreadSummary[] }) {
   const [showAll, setShowAll] = useState(false);
   if (chats.length === 0) return null;
   const visible = showAll ? chats : chats.slice(0, PAGE);
@@ -358,8 +420,127 @@ function LooseChatsNav() {
   );
 }
 
+function RemoteDevicesNav({
+  hosts,
+  projectsByDevice,
+  looseChatsByDevice,
+  chatsByDevice,
+  byProject,
+}: {
+  hosts: readonly RemoteHost[];
+  projectsByDevice: Map<string, ProjectSummary[]>;
+  looseChatsByDevice: Map<string, ThreadSummary[]>;
+  chatsByDevice: Map<string, ThreadSummary[]>;
+  byProject: Map<string, ThreadSummary[]>;
+}) {
+  if (hosts.length === 0) return null;
+  return (
+    <SidebarGroup>
+      <SidebarGroupLabel>{t("shell.devices")}</SidebarGroupLabel>
+      <SidebarMenu>
+        {hosts.map((host) => (
+          <DeviceFolder
+            key={host.nodeId}
+            host={host}
+            projects={projectsByDevice.get(host.nodeId) ?? EMPTY_PROJECTS}
+            looseChats={looseChatsByDevice.get(host.nodeId) ?? EMPTY}
+            allChats={chatsByDevice.get(host.nodeId) ?? EMPTY}
+            byProject={byProject}
+          />
+        ))}
+      </SidebarMenu>
+    </SidebarGroup>
+  );
+}
+
+const DeviceFolder = memo(function DeviceFolder({
+  host,
+  projects,
+  looseChats,
+  allChats,
+  byProject,
+}: {
+  host: RemoteHost;
+  projects: ProjectSummary[];
+  looseChats: ThreadSummary[];
+  allChats: ThreadSummary[];
+  byProject: Map<string, ThreadSummary[]>;
+}) {
+  const storedOpen = useNav((s) => s.openDevices[host.nodeId]);
+  const open = storedOpen ?? host.connected;
+  const [showAll, setShowAll] = useState(false);
+  const activeCount = useLive((s) => allChats.filter((c) => STATUS[s.threads[c.id]?.status ?? c.status].active).length);
+  const visibleLoose = showAll ? looseChats : looseChats.slice(0, PAGE);
+  const statusLabel = host.connected ? t("shell.deviceOnline") : t("shell.deviceOffline");
+
+  return (
+    <Collapsible asChild open={open} onOpenChange={(o) => useNav.getState().setDeviceOpen(host.nodeId, o)}>
+      <SidebarMenuItem>
+        <CollapsibleTrigger asChild>
+          <SidebarMenuButton
+            tooltip={`${host.name} · ${statusLabel}`}
+            className={!host.connected ? "text-muted-foreground" : undefined}
+          >
+            <ChevronRight
+              className={`size-3.5! text-muted-foreground transition-transform duration-200 ${open ? "rotate-90" : ""}`}
+            />
+            <Monitor />
+            <span>{host.name}</span>
+            {activeCount > 0 ? (
+              <span className="ml-auto flex items-center gap-1 text-xs text-live tabular-nums animate-in fade-in-0 zoom-in-75 animation-duration-200">
+                <span className="size-1.5 animate-pulse rounded-full bg-live" />
+                {activeCount}
+              </span>
+            ) : (
+              <span
+                aria-label={statusLabel}
+                title={statusLabel}
+                className={`ml-auto size-1.5 shrink-0 rounded-full ${host.connected ? "bg-ok" : "bg-muted-foreground/40"}`}
+              />
+            )}
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+
+        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+          <SidebarMenuSub className="mr-0 pr-0">
+            {projects.map((p) => (
+              <ProjectFolder key={p.id} project={p} chats={byProject.get(p.id) ?? EMPTY} nested />
+            ))}
+            {projects.length > 0 && looseChats.length > 0 && (
+              <li className="px-2 pt-1.5 pb-0.5 text-[11px] font-medium text-muted-foreground select-none">
+                {t("shell.chats")}
+              </li>
+            )}
+            {visibleLoose.map((c, i) => (
+              <SidebarMenuItem
+                key={c.id}
+                className="animate-in fade-in-0 slide-in-from-left-1 fill-mode-both duration-200"
+                style={{ animationDelay: `${Math.min(i, 10) * 25}ms` }}
+              >
+                <ChatLink chat={c} compact />
+              </SidebarMenuItem>
+            ))}
+            {looseChats.length > PAGE && (
+              <SidebarMenuSubItem>
+                <SidebarMenuSubButton onClick={() => setShowAll((v) => !v)} className="text-xs text-muted-foreground">
+                  <span>{showAll ? t("shell.showLess") : t("shell.showMore", { n: looseChats.length - PAGE })}</span>
+                </SidebarMenuSubButton>
+              </SidebarMenuSubItem>
+            )}
+            {projects.length === 0 && looseChats.length === 0 && (
+              <li className="px-2 py-1 text-xs text-muted-foreground">
+                {host.connected ? t("shell.deviceEmpty") : t("shell.deviceOffline")}
+              </li>
+            )}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
+  );
+});
+
 /** "…" menu of a chat row (shown on hover): delete, after confirmation (`DeleteChatDialog`). */
-function ChatActions({ chatId, sub }: { chatId: string; sub: boolean }) {
+function ChatActions({ chatId, sub, compact = false }: { chatId: string; sub: boolean; compact?: boolean }) {
   const trigger = sub ? (
     <button
       type="button"
@@ -369,7 +550,7 @@ function ChatActions({ chatId, sub }: { chatId: string; sub: boolean }) {
       <span className="sr-only">{t("chat.chatActions")}</span>
     </button>
   ) : (
-    <SidebarMenuAction showOnHover>
+    <SidebarMenuAction showOnHover className={compact ? "top-1" : undefined}>
       <MoreHorizontal />
       <span className="sr-only">{t("chat.chatActions")}</span>
     </SidebarMenuAction>
@@ -388,7 +569,15 @@ function ChatActions({ chatId, sub }: { chatId: string; sub: boolean }) {
 }
 
 /** A chat entry; title and status come from the live store when available. */
-const ChatLink = memo(function ChatLink({ chat, sub = false }: { chat: ThreadSummary; sub?: boolean }) {
+const ChatLink = memo(function ChatLink({
+  chat,
+  sub = false,
+  compact = false,
+}: {
+  chat: ThreadSummary;
+  sub?: boolean;
+  compact?: boolean;
+}) {
   const title = useLive((s) => s.threads[chat.id]?.title ?? chat.title);
   const status = useLive((s) => s.threads[chat.id]?.status ?? chat.status);
   const active = useUi((s) => s.view.kind === "thread" && s.view.id === chat.id);
@@ -418,19 +607,22 @@ const ChatLink = memo(function ChatLink({ chat, sub = false }: { chat: ThreadSum
       </>
     );
   }
+  const buttonClass = [compact ? "h-7" : "", working ? "pr-7" : ""].filter(Boolean).join(" ") || undefined;
   return (
     <>
       {/* The status dot sits over the row's right edge: keep the title clear of it. */}
-      <SidebarMenuButton isActive={active} onClick={open} tooltip={label} className={working ? "pr-7" : undefined}>
+      <SidebarMenuButton isActive={active} onClick={open} tooltip={label} className={buttonClass}>
         <AgentLogo agent={chat.agent} />
         <span>{label}</span>
       </SidebarMenuButton>
       {working && (
-        <SidebarMenuBadge className="group-focus-within/menu-item:opacity-0 group-hover/menu-item:opacity-0">
+        <SidebarMenuBadge
+          className={`${compact ? "top-1 " : ""}group-focus-within/menu-item:opacity-0 group-hover/menu-item:opacity-0`}
+        >
           <StatusDot status={status} className="animate-in fade-in-0 zoom-in-50 duration-200" />
         </SidebarMenuBadge>
       )}
-      <ChatActions chatId={chat.id} sub={false} />
+      <ChatActions chatId={chat.id} sub={false} compact={compact} />
     </>
   );
 });

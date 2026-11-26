@@ -22,6 +22,8 @@ pub struct RemoteStatus {
     pub node_id: Option<String>,
     /// The endpoint is running (hosting and/or controlling devices).
     pub running: bool,
+    /// UDP port the endpoint is listening on (useful for firewall rules when hosting).
+    pub port: Option<u16>,
     /// Open pairing code (host side).
     pub pairing: Option<PairingCode>,
 }
@@ -43,6 +45,7 @@ async fn status(state: &AppState) -> AppResult<RemoteStatus> {
         settings,
         node_id: node.as_ref().map(|n| n.id().to_string()),
         running: node.is_some(),
+        port: node.as_ref().and_then(|n| n.port()),
         pairing: node.as_ref().and_then(|n| n.pairing()),
     })
 }

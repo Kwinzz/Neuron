@@ -225,6 +225,8 @@ const settings: Translation<typeof fr> = {
   devicesNameDescription: "Shown to other devices when pairing and in the sidebar.",
   devicesNamePlaceholder: "My computer",
   devicesIdLabel: "Device ID",
+  devicesPortLabel: "Local network port (UDP)",
+  devicesPortHint: "Allow in your firewall on Linux (e.g. ufw allow {port}/udp).",
   devicesPairTitle: "Pair a device",
   devicesPairDescription:
     "Generate a temporary code valid for 2 minutes to allow another device to control this one.",

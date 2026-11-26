@@ -10,6 +10,7 @@
 
 pub mod dispatch;
 pub mod hub;
+pub mod mdns;
 pub mod node;
 pub mod pairing;
 pub mod protocol;
@@ -143,11 +144,21 @@ impl Remote {
         }
         if needed {
             let secret = load_or_create_secret(&self.data_dir)?;
-            let config =
-                NodeConfig { secret, name: settings.device_name.clone(), hosting: settings.enabled, mdns: true };
+            let config = NodeConfig {
+                secret,
+                name: settings.device_name.clone(),
+                hosting: settings.enabled,
+                mdns: true,
+                fixed_port: settings.enabled,
+            };
             let backend = Arc::new(AppBackend { app: app.clone() });
             let node = Node::start(config, backend, hub::sender()).await?;
-            tracing::info!(id = %node.id().fmt_short(), hosting = settings.enabled, "remote: endpoint started");
+            tracing::info!(
+                id = %node.id().fmt_short(),
+                hosting = settings.enabled,
+                port = ?node.port(),
+                "remote: endpoint started"
+            );
             *slot = Some(node);
         }
         let _ = app.emit_to("main", REMOTE_STATUS_CHANNEL, ());

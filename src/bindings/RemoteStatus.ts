@@ -12,6 +12,10 @@ nodeId: string | null,
  */
 running: boolean, 
 /**
+ * UDP port the endpoint is listening on (useful for firewall rules when hosting).
+ */
+port: number | null, 
+/**
  * Open pairing code (host side).
  */
 pairing: PairingCode | null, };

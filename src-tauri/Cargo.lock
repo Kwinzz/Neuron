@@ -2601,26 +2601,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "iroh-mdns-address-lookup"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7e00b132891c9cfad726fb437b62315e722949d409717b6c7dcb535e9f24112"
-dependencies = [
- "data-encoding",
- "derive_more",
- "futures-util",
- "iroh",
- "iroh-base",
- "n0-error",
- "n0-future",
- "n0-watcher",
- "swarm-discovery",
- "tokio",
- "tokio-stream",
- "tracing",
-]
-
-[[package]]
 name = "iroh-metrics"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3341,10 +3321,13 @@ version = "0.2.1"
 dependencies = [
  "base64 0.22.1",
  "blake3",
+ "data-encoding",
+ "futures-util",
  "ignore",
  "iroh",
- "iroh-mdns-address-lookup",
  "n0-future",
+ "n0-watcher",
+ "netwatch",
  "portable-pty",
  "reqwest 0.12.28",
  "rusqlite",
@@ -3352,6 +3335,7 @@ dependencies = [
  "serde_json",
  "similar",
  "spake2",
+ "swarm-discovery",
  "sys-locale",
  "tauri",
  "tauri-build",
@@ -3363,6 +3347,7 @@ dependencies = [
  "tauri-winrt-notification",
  "thiserror 2.0.21",
  "tokio",
+ "tokio-stream",
  "tracing",
  "tracing-subscriber",
  "ts-rs",

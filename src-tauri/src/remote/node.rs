@@ -5,14 +5,14 @@
 
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::pin::Pin;
 use std::sync::{Arc, Mutex, MutexGuard, Weak};
 use std::time::Duration;
 
 use iroh::address_lookup::MemoryLookup;
-use iroh::endpoint::{Connection, Incoming, RecvStream, SendStream, presets};
+use iroh::endpoint::{BindOpts, Connection, Incoming, RecvStream, SendStream, presets};
 use iroh::{Endpoint, EndpointAddr, EndpointId, RelayMode, SecretKey};
-use iroh_mdns_address_lookup::{DiscoveryEvent, MdnsAddressLookup};
 use n0_future::StreamExt;
 use serde::Serialize;
 use serde_json::Value;
@@ -20,6 +20,7 @@ use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use ts_rs::TS;
 
+use super::mdns::{DiscoveryEvent, MdnsLookup};
 use super::pairing::{Exchange, PairingCode, PairingWindow, Role, wrong_code};
 use super::protocol::{
     MAX_MESSAGE, PAIR_ALPN, PairConfirm, PairHello, PairOutcome, PairReply, RPC_ALPN, RpcRequest, RpcResponse,
@@ -33,6 +34,9 @@ pub type BoxFut<T> = Pin<Box<dyn Future<Output = T> + Send + 'static>>;
 
 /// mDNS service under which Neuron instances find each other (other iroh apps are ignored).
 const MDNS_SERVICE: &str = "neuron";
+/// Preferred UDP port when hosting other devices, so firewalls (e.g. ufw on Linux) only need one rule.
+/// Falls back to an ephemeral OS port if already in use.
+pub const DEFAULT_HOST_PORT: u16 = 47831;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(8);
 /// A request may start a CLI (`agent_access`, `list_models`): generous.
 const CALL_TIMEOUT: Duration = Duration::from_secs(90);
@@ -76,6 +80,8 @@ pub struct NodeConfig {
     pub hosting: bool,
     /// Local network discovery (off in tests).
     pub mdns: bool,
+    /// Bind [`DEFAULT_HOST_PORT`] when hosting (with ephemeral fallback if busy; off in tests).
+    pub fixed_port: bool,
 }
 
 pub struct Node {
@@ -119,27 +125,11 @@ impl Node {
         events: broadcast::Sender<WireEvent>,
     ) -> AppResult<Arc<Self>> {
         let name = clean_name(&config.name);
-        let alpns = if config.hosting { vec![PAIR_ALPN.to_vec(), RPC_ALPN.to_vec()] } else { Vec::new() };
-        let mut builder =
-            Endpoint::builder(presets::Minimal).secret_key(config.secret).relay_mode(RelayMode::Disabled).alpns(alpns);
-        if config.hosting {
-            let mut advertised = name.clone();
-            while advertised.len() > iroh::address_lookup::UserData::MAX_LENGTH {
-                advertised.pop();
-            }
-            if let Ok(user_data) = advertised.try_into() {
-                builder = builder.user_data_for_address_lookup(user_data);
-            }
-        }
-        let endpoint = builder.bind().await.map_err(net_err)?;
+        let endpoint = bind_endpoint(&config, &name).await?;
         let addresses = MemoryLookup::new();
         endpoint.address_lookup().map_err(net_err)?.add(addresses.clone());
         let mdns = if config.mdns {
-            let mdns = MdnsAddressLookup::builder()
-                .service_name(MDNS_SERVICE)
-                .advertise(config.hosting)
-                .build(endpoint.id())
-                .map_err(net_err)?;
+            let mdns = MdnsLookup::start(endpoint.id(), MDNS_SERVICE, config.hosting).await?;
             endpoint.address_lookup().map_err(net_err)?.add(mdns.clone());
             Some(mdns)
         } else {
@@ -213,6 +203,12 @@ impl Node {
     /// Name shown to the other devices.
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// UDP port this endpoint is listening on (IPv4 preferred).
+    pub fn port(&self) -> Option<u16> {
+        let sockets = self.endpoint.bound_sockets();
+        sockets.iter().find(|s| s.is_ipv4()).or_else(|| sockets.first()).map(SocketAddr::port)
     }
 
     /// This node's address (tests, and later remembering where a host was reached).
@@ -532,8 +528,53 @@ impl Node {
         for task in lock(&self.tasks).drain(..) {
             task.abort();
         }
+        if let Ok(lookup) = self.endpoint.address_lookup() {
+            lookup.clear();
+        }
         self.endpoint.close().await;
     }
+}
+
+fn endpoint_builder(secret: SecretKey, name: &str, hosting: bool) -> iroh::endpoint::Builder {
+    let alpns = if hosting { vec![PAIR_ALPN.to_vec(), RPC_ALPN.to_vec()] } else { Vec::new() };
+    let mut builder =
+        Endpoint::builder(presets::Minimal).secret_key(secret).relay_mode(RelayMode::Disabled).alpns(alpns);
+    if hosting {
+        let mut advertised = name.to_string();
+        while advertised.len() > iroh::address_lookup::UserData::MAX_LENGTH {
+            advertised.pop();
+        }
+        if let Ok(user_data) = advertised.try_into() {
+            builder = builder.user_data_for_address_lookup(user_data);
+        }
+    }
+    builder
+}
+
+async fn bind_endpoint(config: &NodeConfig, name: &str) -> AppResult<Endpoint> {
+    if config.hosting && config.fixed_port {
+        let fixed = endpoint_builder(config.secret.clone(), name, true)
+            .clear_ip_transports()
+            .bind_addr(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, DEFAULT_HOST_PORT))
+            .and_then(|b| {
+                b.bind_addr_with_opts(
+                    SocketAddrV6::new(Ipv6Addr::UNSPECIFIED, DEFAULT_HOST_PORT, 0, 0),
+                    BindOpts::default().set_is_required(false),
+                )
+            });
+        match fixed {
+            Ok(builder) => match builder.bind().await {
+                Ok(endpoint) => return Ok(endpoint),
+                Err(err) => tracing::warn!(
+                    port = DEFAULT_HOST_PORT,
+                    %err,
+                    "remote: fixed host port busy, falling back to ephemeral port"
+                ),
+            },
+            Err(err) => tracing::warn!(%err, "remote: fixed host bind addr invalid, falling back to ephemeral port"),
+        }
+    }
+    endpoint_builder(config.secret.clone(), name, config.hosting).bind().await.map_err(net_err)
 }
 
 #[cfg(test)]
@@ -585,7 +626,8 @@ mod tests {
     async fn node(name: &str, hosting: bool) -> (Arc<Node>, Arc<Mock>, broadcast::Sender<WireEvent>) {
         let backend = Arc::new(Mock::default());
         let (events, _) = broadcast::channel(64);
-        let config = NodeConfig { secret: SecretKey::generate(), name: name.into(), hosting, mdns: false };
+        let config =
+            NodeConfig { secret: SecretKey::generate(), name: name.into(), hosting, mdns: false, fixed_port: false };
         let node = Node::start(config, backend.clone(), events.clone()).await.unwrap();
         (node, backend, events)
     }
@@ -672,5 +714,29 @@ mod tests {
         assert!(client.pair(&host.id().to_string(), "123456").await.is_err());
         client.shutdown().await;
         host.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn hosting_node_prefers_fixed_port_and_falls_back_when_busy() {
+        let start_fixed = || async {
+            let backend = Arc::new(Mock::default());
+            let (events, _) = broadcast::channel(16);
+            let config = NodeConfig {
+                secret: SecretKey::generate(),
+                name: "Host".into(),
+                hosting: true,
+                mdns: false,
+                fixed_port: true,
+            };
+            Node::start(config, backend, events).await.unwrap()
+        };
+        let first = start_fixed().await;
+        let second = start_fixed().await;
+        let first_port = first.port().expect("first host bound a port");
+        let second_port = second.port().expect("second host bound a port");
+        // If DEFAULT_HOST_PORT was free, the first took it and the second fell back cleanly to another port.
+        assert_ne!(first_port, second_port);
+        second.shutdown().await;
+        first.shutdown().await;
     }
 }

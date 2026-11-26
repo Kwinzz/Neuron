@@ -226,6 +226,8 @@ const settings = {
   devicesNameDescription: "Affiché aux autres appareils lors de l'appairage et dans la barre latérale.",
   devicesNamePlaceholder: "Mon ordinateur",
   devicesIdLabel: "Identifiant de cet appareil",
+  devicesPortLabel: "Port réseau local (UDP)",
+  devicesPortHint: "À autoriser dans le pare-feu sous Linux (ex. ufw allow {port}/udp).",
   devicesPairTitle: "Appairer un appareil",
   devicesPairDescription:
     "Générez un code temporaire valable 2 minutes pour autoriser un autre appareil à piloter celui-ci.",
