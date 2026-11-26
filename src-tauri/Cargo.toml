@@ -8,7 +8,9 @@ rust-version = "1.85"
 [lib]
 # `_lib` suffix avoids a name clash with the bin target on Windows.
 name = "neuron_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# Desktop only: the binary links the rlib. The template's "staticlib" / "cdylib" are only for Tauri mobile (iOS /
+# Android) and doubled every build (the huge cdylib even crashed lld on Linux). Mobile: ["staticlib", "cdylib", "rlib"].
+crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2.7", features = [] }
