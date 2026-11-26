@@ -15,6 +15,11 @@ pub enum Command {
     CliPath {
         add: bool,
     },
+    /// New version: `--check` only tells, `--yes` installs without asking.
+    Update {
+        check: bool,
+        yes: bool,
+    },
     Version,
     Help,
 }
@@ -48,6 +53,21 @@ pub fn parse(args: &[String]) -> Option<Result<Command, String>> {
         },
         "help" | "--help" | "-h" => Ok(Command::Help),
         "remote" => parse_remote(rest).map(Command::Remote),
+        "update" => {
+            let mut cmd = (false, false);
+            let mut bad = None;
+            for arg in rest {
+                match arg.as_str() {
+                    "--check" => cmd.0 = true,
+                    "--yes" | "-y" => cmd.1 = true,
+                    other => bad = Some(other.to_string()),
+                }
+            }
+            match bad {
+                Some(extra) => Err(crate::tr!("argument inattendu : {extra}", "unexpected argument: {extra}")),
+                None => Ok(Command::Update { check: cmd.0, yes: cmd.1 }),
+            }
+        }
         "service" => match rest {
             [sub] if sub == "install" => Ok(Command::Service(ServiceCmd::Install)),
             [sub] if sub == "uninstall" => Ok(Command::Service(ServiceCmd::Uninstall)),
@@ -150,6 +170,7 @@ Usage : neuron <commande>
   remote revoke <appareil>        retire l'accès d'un appareil
   remote forget <appareil>        cesse de piloter un appareil
   service install|uninstall|status   service systemd : démarre avec la machine (Linux)
+  update [--check] [--yes]        cherche (et installe) la dernière version
   version | help
 
 Un appareil se désigne par le début de son nom ou de son identifiant.
@@ -170,6 +191,7 @@ Usage: neuron <command>
   remote revoke <device>          remove a device's access
   remote forget <device>          stop controlling a device
   service install|uninstall|status   systemd service: starts with the machine (Linux)
+  update [--check] [--yes]        look for (and install) the latest version
   version | help
 
 A device is named by the start of its name or id.
@@ -209,6 +231,9 @@ mod tests {
             p("remote level PC de Kim chat"),
             Some(Ok(Command::Remote(RemoteCmd::Level { device: "PC de Kim".into(), level: AccessLevel::Chat })))
         );
+        assert_eq!(p("update"), Some(Ok(Command::Update { check: false, yes: false })));
+        assert_eq!(p("update -y --check"), Some(Ok(Command::Update { check: true, yes: true })));
+        assert!(matches!(p("update now"), Some(Err(_))));
         assert_eq!(p("--cli-path remove"), Some(Ok(Command::CliPath { add: false })));
         assert_eq!(p("service install"), Some(Ok(Command::Service(ServiceCmd::Install))));
         assert!(matches!(p("service start"), Some(Err(_))));

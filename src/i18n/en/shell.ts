@@ -9,6 +9,7 @@ const shell: Translation<typeof fr> = {
   navHome: "Home",
   navMemory: "Memory",
   navSettings: "Settings",
+  updateAvailable: "Update available",
   navSettingsTooltip: "Settings ({combo})",
   navSearchTooltip: "Search ({combo})",
   projects: "Projects",

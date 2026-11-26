@@ -10,6 +10,7 @@ mod client;
 pub mod output;
 mod serve;
 pub mod service;
+mod update_cmd;
 
 use crate::error::AppError;
 use crate::state::AppPaths;

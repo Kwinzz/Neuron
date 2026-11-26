@@ -5,6 +5,7 @@ import type { GenericCliProfile } from "./GenericCliProfile";
 import type { Language } from "./Language";
 import type { NotificationSettings } from "./NotificationSettings";
 import type { QuickLauncherSettings } from "./QuickLauncherSettings";
+import type { UpdateSettings } from "./UpdateSettings";
 
 export type AppSettings = { 
 /**
@@ -18,4 +19,4 @@ idleShutdownMinutes: number, notifications: NotificationSettings, context: Conte
 /**
  * User-defined CLIs usable as the "Generic" agent (each one appears as a model).
  */
-genericClis: Array<GenericCliProfile>, background: BackgroundSettings, quickLauncher: QuickLauncherSettings, };
+genericClis: Array<GenericCliProfile>, background: BackgroundSettings, quickLauncher: QuickLauncherSettings, updates: UpdateSettings, };

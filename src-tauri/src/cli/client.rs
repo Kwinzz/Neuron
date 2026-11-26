@@ -18,6 +18,7 @@ pub async fn run(cmd: Command, paths: &crate::state::AppPaths) -> AppResult<i32>
     match cmd {
         Command::Status => status(dir).await,
         Command::Remote(cmd) => remote(dir, cmd).await,
+        Command::Update { check, yes } => super::update_cmd::run(dir, check, yes).await,
         Command::Serve | Command::Service(_) | Command::CliPath { .. } | Command::Version | Command::Help => Ok(0),
     }
 }

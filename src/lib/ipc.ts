@@ -46,6 +46,8 @@ import type { PairingCode } from "@/bindings/PairingCode";
 import type { RemoteDevices } from "@/bindings/RemoteDevices";
 import type { RemoteEventPayload } from "@/bindings/RemoteEventPayload";
 import type { RemoteStatus } from "@/bindings/RemoteStatus";
+import type { UpdateInfo } from "@/bindings/UpdateInfo";
+import type { UpdateProgress } from "@/bindings/UpdateProgress";
 import {
   connectedHosts,
   deviceOfProject,
@@ -397,6 +399,12 @@ export const events = {
   onQuotasChanged: (handler: () => void): Promise<UnlistenFn> => listen(QUOTAS_CHANGED_CHANNEL, () => handler()),
   /** Usage imported from the Claude Code / Codex logs. */
   onUsageChanged: (handler: () => void): Promise<UnlistenFn> => listen("usage://changed", () => handler()),
+  /** A newer version of Neuron was found (once per version, automatic check). */
+  onUpdateAvailable: (handler: (info: UpdateInfo) => void): Promise<UnlistenFn> =>
+    listen<UpdateInfo>("update://available", (e) => handler(e.payload)),
+  /** Download of the update installer (Windows). */
+  onUpdateProgress: (handler: (progress: UpdateProgress) => void): Promise<UnlistenFn> =>
+    listen<UpdateProgress>("update://progress", (e) => handler(e.payload)),
   onNotificationClicked: (handler: (threadId: string | null) => void): Promise<UnlistenFn> =>
     listen<string | null>(NOTIFICATION_CLICKED_CHANNEL, (e) => handler(e.payload)),
   /** The quick prompt asks for the « Nouveau chat » screen (payload = project id or null). */
@@ -452,6 +460,18 @@ export const appWindow = {
   /** Fires on every resize (maximize / restore included). */
   onResized: (handler: () => void): Promise<UnlistenFn> => getCurrentWindow().onResized(() => handler()),
 };
+
+/** New versions of Neuron (GitHub releases). */
+export const updates = {
+  /** Last known answer, no network. */
+  status: () => invoke<UpdateInfo | null>("update_status"),
+  check: () => invoke<UpdateInfo>("update_check"),
+  /** Windows: downloads, starts the installer and quits (Neuron restarts). Linux: update in a terminal. */
+  install: () => invoke<void>("update_install"),
+} as const;
+
+/** `threadId` of the « update available » notification: its click opens Paramètres → Mises à jour. */
+export const UPDATE_NOTIFICATION_TARGET = "neuron:update";
 
 /** Native desktop notifications (asks the OS permission once). */
 export const notify = {

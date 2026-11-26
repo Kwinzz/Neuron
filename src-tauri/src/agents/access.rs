@@ -460,7 +460,7 @@ fn login_script(agent: AgentKind) -> AppResult<(String, String)> {
 }
 
 #[cfg(windows)]
-fn open_terminal(title: &str, script: &str) -> AppResult<()> {
+pub(crate) fn open_terminal(title: &str, script: &str) -> AppResult<()> {
     use std::os::windows::process::CommandExt;
     const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
     crate::env_path::refresh_path();
@@ -558,7 +558,7 @@ fn pick_terminal() -> Option<(std::path::PathBuf, Vec<&'static str>)> {
 }
 
 #[cfg(not(windows))]
-fn open_terminal(title: &str, script: &str) -> AppResult<()> {
+pub(crate) fn open_terminal(title: &str, script: &str) -> AppResult<()> {
     use std::process::Stdio;
     crate::env_path::refresh_path();
     let (terminal, args) = pick_terminal().ok_or_else(|| {

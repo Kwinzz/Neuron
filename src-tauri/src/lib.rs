@@ -19,6 +19,7 @@ pub mod notifications;
 pub mod pricing;
 pub mod remote;
 pub mod state;
+pub mod update;
 pub mod usage_import;
 pub mod util;
 
@@ -97,6 +98,8 @@ pub fn run() {
             // Tray, global shortcut, start with Windows; shows the main window unless started in the background.
             desktop::setup(app.handle(), &settings);
             background::start(&state);
+            // Only here, not in `neuron serve`: a version is announced once, to the app that can show it.
+            update::spawn_periodic(&state);
             spawn_control(app.handle(), &state);
             Ok(())
         })
@@ -177,6 +180,9 @@ pub fn run() {
             commands::remote::remote_call,
             commands::remote::remote_upload_attachments,
             commands::remote::remote_fetch_attachments,
+            commands::update::update_status,
+            commands::update::update_check,
+            commands::update::update_install,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Neuron");

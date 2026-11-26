@@ -17,6 +17,7 @@ import { NotificationsSection } from "./NotificationsSection";
 import { SettingsNav } from "./SettingsNav";
 import { SettingsSkeleton } from "./SettingsSkeleton";
 import { ShortcutsSection } from "./ShortcutsSection";
+import { UpdatesSection } from "./UpdatesSection";
 import { t } from "@/i18n";
 
 interface SettingsViewProps {
@@ -102,6 +103,8 @@ export function SettingsView({ section }: SettingsViewProps) {
             <NotificationsSection settings={settings} />
           ) : active === "context" ? (
             <ContextSection settings={settings} />
+          ) : active === "updates" ? (
+            <UpdatesSection settings={settings} />
           ) : (
             <GenericClisSection settings={settings} />
           )}

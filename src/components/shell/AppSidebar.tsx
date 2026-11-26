@@ -4,6 +4,7 @@ import {
   Settings,
   ChevronRight,
   CirclePlus,
+  Download,
   FileText,
   Folder,
   FolderOpen,
@@ -31,6 +32,7 @@ import { MOD_LABEL } from "@/components/ui/Kbd";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupAction,
   SidebarGroupContent,
@@ -57,6 +59,7 @@ import { useNav } from "@/stores/nav";
 import { useChatDeletion } from "@/stores/chatDeletion";
 import { toast } from "@/stores/toast";
 import { useUi } from "@/stores/ui";
+import { useUpdate } from "@/stores/update";
 import neuronMark from "@/assets/neuron-mark.png";
 import { t } from "@/i18n";
 import { SidebarResizer } from "./SidebarResizer";
@@ -99,8 +102,34 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
         <SidebarSections />
       </SidebarContent>
 
+      <UpdateBadge />
+
       <SidebarResizer />
     </Sidebar>
+  );
+}
+
+/** « Mise à jour disponible » at the bottom of the sidebar → Paramètres → Mises à jour. */
+function UpdateBadge() {
+  const latest = useUpdate((s) => (s.info?.available ? s.info.latest : null));
+  if (latest === null) return null;
+  const label = t("shell.updateAvailable");
+  return (
+    <SidebarFooter>
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            tooltip={t("settings.updatesAvailableTitle", { version: latest })}
+            onClick={() => useUi.getState().openSettings("updates")}
+            className="border text-foreground"
+          >
+            <Download />
+            <span>{label}</span>
+          </SidebarMenuButton>
+          <SidebarMenuBadge className="font-mono text-muted-foreground">{latest}</SidebarMenuBadge>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </SidebarFooter>
   );
 }
 

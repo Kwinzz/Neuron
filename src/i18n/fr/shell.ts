@@ -8,6 +8,7 @@ const shell = {
   navHome: "Accueil",
   navMemory: "Mémoire",
   navSettings: "Paramètres",
+  updateAvailable: "Mise à jour disponible",
   navSettingsTooltip: "Paramètres ({combo})",
   navSearchTooltip: "Rechercher ({combo})",
   projects: "Projets",

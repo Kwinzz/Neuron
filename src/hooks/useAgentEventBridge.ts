@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import type { AgentEventEnvelope } from "@/bindings/AgentEventEnvelope";
 import type { TurnOutcome } from "@/bindings/TurnOutcome";
 import { type MessageKey, t } from "@/i18n";
-import { events, notify } from "@/lib/ipc";
+import { events, notify, UPDATE_NOTIFICATION_TARGET } from "@/lib/ipc";
 import { useActivity } from "@/stores/activity";
 import { useChat } from "@/stores/chat";
 import { useDashboard } from "@/stores/dashboard";
@@ -108,7 +108,8 @@ export function useAgentEventBridge(): void {
     // Clicking a notification brings the window back (backend) and opens the chat it was about.
     events
       .onNotificationClicked((threadId) => {
-        if (threadId) useUi.getState().focusThread(threadId);
+        if (threadId === UPDATE_NOTIFICATION_TARGET) useUi.getState().openSettings("updates");
+        else if (threadId) useUi.getState().focusThread(threadId);
       })
       .then((fn) => {
         if (disposed) fn();

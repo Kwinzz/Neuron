@@ -24,7 +24,8 @@ export type SettingsSection =
   | "notifications"
   | "context"
   | "generic"
-  | "shortcuts";
+  | "shortcuts"
+  | "updates";
 
 const DOCK_KEY = "neuron.dockOpen";
 

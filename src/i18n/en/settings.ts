@@ -18,6 +18,7 @@ const settings: Translation<typeof fr> = {
   navContext: "Injected context",
   navGeneric: "Generic CLIs",
   navShortcuts: "Shortcuts",
+  navUpdates: "Updates",
 
   // SettingsSkeleton
   loadingLabel: "Loading settings",
@@ -283,6 +284,23 @@ const settings: Translation<typeof fr> = {
   devicesInvitePlaceholder: "neuron-pair:…",
   devicesInviteNeedsInternet: "First turn on “Reachable outside the local network” on this device.",
   devicesInviteEnableInternet: "Turn on",
+  updatesTitle: "Updates",
+  updatesDescription: "New versions of Neuron published on GitHub.",
+  updatesNeverChecked: "Not checked yet",
+  updatesUpToDate: "Neuron {version} is up to date",
+  updatesAvailableTitle: "Neuron {version} is available",
+  updatesAvailableBody: "Install it from Settings → Updates.",
+  updatesInstalled: "Installed: {version}",
+  updatesCheckedAgo: "checked {time}",
+  updatesCheck: "Check",
+  updatesInstall: "Install {version}",
+  updatesDownloading: "Downloading… {percent}",
+  updatesHowWindows:
+    "The installer starts in update mode (administrator permission asked), then Neuron restarts by itself. Your settings and install choices are kept.",
+  updatesHowLinux:
+    "The update runs in a terminal (install.sh): Neuron closes during the build, start it again afterwards.",
+  updatesAuto: "Check automatically",
+  updatesAutoDescription: "At startup then every 12 h; one notification per new version.",
 };
 
 export default settings;

@@ -9,3 +9,4 @@ pub mod remote;
 pub mod settings;
 pub mod system;
 pub mod threads;
+pub mod update;

@@ -17,6 +17,7 @@ const settings = {
   navContext: "Contexte injecté",
   navGeneric: "CLI génériques",
   navShortcuts: "Raccourcis",
+  navUpdates: "Mises à jour",
 
   // SettingsSkeleton
   loadingLabel: "Chargement des paramètres",
@@ -284,6 +285,23 @@ const settings = {
   devicesInvitePlaceholder: "neuron-pair:…",
   devicesInviteNeedsInternet: "Activez d'abord « Accessible hors du réseau local » sur cet appareil.",
   devicesInviteEnableInternet: "Activer",
+  updatesTitle: "Mises à jour",
+  updatesDescription: "Nouvelles versions de Neuron publiées sur GitHub.",
+  updatesNeverChecked: "Pas encore vérifié",
+  updatesUpToDate: "Neuron {version} est à jour",
+  updatesAvailableTitle: "Neuron {version} est disponible",
+  updatesAvailableBody: "Installez-la depuis Paramètres → Mises à jour.",
+  updatesInstalled: "Installée : {version}",
+  updatesCheckedAgo: "vérifié {time}",
+  updatesCheck: "Vérifier",
+  updatesInstall: "Installer {version}",
+  updatesDownloading: "Téléchargement… {percent}",
+  updatesHowWindows:
+    "L'installateur se lance en mode mise à jour (autorisation administrateur demandée), puis Neuron redémarre tout seul. Vos réglages et choix d'installation sont conservés.",
+  updatesHowLinux:
+    "La mise à jour s'exécute dans un terminal (install.sh) : Neuron se ferme pendant la compilation, relancez-le ensuite.",
+  updatesAuto: "Vérifier automatiquement",
+  updatesAutoDescription: "Au démarrage puis toutes les 12 h ; une notification par nouvelle version.",
 } satisfies Record<string, Message>;
 
 export default settings;

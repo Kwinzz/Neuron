@@ -2,6 +2,7 @@ import { cn } from "cn";
 import {
   AppWindow,
   Bell,
+  Download,
   Keyboard,
   Layers,
   MonitorSmartphone,
@@ -28,6 +29,7 @@ const NAV_ITEMS: readonly SettingsNavItem[] = [
   { id: "context", label: "settings.navContext", icon: Layers },
   { id: "generic", label: "settings.navGeneric", icon: SquareTerminal },
   { id: "shortcuts", label: "settings.navShortcuts", icon: Keyboard },
+  { id: "updates", label: "settings.navUpdates", icon: Download },
 ];
 
 interface SettingsNavProps {
