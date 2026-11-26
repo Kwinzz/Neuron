@@ -169,6 +169,7 @@ pub fn run() {
             commands::remote::remote_cancel_pairing,
             commands::remote::remote_nearby,
             commands::remote::remote_pair,
+            commands::remote::remote_pair_invite,
             commands::remote::remote_devices,
             commands::remote::remote_set_level,
             commands::remote::remote_revoke,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { KeyRound, Loader2 } from "lucide-react";
+import { Check, Copy, KeyRound, Loader2 } from "lucide-react";
 import type { PairingCode } from "@/bindings/PairingCode";
 import type { RemoteClient } from "@/bindings/RemoteClient";
 import { Button } from "@/components/ui/button";
@@ -30,12 +30,14 @@ export function DevicePairingCard() {
   const tauri = isTauri();
 
   const pairing = status?.pairing ?? null;
+  const invite = status?.invite ?? null;
   const clients = devices?.clients ?? EMPTY_CLIENTS;
 
   const [starting, setStarting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expiredAt, setExpiredAt] = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const prevPairingRef = useRef<PairingCode | null>(null);
   const clientsBeforePairingRef = useRef<Set<string> | null>(null);
@@ -98,6 +100,17 @@ export function DevicePairingCard() {
     }
   };
 
+  const handleCopyInvite = async () => {
+    if (invite === null) return;
+    try {
+      await navigator.clipboard.writeText(invite);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  };
+
   const handleExpired = useCallback(() => {
     if (pairing) setExpiredAt(pairing.expiresAt);
     void useDevices
@@ -152,6 +165,33 @@ export function DevicePairingCard() {
             <p className="text-xs text-muted-foreground">
               {t("settings.devicesPairInstructions")}
             </p>
+
+            {invite !== null && (
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <span className="text-xs font-medium text-foreground">
+                  {t("settings.devicesInviteLabel")}
+                </span>
+                <div className="flex min-w-0 items-center gap-2">
+                  <code className="min-w-0 flex-1 truncate rounded-md border bg-background px-2 py-1.5 font-mono text-[11px] text-muted-foreground select-all">
+                    {invite}
+                  </code>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void handleCopyInvite()}
+                  >
+                    {copied ? (
+                      <Check className="size-3.5" aria-hidden />
+                    ) : (
+                      <Copy className="size-3.5" aria-hidden />
+                    )}
+                    <span>{copied ? t("common.copied") : t("common.copy")}</span>
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">{t("settings.devicesInviteHint")}</p>
+              </div>
+            )}
 
             <div>
               <Button

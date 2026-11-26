@@ -222,6 +222,17 @@ async fn pair(dir: &Path) -> AppResult<i32> {
             "On the other device: Settings → Devices → Add a device, then type this code ({minutes} min, 3 attempts)."
         )
     );
+    // Internet mode: the invitation lets a device outside the local network pair (same window, same code).
+    if let Some(invite) = control::call::<RemoteStatus>(dir, "remote_status", Value::Null).await?.invite {
+        println!(
+            "{}",
+            crate::tr!(
+                "Hors du réseau local : Paramètres → Appareils → « Appairer avec une invitation », puis colle :",
+                "Outside the local network: Settings → Devices → “Pair with an invitation”, then paste:"
+            )
+        );
+        println!("  {invite}");
+    }
     loop {
         tokio::select! {
             _ = tokio::signal::ctrl_c() => {

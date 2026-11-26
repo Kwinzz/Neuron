@@ -410,7 +410,7 @@ export const remote = {
   /** Allow (or not) other devices to pair with and control this one. */
   setEnabled: (enabled: boolean) => invoke<RemoteStatus>("remote_set_enabled", { enabled }),
   setDeviceName: (name: string) => invoke<RemoteStatus>("remote_set_device_name", { name }),
-  /** Reach / be reached by paired devices outside the local network (public relays; pairing stays local). */
+  /** Reach / be reached by paired devices outside the local network (public relays; pairing there = invitation). */
   setInternet: (enabled: boolean) => invoke<RemoteStatus>("remote_set_internet", { enabled }),
   /** Opens a pairing window here: the 6-digit code to type on the other device (2 min, 3 attempts). */
   startPairing: () => invoke<PairingCode>("remote_start_pairing"),
@@ -419,6 +419,8 @@ export const remote = {
   nearby: () => invoke<NearbyDevice[]>("remote_nearby"),
   /** Pairs with a nearby device showing `code`; resolves to its name. */
   pair: (nodeId: string, code: string) => invoke<string>("remote_pair", { nodeId, code }),
+  /** Pairs with a device anywhere from its invitation (`neuron-pair:<id>:<code>`); needs internet mode here. */
+  pairInvite: (invite: string) => invoke<string>("remote_pair_invite", { invite }),
   devices: () => invoke<RemoteDevices>("remote_devices"),
   setLevel: (nodeId: string, level: AccessLevel) => invoke<void>("remote_set_level", { nodeId, level }),
   /** A device that controls this one loses access right away. */

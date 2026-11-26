@@ -27,6 +27,7 @@ interface DevicesState {
   startPairing: () => Promise<PairingCode>;
   cancelPairing: () => Promise<void>;
   pair: (nodeId: string, code: string) => Promise<string>;
+  pairInvite: (invite: string) => Promise<string>;
   setLevel: (nodeId: string, level: AccessLevel) => Promise<void>;
   revoke: (nodeId: string) => Promise<void>;
   forget: (nodeId: string) => Promise<void>;
@@ -108,6 +109,12 @@ export const useDevices = create<DevicesState>((set, get) => ({
 
   pair: async (nodeId, code) => {
     const name = await remote.pair(nodeId, code);
+    await get().load();
+    return name;
+  },
+
+  pairInvite: async (invite) => {
+    const name = await remote.pairInvite(invite);
     await get().load();
     return name;
   },

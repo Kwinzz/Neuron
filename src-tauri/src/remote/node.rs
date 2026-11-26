@@ -109,7 +109,13 @@ fn is_local_ip(ip: std::net::IpAddr) -> bool {
     }
 }
 
-/// The connection runs over a direct path to a local-network address (pairing is local-only).
+/// A pairing attempt is served from the local network, or from anywhere while a window opened in internet mode
+/// (the invitation) is open.
+fn pairing_allowed(local: bool, window_internet: bool) -> bool {
+    local || window_internet
+}
+
+/// The connection runs over a direct path to a local-network address.
 fn is_local_connection(conn: &Connection) -> bool {
     conn.paths()
         .iter()
@@ -301,7 +307,7 @@ impl Node {
                 "enable access from other devices first"
             )));
         }
-        let window = PairingWindow::open(now_ms());
+        let window = PairingWindow::open(now_ms(), self.internet);
         let code = window.code.clone();
         *lock(&self.pairing) = Some(window);
         self.backend.changed();
@@ -311,6 +317,13 @@ impl Node {
     pub fn cancel_pairing(&self) {
         *lock(&self.pairing) = None;
         self.backend.changed();
+    }
+
+    /// Invitation of the open pairing window, when a device outside the local network may use it.
+    pub fn invite(&self) -> Option<String> {
+        let code = self.pairing()?;
+        let internet = lock(&self.pairing).as_ref().is_some_and(|w| w.internet);
+        internet.then(|| super::pairing::invite(&self.id().to_string(), &code.code))
     }
 
     /// The open pairing code, if any.
@@ -360,8 +373,9 @@ impl Node {
 
     async fn serve_pairing(self: Arc<Self>, conn: Connection) {
         let peer = conn.remote_id();
-        // Pairing stays a local-network gesture, even when this device is reachable from the internet.
-        if !is_local_connection(&conn) {
+        // Pairing stays a local-network gesture, unless the window was opened in internet mode (invitation).
+        let window_internet = lock(&self.pairing).as_ref().is_some_and(|w| w.internet && w.is_open(now_ms()));
+        if !pairing_allowed(is_local_connection(&conn), window_internet) {
             tracing::warn!(peer = %peer.fmt_short(), "remote: pairing refused, not from the local network");
             conn.close(4u32.into(), b"pairing is local only");
             return;
@@ -644,6 +658,14 @@ async fn bind_endpoint(config: &NodeConfig, name: &str) -> AppResult<Endpoint> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn pairing_from_outside_needs_an_internet_window() {
+        assert!(pairing_allowed(true, false));
+        assert!(pairing_allowed(true, true));
+        assert!(pairing_allowed(false, true));
+        assert!(!pairing_allowed(false, false));
+    }
     use tokio::sync::mpsc;
 
     /// In-memory backend: paired devices in maps, calls echoed back, host events sent to a channel.
@@ -716,6 +738,8 @@ mod tests {
         // No pairing window: refused. Wrong code: refused and counted.
         assert!(client.pair(&host_id, "123456").await.is_err());
         let code = host.open_pairing().unwrap();
+        // Local network only (no internet mode): no invitation.
+        assert!(host.invite().is_none());
         let wrong = if code.code == "000000" { "111111" } else { "000000" };
         assert!(client.pair(&host_id, wrong).await.is_err());
         assert!(host.pairing().is_some(), "one failure leaves the window open");

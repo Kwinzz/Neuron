@@ -27,11 +27,14 @@ pub struct PairingCode {
 pub struct PairingWindow {
     pub code: PairingCode,
     pub failures: u8,
+    /// Opened while this device is reachable from the internet: a device outside the local network may pair (with
+    /// the invitation). Otherwise pairing stays a local-network gesture.
+    pub internet: bool,
 }
 
 impl PairingWindow {
-    pub fn open(now: i64) -> Self {
-        Self { code: PairingCode { code: new_code(), expires_at: now + CODE_TTL_MS }, failures: 0 }
+    pub fn open(now: i64, internet: bool) -> Self {
+        Self { code: PairingCode { code: new_code(), expires_at: now + CODE_TTL_MS }, failures: 0, internet }
     }
 
     pub fn is_open(&self, now: i64) -> bool {
@@ -49,6 +52,27 @@ fn new_code() -> String {
 /// Digits only: « 123 456 » and « 123-456 » are accepted.
 pub fn normalize(code: &str) -> String {
     code.chars().filter(char::is_ascii_digit).collect()
+}
+
+const INVITE_PREFIX: &str = "neuron-pair:";
+
+/// Invitation to pair from anywhere: the host's id and the code, in one string to paste on the other device.
+pub fn invite(node_id: &str, code: &str) -> String {
+    format!("{INVITE_PREFIX}{node_id}:{}", normalize(code))
+}
+
+/// `(node id, code)` of an invitation (spaces and line breaks around it are ignored).
+pub fn parse_invite(invite: &str) -> AppResult<(String, String)> {
+    let invalid = || AppError::Invalid(crate::tr!("invitation invalide", "invalid invitation"));
+    let compact: String = invite.chars().filter(|c| !c.is_whitespace()).collect();
+    let rest = compact.strip_prefix(INVITE_PREFIX).ok_or_else(invalid)?;
+    let (id, code) = rest.split_once(':').ok_or_else(invalid)?;
+    let code = normalize(code);
+    let id = id.to_lowercase();
+    if id.len() != 64 || !id.chars().all(|c| c.is_ascii_hexdigit()) || code.len() != 6 {
+        return Err(invalid());
+    }
+    Ok((id, code))
 }
 
 /// Side of the exchange.
@@ -132,6 +156,25 @@ pub fn wrong_code() -> String {
 mod tests {
     use super::*;
 
+    #[test]
+    fn invitation_round_trip() {
+        let id = "ab".repeat(32);
+        let text = invite(&id, "123 456");
+        assert_eq!(text, format!("neuron-pair:{id}:123456"));
+        assert_eq!(
+            parse_invite(&format!(
+                "  {text}
+"
+            ))
+            .unwrap(),
+            (id.clone(), "123456".into())
+        );
+        assert_eq!(parse_invite(&text.to_uppercase().replace("NEURON-PAIR", "neuron-pair")).unwrap().0, id);
+        assert!(parse_invite("123456").is_err());
+        assert!(parse_invite(&format!("neuron-pair:{id}:12345")).is_err());
+        assert!(parse_invite("neuron-pair:abcd:123456").is_err());
+    }
+
     fn run(client_code: &str, host_code: &str) -> (bool, bool) {
         let (c, h) = ([1u8; 32], [2u8; 32]);
         let (client, to_host) = Exchange::start(Role::Client, client_code, c, h);
@@ -165,7 +208,7 @@ mod tests {
 
     #[test]
     fn window_and_codes() {
-        let w = PairingWindow::open(1000);
+        let w = PairingWindow::open(1000, false);
         assert_eq!(w.code.code.len(), 6);
         assert!(w.code.code.chars().all(|c| c.is_ascii_digit()));
         assert!(w.is_open(1000) && !w.is_open(1000 + CODE_TTL_MS));

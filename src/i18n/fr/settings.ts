@@ -224,7 +224,7 @@ const settings = {
     "Les appareils appairés voient vos chats, écrivent, approuvent les autorisations et peuvent tout autoriser. Réseau local uniquement.",
   devicesAllowInternet: "Accessible hors du réseau local",
   devicesAllowInternetDescription:
-    "Retrouvez vos appareils appairés depuis n'importe où (4G, autre Wi-Fi). Connexion chiffrée de bout en bout, directe ou via un relais public. À activer sur les deux appareils ; l'appairage reste possible uniquement en réseau local.",
+    "Retrouvez vos appareils appairés depuis n'importe où (4G, autre Wi-Fi). Connexion chiffrée de bout en bout, directe ou via un relais public. À activer sur les deux appareils ; hors du réseau local, l'appairage se fait avec une invitation.",
   devicesNameLabel: "Nom de cet appareil",
   devicesNameDescription: "Affiché aux autres appareils lors de l'appairage et dans la barre latérale.",
   devicesNamePlaceholder: "Mon ordinateur",
@@ -275,6 +275,15 @@ const settings = {
     "Saisissez le code à 6 chiffres affiché dans Paramètres → Appareils sur l'autre appareil.",
   devicesPairSubmit: "Appairer",
   devicesPairedHost: "{name} est appairé : ses chats apparaissent dans la barre latérale.",
+  devicesInviteLabel: "Invitation (hors du réseau local)",
+  devicesInviteHint:
+    "Sur un appareil qui n'est pas sur ce réseau : Ajouter un appareil → Appairer avec une invitation, puis collez-la.",
+  devicesInviteTitle: "Appairer avec une invitation",
+  devicesInviteDescription:
+    "Appareil hors de votre réseau (serveur, VPS) : collez l'invitation affichée par « neuron remote code » ou dans ses Paramètres → Appareils.",
+  devicesInvitePlaceholder: "neuron-pair:…",
+  devicesInviteNeedsInternet: "Activez d'abord « Accessible hors du réseau local » sur cet appareil.",
+  devicesInviteEnableInternet: "Activer",
 } satisfies Record<string, Message>;
 
 export default settings;

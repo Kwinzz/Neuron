@@ -28,6 +28,8 @@ pub struct RemoteStatus {
     pub port: Option<u16>,
     /// Open pairing code (host side).
     pub pairing: Option<PairingCode>,
+    /// Invitation (id + code) of the open pairing window, when it accepts devices outside the local network.
+    pub invite: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -49,6 +51,7 @@ async fn status(state: &AppState) -> AppResult<RemoteStatus> {
         running: node.is_some(),
         port: node.as_ref().and_then(|n| n.port()),
         pairing: node.as_ref().and_then(|n| n.pairing()),
+        invite: node.as_ref().and_then(|n| n.invite()),
     })
 }
 
@@ -150,16 +153,35 @@ pub async fn remote_nearby(state: State<'_, Shared>) -> AppResult<Vec<NearbyDevi
     Ok(state.remote.ensure(&state).await?.nearby())
 }
 
-/// Pairs with a nearby device showing `code`; this device can then control it. Returns its name.
-#[tauri::command]
-pub async fn remote_pair(state: State<'_, Shared>, node_id: String, code: String) -> AppResult<String> {
-    let node = state.remote.ensure(&state).await?;
-    let name = node.pair(&node_id, &code).await?;
+async fn pair(state: &Shared, node_id: &str, code: &str) -> AppResult<String> {
+    let node = state.remote.ensure(state).await?;
+    let name = node.pair(node_id, code).await?;
     // Connect right away: its chats and events show up without waiting.
-    if let Err(err) = node.connect_host(&node_id).await {
+    if let Err(err) = node.connect_host(node_id).await {
         tracing::debug!(%err, "remote: first connection after pairing failed");
     }
     Ok(name)
+}
+
+/// Pairs with a nearby device showing `code`; this device can then control it. Returns its name.
+#[tauri::command]
+pub async fn remote_pair(state: State<'_, Shared>, node_id: String, code: String) -> AppResult<String> {
+    pair(&state, &node_id, &code).await
+}
+
+/// Pairs with a device anywhere (a server, a VPS) from its invitation (`neuron-pair:<id>:<code>`). Needs this
+/// device to be reachable outside the local network (the host is found through the address directory).
+#[tauri::command]
+pub async fn remote_pair_invite(state: State<'_, Shared>, invite: String) -> AppResult<String> {
+    let (node_id, code) = crate::remote::pairing::parse_invite(&invite)?;
+    let internet = state.db.call(|c| remote::load_settings(c)).await?.internet;
+    if !internet {
+        return Err(AppError::Invalid(crate::tr!(
+            "active « Accessible hors du réseau local » sur cet appareil pour appairer avec une invitation",
+            "turn on “Reachable outside the local network” on this device to pair with an invitation"
+        )));
+    }
+    pair(&state, &node_id, &code).await
 }
 
 pub async fn remote_devices_inner(state: &Shared) -> AppResult<RemoteDevices> {

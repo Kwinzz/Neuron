@@ -223,7 +223,7 @@ const settings: Translation<typeof fr> = {
     "Paired devices can view your chats, write messages, approve permissions and allow all actions. Local network only.",
   devicesAllowInternet: "Reachable outside the local network",
   devicesAllowInternetDescription:
-    "Reach your paired devices from anywhere (4G, another Wi-Fi). End-to-end encrypted connection, direct or via a public relay. Enable on both devices; pairing remains local network only.",
+    "Reach your paired devices from anywhere (4G, another Wi-Fi). End-to-end encrypted connection, direct or via a public relay. Enable on both devices; outside the local network, pairing uses an invitation.",
   devicesNameLabel: "Name of this device",
   devicesNameDescription: "Shown to other devices when pairing and in the sidebar.",
   devicesNamePlaceholder: "My computer",
@@ -274,6 +274,15 @@ const settings: Translation<typeof fr> = {
     "Enter the 6-digit code shown in Settings → Devices on the other device.",
   devicesPairSubmit: "Pair",
   devicesPairedHost: "{name} is paired: its chats appear in the sidebar.",
+  devicesInviteLabel: "Invitation (outside the local network)",
+  devicesInviteHint:
+    "On a device that is not on this network: Add a device → Pair with an invitation, then paste it.",
+  devicesInviteTitle: "Pair with an invitation",
+  devicesInviteDescription:
+    "Device outside your network (server, VPS): paste the invitation shown by “neuron remote code” or in its Settings → Devices.",
+  devicesInvitePlaceholder: "neuron-pair:…",
+  devicesInviteNeedsInternet: "First turn on “Reachable outside the local network” on this device.",
+  devicesInviteEnableInternet: "Turn on",
 };
 
 export default settings;

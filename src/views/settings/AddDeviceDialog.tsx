@@ -27,6 +27,7 @@ interface AddDeviceDialogProps {
 export function AddDeviceDialog({ open, onOpenChange }: AddDeviceDialogProps) {
   const nearby = useDevices((s) => s.nearby);
   const devices = useDevices((s) => s.devices);
+  const internet = useDevices((s) => s.status?.settings.internet ?? false);
 
   const [selected, setSelected] = useState<NearbyDevice | null>(null);
   const [codeInput, setCodeInput] = useState("");
@@ -34,6 +35,10 @@ export function AddDeviceDialog({ open, onOpenChange }: AddDeviceDialogProps) {
   const [pairError, setPairError] = useState<string | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const codeInputRef = useRef<HTMLInputElement | null>(null);
+  const [inviteInput, setInviteInput] = useState("");
+  const [inviteSubmitting, setInviteSubmitting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [enablingInternet, setEnablingInternet] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -42,6 +47,9 @@ export function AddDeviceDialog({ open, onOpenChange }: AddDeviceDialogProps) {
       setPairError(null);
       setScanError(null);
       setSubmitting(false);
+      setInviteInput("");
+      setInviteError(null);
+      setInviteSubmitting(false);
       return;
     }
     if (!isTauri()) return;
@@ -105,6 +113,36 @@ export function AddDeviceDialog({ open, onOpenChange }: AddDeviceDialogProps) {
       setPairError(ipcErrorMessage(err));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleInvite = async (e: FormEvent) => {
+    e.preventDefault();
+    const invite = inviteInput.trim();
+    if (invite === "" || inviteSubmitting) return;
+    setInviteSubmitting(true);
+    setInviteError(null);
+    try {
+      const pairedName = await useDevices.getState().pairInvite(invite);
+      toast({ tone: "ok", title: t("settings.devicesPairedHost", { name: pairedName }) });
+      onOpenChange(false);
+    } catch (err: unknown) {
+      setInviteError(ipcErrorMessage(err));
+    } finally {
+      setInviteSubmitting(false);
+    }
+  };
+
+  const handleEnableInternet = async () => {
+    if (enablingInternet) return;
+    setEnablingInternet(true);
+    setInviteError(null);
+    try {
+      await useDevices.getState().setInternet(true);
+    } catch (err: unknown) {
+      setInviteError(ipcErrorMessage(err));
+    } finally {
+      setEnablingInternet(false);
     }
   };
 
@@ -180,6 +218,63 @@ export function AddDeviceDialog({ open, onOpenChange }: AddDeviceDialogProps) {
               )}
 
               <p className="text-xs text-muted-foreground">{t("settings.devicesAddHint")}</p>
+
+              <div className="flex min-w-0 flex-col gap-2 border-t pt-3">
+                <Label htmlFor="device-invite">{t("settings.devicesInviteTitle")}</Label>
+                <p className="text-xs text-muted-foreground">
+                  {t("settings.devicesInviteDescription")}
+                </p>
+                {internet ? (
+                  <form onSubmit={(e) => void handleInvite(e)} className="flex min-w-0 gap-2">
+                    <Input
+                      id="device-invite"
+                      autoComplete="off"
+                      spellCheck={false}
+                      placeholder={t("settings.devicesInvitePlaceholder")}
+                      value={inviteInput}
+                      disabled={inviteSubmitting}
+                      aria-invalid={inviteError !== null}
+                      onChange={(e) => {
+                        setInviteInput(e.target.value);
+                        if (inviteError !== null) setInviteError(null);
+                      }}
+                      className="min-w-0 flex-1 font-mono text-xs"
+                    />
+                    <Button
+                      type="submit"
+                      disabled={inviteInput.trim() === "" || inviteSubmitting}
+                    >
+                      {inviteSubmitting && (
+                        <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                      )}
+                      <span>{t("settings.devicesPairSubmit")}</span>
+                    </Button>
+                  </form>
+                ) : (
+                  <div className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-dashed px-3 py-2">
+                    <span className="text-xs text-muted-foreground">
+                      {t("settings.devicesInviteNeedsInternet")}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={enablingInternet || !isTauri()}
+                      onClick={() => void handleEnableInternet()}
+                    >
+                      {enablingInternet && (
+                        <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                      )}
+                      <span>{t("settings.devicesInviteEnableInternet")}</span>
+                    </Button>
+                  </div>
+                )}
+                {inviteError !== null && (
+                  <p role="alert" className="text-xs text-destructive">
+                    {inviteError}
+                  </p>
+                )}
+              </div>
             </div>
 
             <DialogFooter>

@@ -18,4 +18,8 @@ port: number | null,
 /**
  * Open pairing code (host side).
  */
-pairing: PairingCode | null, };
+pairing: PairingCode | null, 
+/**
+ * Invitation (id + code) of the open pairing window, when it accepts devices outside the local network.
+ */
+invite: string | null, };
