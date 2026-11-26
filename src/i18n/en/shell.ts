@@ -28,6 +28,8 @@ const shell: Translation<typeof fr> = {
   showMore: "Show {n} more",
   chats: "Chats",
   devices: "Devices",
+  sectionHide: (v) => `Hide ${v.name}`,
+  sectionShow: (v) => `Show ${v.name}`,
   deviceOnline: "Connected",
   deviceOffline: "Offline",
   devicePathDirect: "direct",

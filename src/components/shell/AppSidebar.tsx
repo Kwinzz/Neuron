@@ -1,4 +1,5 @@
-import { type ComponentProps, memo, useEffect, useMemo, useState } from "react";
+import { type ComponentProps, type ReactNode, memo, useEffect, useMemo, useState } from "react";
+import { cn } from "cn";
 import {
   Brain,
   Settings,
@@ -55,7 +56,7 @@ import { STATUS } from "@/lib/status";
 import { useDashboard } from "@/stores/dashboard";
 import { useDevices } from "@/stores/devices";
 import { useLive } from "@/stores/live";
-import { useNav } from "@/stores/nav";
+import { type SidebarSection, useNav } from "@/stores/nav";
 import { useChatDeletion } from "@/stores/chatDeletion";
 import { toast } from "@/stores/toast";
 import { useUi } from "@/stores/ui";
@@ -252,6 +253,61 @@ function SidebarSections() {
   );
 }
 
+/** Chats of `chats` running right now. */
+function useActiveCount(chats: readonly ThreadSummary[]): number {
+  return useLive((s) => chats.filter((c) => STATUS[s.threads[c.id]?.status ?? c.status].active).length);
+}
+
+/** A sidebar group whose label folds it away (state kept across launches); `action` stays visible when folded. */
+function SectionGroup({
+  section,
+  label,
+  activeCount,
+  action,
+  className,
+  children,
+}: {
+  section: SidebarSection;
+  label: string;
+  activeCount: number;
+  action?: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
+  const collapsed = useNav((s) => s.collapsedSections[section] ?? false);
+  return (
+    <Collapsible asChild open={!collapsed} onOpenChange={() => useNav.getState().toggleSection(section)}>
+      <SidebarGroup className={className}>
+        <SidebarGroupLabel asChild>
+          <CollapsibleTrigger
+            className={cn(
+              "w-full gap-1.5 text-left transition-colors duration-150 hover:text-sidebar-foreground",
+              action && "pr-8",
+            )}
+            title={collapsed ? t("shell.sectionShow", { name: label }) : t("shell.sectionHide", { name: label })}
+          >
+            <ChevronRight
+              className={cn("size-3! transition-transform duration-200", !collapsed && "rotate-90")}
+              aria-hidden
+            />
+            <span>{label}</span>
+            {collapsed && activeCount > 0 && (
+              <span className="ml-auto flex items-center gap-1 text-live tabular-nums animate-in fade-in-0 zoom-in-75 duration-200">
+                <span className="size-1.5 animate-pulse rounded-full bg-live" />
+                {activeCount}
+              </span>
+            )}
+          </CollapsibleTrigger>
+        </SidebarGroupLabel>
+        {action}
+        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+          {children}
+        </CollapsibleContent>
+      </SidebarGroup>
+    </Collapsible>
+  );
+}
+
 async function addProject() {
   try {
     const path = await ipc.pickDirectory();
@@ -273,13 +329,20 @@ function ProjectsNav({
   projects: ProjectSummary[];
   byProject: Map<string, ThreadSummary[]>;
 }) {
+  const projectChats = useMemo(() => projects.flatMap((p) => byProject.get(p.id) ?? EMPTY), [projects, byProject]);
+  const activeCount = useActiveCount(projectChats);
   return (
-    <SidebarGroup>
-      <SidebarGroupLabel>{t("shell.projects")}</SidebarGroupLabel>
-      <SidebarGroupAction title={t("shell.addProjectTitle")} onClick={() => void addProject()}>
-        <FolderPlus />
-        <span className="sr-only">{t("shell.addProject")}</span>
-      </SidebarGroupAction>
+    <SectionGroup
+      section="projects"
+      label={t("shell.projects")}
+      activeCount={activeCount}
+      action={
+        <SidebarGroupAction title={t("shell.addProjectTitle")} onClick={() => void addProject()}>
+          <FolderPlus />
+          <span className="sr-only">{t("shell.addProject")}</span>
+        </SidebarGroupAction>
+      }
+    >
       <SidebarMenu>
         {projects.length === 0 && (
           <SidebarMenuItem>
@@ -293,7 +356,7 @@ function ProjectsNav({
           <ProjectFolder key={p.id} project={p} chats={byProject.get(p.id) ?? EMPTY} />
         ))}
       </SidebarMenu>
-    </SidebarGroup>
+    </SectionGroup>
   );
 }
 
@@ -422,11 +485,16 @@ const ProjectFolder = memo(function ProjectFolder({
 
 function LooseChatsNav({ chats }: { chats: ThreadSummary[] }) {
   const [showAll, setShowAll] = useState(false);
+  const activeCount = useActiveCount(chats);
   if (chats.length === 0) return null;
   const visible = showAll ? chats : chats.slice(0, PAGE);
   return (
-    <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>{t("shell.chats")}</SidebarGroupLabel>
+    <SectionGroup
+      section="chats"
+      label={t("shell.chats")}
+      activeCount={activeCount}
+      className="group-data-[collapsible=icon]:hidden"
+    >
       <SidebarMenu>
         {visible.map((c, i) => (
           <SidebarMenuItem
@@ -445,7 +513,7 @@ function LooseChatsNav({ chats }: { chats: ThreadSummary[] }) {
           </SidebarMenuItem>
         )}
       </SidebarMenu>
-    </SidebarGroup>
+    </SectionGroup>
   );
 }
 
@@ -462,10 +530,11 @@ function RemoteDevicesNav({
   chatsByDevice: Map<string, ThreadSummary[]>;
   byProject: Map<string, ThreadSummary[]>;
 }) {
+  const deviceChats = useMemo(() => [...chatsByDevice.values()].flat(), [chatsByDevice]);
+  const activeCount = useActiveCount(deviceChats);
   if (hosts.length === 0) return null;
   return (
-    <SidebarGroup>
-      <SidebarGroupLabel>{t("shell.devices")}</SidebarGroupLabel>
+    <SectionGroup section="devices" label={t("shell.devices")} activeCount={activeCount}>
       <SidebarMenu>
         {hosts.map((host) => (
           <DeviceFolder
@@ -478,7 +547,7 @@ function RemoteDevicesNav({
           />
         ))}
       </SidebarMenu>
-    </SidebarGroup>
+    </SectionGroup>
   );
 }
 

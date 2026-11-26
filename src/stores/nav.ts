@@ -13,6 +13,10 @@ const CHAT_LIMIT = 500;
 const REFRESH_THROTTLE_MS = 3000;
 const OPEN_KEY = "neuron.openProjects";
 const OPEN_DEVICES_KEY = "neuron.openDevices";
+const COLLAPSED_KEY = "neuron.collapsedSections";
+
+/** Sidebar groups that fold away entirely (click on their label). */
+export type SidebarSection = "projects" | "chats" | "devices";
 
 function readOpen(key: string): Record<string, boolean> {
   try {
@@ -38,10 +42,13 @@ interface NavState {
   openProjects: Record<string, boolean>;
   /** Expanded remote-device folders (absent = follow connected state). */
   openDevices: Record<string, boolean>;
+  /** Folded sidebar groups. */
+  collapsedSections: Record<string, boolean>;
   load: () => Promise<void>;
   scheduleRefresh: () => void;
   setProjectOpen: (projectId: string, open: boolean) => void;
   setDeviceOpen: (deviceId: string, open: boolean) => void;
+  toggleSection: (section: SidebarSection) => void;
   setProjects: (projects: ProjectSummary[]) => void;
 }
 
@@ -53,6 +60,7 @@ export const useNav = create<NavState>((set, get) => ({
   loaded: false,
   openProjects: readOpen(OPEN_KEY),
   openDevices: readOpen(OPEN_DEVICES_KEY),
+  collapsedSections: readOpen(COLLAPSED_KEY),
 
   load: async () => {
     try {
@@ -84,6 +92,12 @@ export const useNav = create<NavState>((set, get) => ({
     const openDevices = { ...get().openDevices, [deviceId]: open };
     writeOpen(OPEN_DEVICES_KEY, openDevices);
     set({ openDevices });
+  },
+
+  toggleSection: (section) => {
+    const collapsedSections = { ...get().collapsedSections, [section]: !get().collapsedSections[section] };
+    writeOpen(COLLAPSED_KEY, collapsedSections);
+    set({ collapsedSections });
   },
 
   setProjects: (projects) => set({ projects }),

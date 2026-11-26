@@ -27,6 +27,8 @@ const shell = {
   showMore: "Afficher {n} de plus",
   chats: "Chats",
   devices: "Appareils",
+  sectionHide: (v) => `Masquer : ${v.name}`,
+  sectionShow: (v) => `Afficher : ${v.name}`,
   deviceOnline: "Connecté",
   deviceOffline: "Hors ligne",
   devicePathDirect: "directe",
