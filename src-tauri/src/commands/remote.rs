@@ -70,6 +70,22 @@ pub async fn remote_set_enabled(app: AppHandle, state: State<'_, AppState>, enab
     status(&state).await
 }
 
+/// Reach (and be reached by) paired devices outside the local network, through public relays. Pairing itself
+/// stays local-only.
+#[tauri::command]
+pub async fn remote_set_internet(app: AppHandle, state: State<'_, AppState>, enabled: bool) -> AppResult<RemoteStatus> {
+    state
+        .db
+        .call(move |c| {
+            let mut settings = remote::load_settings(c)?;
+            settings.internet = enabled;
+            remote::save_settings(c, &settings)
+        })
+        .await?;
+    state.remote.sync(&app).await?;
+    status(&state).await
+}
+
 #[tauri::command]
 pub async fn remote_set_device_name(
     app: AppHandle,
@@ -139,6 +155,7 @@ pub async fn remote_devices(state: State<'_, AppState>) -> AppResult<RemoteDevic
         }
         for h in &mut hosts {
             h.connected = live_hosts.contains(&h.node_id);
+            h.path = node.host_path(&h.node_id);
         }
     }
     Ok(RemoteDevices { clients, hosts })

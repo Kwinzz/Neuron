@@ -222,6 +222,9 @@ const settings = {
   devicesAllowControl: "Autoriser d'autres appareils à piloter celui-ci",
   devicesAllowControlDescription:
     "Les appareils appairés voient vos chats, écrivent, approuvent les autorisations et peuvent tout autoriser. Réseau local uniquement.",
+  devicesAllowInternet: "Accessible hors du réseau local",
+  devicesAllowInternetDescription:
+    "Retrouvez vos appareils appairés depuis n'importe où (4G, autre Wi-Fi). Connexion chiffrée de bout en bout, directe ou via un relais public. À activer sur les deux appareils ; l'appairage reste possible uniquement en réseau local.",
   devicesNameLabel: "Nom de cet appareil",
   devicesNameDescription: "Affiché aux autres appareils lors de l'appairage et dans la barre latérale.",
   devicesNamePlaceholder: "Mon ordinateur",
@@ -244,6 +247,8 @@ const settings = {
   devicesConnected: "Connecté",
   devicesLastSeen: "Vu {time}",
   devicesNeverConnected: "Jamais connecté",
+  devicesPathDirect: "Directe",
+  devicesPathRelay: "Via relais",
   devicesLevelAria: "Niveau d'accès pour {name}",
   devicesLevelRead: "Lecture",
   devicesLevelReadDesc: "Voit les chats et l'accueil",

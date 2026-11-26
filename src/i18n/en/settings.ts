@@ -221,6 +221,9 @@ const settings: Translation<typeof fr> = {
   devicesAllowControl: "Allow other devices to control this one",
   devicesAllowControlDescription:
     "Paired devices can view your chats, write messages, approve permissions and allow all actions. Local network only.",
+  devicesAllowInternet: "Reachable outside the local network",
+  devicesAllowInternetDescription:
+    "Reach your paired devices from anywhere (4G, another Wi-Fi). End-to-end encrypted connection, direct or via a public relay. Enable on both devices; pairing remains local network only.",
   devicesNameLabel: "Name of this device",
   devicesNameDescription: "Shown to other devices when pairing and in the sidebar.",
   devicesNamePlaceholder: "My computer",
@@ -243,6 +246,8 @@ const settings: Translation<typeof fr> = {
   devicesConnected: "Connected",
   devicesLastSeen: "Seen {time}",
   devicesNeverConnected: "Never connected",
+  devicesPathDirect: "Direct",
+  devicesPathRelay: "Via relay",
   devicesLevelAria: "Access level for {name}",
   devicesLevelRead: "Read",
   devicesLevelReadDesc: "Sees chats and Home",

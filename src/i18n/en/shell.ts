@@ -29,6 +29,8 @@ const shell: Translation<typeof fr> = {
   devices: "Devices",
   deviceOnline: "Connected",
   deviceOffline: "Offline",
+  devicePathDirect: "direct",
+  devicePathRelay: "via relay",
   deviceEmpty: "No projects or chats",
   unknownDevice: "Unknown device",
   // ErrorBoundary

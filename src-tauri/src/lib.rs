@@ -157,6 +157,7 @@ pub fn run() {
             commands::remote::remote_status,
             commands::remote::remote_set_enabled,
             commands::remote::remote_set_device_name,
+            commands::remote::remote_set_internet,
             commands::remote::remote_start_pairing,
             commands::remote::remote_cancel_pairing,
             commands::remote::remote_nearby,

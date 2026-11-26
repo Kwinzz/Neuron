@@ -28,6 +28,8 @@ const shell = {
   devices: "Appareils",
   deviceOnline: "Connecté",
   deviceOffline: "Hors ligne",
+  devicePathDirect: "directe",
+  devicePathRelay: "via relais",
   deviceEmpty: "Aucun projet ni chat",
   unknownDevice: "Appareil inconnu",
   // ErrorBoundary

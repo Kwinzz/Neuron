@@ -371,6 +371,8 @@ export const remote = {
   /** Allow (or not) other devices to pair with and control this one. */
   setEnabled: (enabled: boolean) => invoke<RemoteStatus>("remote_set_enabled", { enabled }),
   setDeviceName: (name: string) => invoke<RemoteStatus>("remote_set_device_name", { name }),
+  /** Reach / be reached by paired devices outside the local network (public relays; pairing stays local). */
+  setInternet: (enabled: boolean) => invoke<RemoteStatus>("remote_set_internet", { enabled }),
   /** Opens a pairing window here: the 6-digit code to type on the other device (2 min, 3 attempts). */
   startPairing: () => invoke<PairingCode>("remote_start_pairing"),
   cancelPairing: () => invoke<void>("remote_cancel_pairing"),

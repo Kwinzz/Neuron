@@ -82,6 +82,39 @@ pub struct NodeConfig {
     pub mdns: bool,
     /// Bind [`DEFAULT_HOST_PORT`] when hosting (with ephemeral fallback if busy; off in tests).
     pub fixed_port: bool,
+    /// Reachable outside the local network: n0's public relays (NAT traversal, fallback path) and its address
+    /// directory keyed by endpoint id. Off = local network only, nothing leaves the LAN.
+    pub internet: bool,
+}
+
+/// How a connection to a host currently goes.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct HostPath {
+    /// Through a public relay (no direct path found yet).
+    pub via_relay: bool,
+    /// Round-trip time of the path in use, in ms.
+    pub rtt_ms: u32,
+}
+
+/// Private, link-local or loopback address: the peer is on the local network.
+fn is_local_ip(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => v4.is_private() || v4.is_link_local() || v4.is_loopback(),
+        std::net::IpAddr::V6(v6) => {
+            let first = v6.segments()[0];
+            v6.is_loopback() || (first & 0xfe00) == 0xfc00 || (first & 0xffc0) == 0xfe80
+        }
+    }
+}
+
+/// The connection runs over a direct path to a local-network address (pairing is local-only).
+fn is_local_connection(conn: &Connection) -> bool {
+    conn.paths()
+        .iter()
+        .find(|p| p.is_selected())
+        .is_some_and(|p| matches!(p.remote_addr(), iroh::TransportAddr::Ip(addr) if is_local_ip(addr.ip())))
 }
 
 pub struct Node {
@@ -91,6 +124,7 @@ pub struct Node {
     events: broadcast::Sender<WireEvent>,
     name: String,
     hosting: bool,
+    internet: bool,
     pairing: Mutex<Option<PairingWindow>>,
     /// Inbound connections of paired clients, by client.
     clients: Mutex<HashMap<EndpointId, Vec<Connection>>>,
@@ -143,6 +177,7 @@ impl Node {
             events,
             name,
             hosting: config.hosting,
+            internet: config.internet,
             pairing: Mutex::new(None),
             clients: Mutex::new(HashMap::new()),
             hosts: Mutex::new(HashMap::new()),
@@ -188,7 +223,8 @@ impl Node {
         Ok(node)
     }
 
-    fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) {
+    /// Runs a task for the node's lifetime (aborted by [`Node::shutdown`]).
+    pub fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) {
         lock(&self.tasks).push(tokio::spawn(task));
     }
 
@@ -236,6 +272,20 @@ impl Node {
             .filter(|(_, conns)| conns.iter().any(|c| c.close_reason().is_none()))
             .map(|(id, _)| id.to_string())
             .collect()
+    }
+
+    pub fn is_internet(&self) -> bool {
+        self.internet
+    }
+
+    /// Path of the live connection to a host, if any.
+    pub fn host_path(&self, host: &str) -> Option<HostPath> {
+        let id = parse_id(host).ok()?;
+        let hosts = lock(&self.hosts);
+        let conn = hosts.get(&id).filter(|c| c.close_reason().is_none())?;
+        let paths = conn.paths();
+        let path = paths.iter().find(|p| p.is_selected())?;
+        Some(HostPath { via_relay: path.is_relay(), rtt_ms: u32::try_from(path.rtt().as_millis()).unwrap_or(u32::MAX) })
     }
 
     pub fn connected_hosts(&self) -> HashSet<String> {
@@ -310,6 +360,12 @@ impl Node {
 
     async fn serve_pairing(self: Arc<Self>, conn: Connection) {
         let peer = conn.remote_id();
+        // Pairing stays a local-network gesture, even when this device is reachable from the internet.
+        if !is_local_connection(&conn) {
+            tracing::warn!(peer = %peer.fmt_short(), "remote: pairing refused, not from the local network");
+            conn.close(4u32.into(), b"pairing is local only");
+            return;
+        }
         let Ok((mut send, mut recv)) = conn.accept_bi().await else { return };
         if let Err(err) = self.pairing_exchange(peer, &mut send, &mut recv).await {
             tracing::info!(%err, peer = %peer.fmt_short(), "remote: pairing failed");
@@ -535,10 +591,17 @@ impl Node {
     }
 }
 
-fn endpoint_builder(secret: SecretKey, name: &str, hosting: bool) -> iroh::endpoint::Builder {
+fn endpoint_builder(secret: SecretKey, name: &str, hosting: bool, internet: bool) -> iroh::endpoint::Builder {
     let alpns = if hosting { vec![PAIR_ALPN.to_vec(), RPC_ALPN.to_vec()] } else { Vec::new() };
-    let mut builder =
-        Endpoint::builder(presets::Minimal).secret_key(secret).relay_mode(RelayMode::Disabled).alpns(alpns);
+    let builder = if internet {
+        // Public relays + address directory: a paired device is found by its id wherever it is.
+        Endpoint::builder(presets::N0)
+    } else {
+        Endpoint::builder(presets::Minimal).relay_mode(RelayMode::Disabled)
+    };
+    let mut builder = builder.secret_key(secret).alpns(alpns);
+    // The name travels with the address info (mDNS, and the address directory when reachable from the internet:
+    // readable there only by whoever already knows this device's id).
     if hosting {
         let mut advertised = name.to_string();
         while advertised.len() > iroh::address_lookup::UserData::MAX_LENGTH {
@@ -553,7 +616,7 @@ fn endpoint_builder(secret: SecretKey, name: &str, hosting: bool) -> iroh::endpo
 
 async fn bind_endpoint(config: &NodeConfig, name: &str) -> AppResult<Endpoint> {
     if config.hosting && config.fixed_port {
-        let fixed = endpoint_builder(config.secret.clone(), name, true)
+        let fixed = endpoint_builder(config.secret.clone(), name, true, config.internet)
             .clear_ip_transports()
             .bind_addr(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, DEFAULT_HOST_PORT))
             .and_then(|b| {
@@ -574,7 +637,7 @@ async fn bind_endpoint(config: &NodeConfig, name: &str) -> AppResult<Endpoint> {
             Err(err) => tracing::warn!(%err, "remote: fixed host bind addr invalid, falling back to ephemeral port"),
         }
     }
-    endpoint_builder(config.secret.clone(), name, config.hosting).bind().await.map_err(net_err)
+    endpoint_builder(config.secret.clone(), name, config.hosting, config.internet).bind().await.map_err(net_err)
 }
 
 #[cfg(test)]
@@ -626,8 +689,14 @@ mod tests {
     async fn node(name: &str, hosting: bool) -> (Arc<Node>, Arc<Mock>, broadcast::Sender<WireEvent>) {
         let backend = Arc::new(Mock::default());
         let (events, _) = broadcast::channel(64);
-        let config =
-            NodeConfig { secret: SecretKey::generate(), name: name.into(), hosting, mdns: false, fixed_port: false };
+        let config = NodeConfig {
+            secret: SecretKey::generate(),
+            name: name.into(),
+            hosting,
+            mdns: false,
+            fixed_port: false,
+            internet: false,
+        };
         let node = Node::start(config, backend.clone(), events.clone()).await.unwrap();
         (node, backend, events)
     }
@@ -727,6 +796,7 @@ mod tests {
                 hosting: true,
                 mdns: false,
                 fixed_port: true,
+                internet: false,
             };
             Node::start(config, backend, events).await.unwrap()
         };

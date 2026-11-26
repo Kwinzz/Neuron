@@ -24,11 +24,25 @@ export const DeviceBadge = memo(function DeviceBadge({
   const connected = useDevices((s) =>
     device ? (s.devices?.hosts.find((h) => h.nodeId === device)?.connected ?? false) : true,
   );
+  const viaRelay = useDevices((s) =>
+    device ? s.devices?.hosts.find((h) => h.nodeId === device)?.path?.viaRelay : undefined,
+  );
+  const rttMs = useDevices((s) =>
+    device ? s.devices?.hosts.find((h) => h.nodeId === device)?.path?.rttMs : undefined,
+  );
 
   if (!device) return null;
 
   const label = name ?? t("shell.unknownDevice");
-  const title = connected ? label : `${label} · ${t("shell.deviceOffline")}`;
+  let title: string;
+  if (!connected) {
+    title = `${label} · ${t("shell.deviceOffline")}`;
+  } else if (viaRelay !== undefined && rttMs !== undefined) {
+    const pathLabel = t(viaRelay ? "shell.devicePathRelay" : "shell.devicePathDirect");
+    title = `${label} · ${pathLabel} · ${Math.round(rttMs)} ms`;
+  } else {
+    title = label;
+  }
 
   return (
     <span

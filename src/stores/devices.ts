@@ -22,6 +22,7 @@ interface DevicesState {
   load: () => Promise<void>;
   scanNearby: () => Promise<NearbyDevice[]>;
   setEnabled: (enabled: boolean) => Promise<RemoteStatus>;
+  setInternet: (enabled: boolean) => Promise<RemoteStatus>;
   setDeviceName: (name: string) => Promise<RemoteStatus>;
   startPairing: () => Promise<PairingCode>;
   cancelPairing: () => Promise<void>;
@@ -78,6 +79,12 @@ export const useDevices = create<DevicesState>((set, get) => ({
 
   setEnabled: async (enabled) => {
     const next = await remote.setEnabled(enabled);
+    await get().load();
+    return next;
+  },
+
+  setInternet: async (enabled) => {
+    const next = await remote.setInternet(enabled);
     await get().load();
     return next;
   },

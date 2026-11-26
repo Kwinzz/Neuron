@@ -49,11 +49,13 @@ pub struct RemoteSettings {
     pub enabled: bool,
     /// Name shown to the other devices.
     pub device_name: String,
+    /// Reachable / reaching paired devices outside the local network (public relays + address directory).
+    pub internet: bool,
 }
 
 impl Default for RemoteSettings {
     fn default() -> Self {
-        Self { enabled: false, device_name: default_device_name() }
+        Self { enabled: false, device_name: default_device_name(), internet: false }
     }
 }
 
@@ -134,7 +136,10 @@ impl Remote {
         let needed = settings.enabled || hosts > 0 || self.scanning.load(Ordering::Relaxed);
         let mut slot = self.node.lock().await;
         if let Some(node) = slot.as_ref() {
-            if needed && node.is_hosting() == settings.enabled && node.name() == node::clean_name(&settings.device_name)
+            if needed
+                && node.is_hosting() == settings.enabled
+                && node.is_internet() == settings.internet
+                && node.name() == node::clean_name(&settings.device_name)
             {
                 return Ok(Some(Arc::clone(node)));
             }
@@ -150,6 +155,7 @@ impl Remote {
                 hosting: settings.enabled,
                 mdns: true,
                 fixed_port: settings.enabled,
+                internet: settings.internet,
             };
             let backend = Arc::new(AppBackend { app: app.clone() });
             let node = Node::start(config, backend, hub::sender()).await?;
@@ -159,6 +165,7 @@ impl Remote {
                 port = ?node.port(),
                 "remote: endpoint started"
             );
+            spawn_reconnect(app, &node);
             *slot = Some(node);
         }
         let _ = app.emit_to("main", REMOTE_STATUS_CHANNEL, ());
@@ -176,6 +183,30 @@ impl Remote {
             node.shutdown().await;
         }
     }
+}
+
+/// How often paired hosts that are not connected are tried again (no mDNS announcement outside the LAN).
+const RECONNECT_EVERY: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Keeps the paired hosts connected: right away, then every [`RECONNECT_EVERY`] for those that are not.
+fn spawn_reconnect(app: &AppHandle, node: &Arc<Node>) {
+    let app = app.clone();
+    let weak = Arc::downgrade(node);
+    node.spawn(async move {
+        loop {
+            let Some(node) = weak.upgrade() else { break };
+            let Some(state) = app.try_state::<AppState>() else { break };
+            let hosts = state.db.call(|c| store::list_hosts(c)).await.unwrap_or_default();
+            let connected = node.connected_hosts();
+            for host in hosts.into_iter().filter(|h| !connected.contains(&h.node_id)) {
+                if let Err(err) = node.connect_host(&host.node_id).await {
+                    tracing::debug!(%err, host = %host.name, "remote: paired host not reachable");
+                }
+            }
+            drop(node);
+            tokio::time::sleep(RECONNECT_EVERY).await;
+        }
+    });
 }
 
 /// Starts the endpoint in the background when the feature is in use (never blocks the startup).

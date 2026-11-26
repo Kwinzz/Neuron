@@ -11,4 +11,8 @@ enabled: boolean,
 /**
  * Name shown to the other devices.
  */
-deviceName: string, };
+deviceName: string, 
+/**
+ * Reachable / reaching paired devices outside the local network (public relays + address directory).
+ */
+internet: boolean, };

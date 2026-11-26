@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Laptop, Plus } from "lucide-react";
+import { Laptop, Plus, Radio, Zap } from "lucide-react";
 import type { RemoteHost } from "@/bindings/RemoteHost";
 import { Button } from "@/components/ui/button";
 import {
@@ -85,7 +85,25 @@ export function DeviceHostsCard({ onAddDevice }: DeviceHostsCardProps) {
                     <span className="truncate text-sm font-medium text-foreground">
                       {host.name}
                     </span>
-                    <DeviceStatusBadge connected={host.connected} lastSeen={host.lastSeen} />
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
+                      <DeviceStatusBadge connected={host.connected} lastSeen={host.lastSeen} />
+                      {host.connected && host.path && (
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          {host.path.viaRelay ? (
+                            <Radio className="size-3 shrink-0" aria-hidden />
+                          ) : (
+                            <Zap className="size-3 shrink-0" aria-hidden />
+                          )}
+                          <span>
+                            {t(host.path.viaRelay ? "settings.devicesPathRelay" : "settings.devicesPathDirect")}
+                            {" · "}
+                            <span className="font-mono tabular-nums">
+                              {Math.round(host.path.rttMs)} ms
+                            </span>
+                          </span>
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <Button

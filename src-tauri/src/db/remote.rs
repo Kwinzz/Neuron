@@ -67,6 +67,8 @@ pub struct RemoteHost {
     pub last_seen: Option<i64>,
     /// Connected right now (filled by the command layer).
     pub connected: bool,
+    /// Path of the live connection (filled by the command layer): through a relay, round-trip time.
+    pub path: Option<crate::remote::node::HostPath>,
 }
 
 fn client_row(r: &Row<'_>) -> rusqlite::Result<RemoteClient> {
@@ -87,6 +89,7 @@ fn host_row(r: &Row<'_>) -> rusqlite::Result<RemoteHost> {
         created_at: r.get(2)?,
         last_seen: r.get(3)?,
         connected: false,
+        path: None,
     })
 }
 

@@ -20,12 +20,14 @@ export function DeviceAccessCard() {
   const status = useDevices((s) => s.status);
   const tauri = isTauri();
   const enabled = status?.settings.enabled ?? false;
+  const internet = status?.settings.internet ?? false;
   const savedName = status?.settings.deviceName ?? "";
   const nodeId = status?.nodeId ?? null;
   const port = status?.port ?? null;
 
   const [nameDraft, setNameDraft] = useState(savedName);
   const [savingEnabled, setSavingEnabled] = useState(false);
+  const [savingInternet, setSavingInternet] = useState(false);
   const [savingName, setSavingName] = useState(false);
 
   useEffect(() => {
@@ -45,6 +47,22 @@ export function DeviceAccessCard() {
       });
     } finally {
       setSavingEnabled(false);
+    }
+  };
+
+  const handleToggleInternet = async (next: boolean) => {
+    if (!tauri || savingInternet) return;
+    setSavingInternet(true);
+    try {
+      await useDevices.getState().setInternet(next);
+    } catch (err: unknown) {
+      toast({
+        tone: "danger",
+        title: t("settings.devicesUpdateFailed"),
+        description: ipcErrorMessage(err),
+      });
+    } finally {
+      setSavingInternet(false);
     }
   };
 
@@ -105,6 +123,24 @@ export function DeviceAccessCard() {
               disabled={!tauri || savingEnabled}
               onCheckedChange={(checked) => void handleToggleEnabled(checked)}
               aria-describedby="devices-allow-control-desc"
+            />
+          }
+        />
+
+        <Separator />
+
+        <SettingRow
+          id="devices-allow-internet"
+          label={t("settings.devicesAllowInternet")}
+          description={t("settings.devicesAllowInternetDescription")}
+          disabled={!tauri}
+          control={
+            <SettingSwitch
+              id="devices-allow-internet"
+              checked={internet}
+              disabled={!tauri || savingInternet}
+              onCheckedChange={(checked) => void handleToggleInternet(checked)}
+              aria-describedby="devices-allow-internet-desc"
             />
           }
         />
