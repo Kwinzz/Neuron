@@ -170,5 +170,5 @@ where
         let _ = ev_tx.send(AdapterEvent::Exited { code, stderr_tail });
     });
 
-    Ok(SessionHandle { commands: cmd_tx, events: ev_rx, pid })
+    Ok(SessionHandle { commands: cmd_tx, events: ev_rx, pid, turn_pid: None })
 }

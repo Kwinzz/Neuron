@@ -3,6 +3,7 @@ import type { AccessIssue } from "./AccessIssue";
 import type { Attachment } from "./Attachment";
 import type { DeltaChannel } from "./DeltaChannel";
 import type { FileChange } from "./FileChange";
+import type { SubagentSource } from "./SubagentSource";
 import type { SubagentStatus } from "./SubagentStatus";
 import type { ThreadStatus } from "./ThreadStatus";
 import type { TokenUsage } from "./TokenUsage";
@@ -28,4 +29,20 @@ durationMs: number | null, } | { "kind": "ThreadStatusChanged", status: ThreadSt
 /**
  * Set when Neuron can offer the fix (install the CLI, sign in).
  */
-issue: AccessIssue | null, } | { "kind": "SubagentUpdate", toolCallId: string, description: string | null, subagentType: string | null, status: SubagentStatus, toolUses: number | null, tokens: number | null, lastTool: string | null, };
+issue: AccessIssue | null, } | { "kind": "SubagentUpdate", toolCallId: string, description: string | null, subagentType: string | null, status: SubagentStatus, toolUses: number | null, tokens: number | null, lastTool: string | null, source: SubagentSource, 
+/**
+ * Agent CLI (`claude`, `codex`, `antigravity`, `gemini`…), for sources other than `task`.
+ */
+agent: string | null, 
+/**
+ * Command line that started it.
+ */
+command: string | null, pid: number | null, 
+/**
+ * Last lines it printed (when its command returned).
+ */
+output: string | null, 
+/**
+ * Tool call of the chat during which it appeared (process-tree sub-agents).
+ */
+parentToolCallId: string | null, };

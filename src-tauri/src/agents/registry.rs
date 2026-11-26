@@ -16,9 +16,15 @@ use crate::agents::activity::tool_activity;
 use crate::agents::antigravity::AntigravityAdapter;
 use crate::agents::claude::ClaudeCodeAdapter;
 use crate::agents::codex::CodexAdapter;
-use crate::agents::events::{AGENT_EVENT_CHANNEL, AgentEvent, AgentEventEnvelope, AgentKind, ThreadStatus, TokenUsage};
+use crate::agents::events::{
+    AGENT_EVENT_CHANNEL, AgentEvent, AgentEventEnvelope, AgentKind, SubagentSource, SubagentStatus, ThreadStatus,
+    TokenUsage,
+};
 use crate::agents::generic::GenericAdapter;
-use crate::agents::{AdapterEvent, AgentAdapter, PermissionDecision, SessionCommand, SessionSpec, kill_process_tree};
+use crate::agents::subagents::{self, ProcAgent, SubagentTracker, TrackerUpdate};
+use crate::agents::{
+    AdapterEvent, AgentAdapter, PermissionDecision, SessionCommand, SessionSpec, TurnPid, kill_process_tree,
+};
 use crate::db::Db;
 use crate::db::chat::{self, ToolStatus};
 use crate::db::threads::{self, ThreadRuntime};
@@ -33,6 +39,10 @@ const STOP_GRACE: Duration = Duration::from_secs(5);
 struct ActiveSession {
     commands: mpsc::UnboundedSender<SessionCommand>,
     pid: Option<u32>,
+    /// Current per-turn process (Codex, generic CLIs).
+    turn_pid: Option<TurnPid>,
+    /// Agent CLIs this session started (commands, process tree).
+    subagents: SubagentTracker,
     /// Unique per spawn, so a late `Exited` from an old process never removes a newer session.
     generation: u64,
     /// Pending permission requests: request id → (tool name, tool input echoed back on allow).
@@ -126,6 +136,35 @@ async fn run_agy_command(
 
 pub(crate) fn emit_event(events: &dyn EventSink, thread_id: &str, event: AgentEvent) {
     emit(events, thread_id, event);
+}
+
+/// A sub-agent event for an agent CLI started by the chat's agent (fields not given: unknown / unchanged).
+fn cli_subagent_event(tool_call_id: String, status: SubagentStatus, source: SubagentSource) -> AgentEvent {
+    AgentEvent::SubagentUpdate {
+        tool_call_id,
+        description: None,
+        subagent_type: None,
+        status,
+        tool_uses: None,
+        tokens: None,
+        last_tool: None,
+        source,
+        agent: None,
+        command: None,
+        pid: None,
+        output: None,
+        parent_tool_call_id: None,
+    }
+}
+
+/// Command lines shown in the UI are cut to this many characters.
+const COMMAND_SHOWN: usize = 400;
+
+fn shorten(text: &str) -> String {
+    if text.chars().count() <= COMMAND_SHOWN {
+        return text.to_string();
+    }
+    format!("{}…", text.chars().take(COMMAND_SHOWN - 1).collect::<String>())
 }
 
 fn emit(events: &dyn EventSink, thread_id: &str, event: AgentEvent) {
@@ -409,6 +448,8 @@ impl AgentRegistry {
             ActiveSession {
                 commands: handle.commands,
                 pid: handle.pid,
+                turn_pid: handle.turn_pid,
+                subagents: SubagentTracker::default(),
                 generation: gen_id,
                 pending: HashMap::new(),
                 inject,
@@ -584,6 +625,58 @@ impl AgentRegistry {
         }
     }
 
+    /// Process ids under which each running session's sub-agents are looked for: `(thread, pids)`.
+    pub fn process_roots(&self) -> Vec<(String, Vec<u32>)> {
+        self.lock()
+            .iter()
+            .filter_map(|(id, s)| {
+                let mut pids: Vec<u32> = s.pid.into_iter().collect();
+                if let Some(turn) = &s.turn_pid {
+                    let pid = turn.load(std::sync::atomic::Ordering::Relaxed);
+                    if pid != 0 {
+                        pids.push(pid);
+                    }
+                }
+                (!pids.is_empty()).then(|| (id.clone(), pids))
+            })
+            .collect()
+    }
+
+    /// Agent processes found under each session (`proc_watch`): started / ended sub-agents are emitted.
+    pub fn update_process_subagents(&self, events: &dyn EventSink, found: Vec<(String, Vec<ProcAgent>)>) {
+        let now = Instant::now();
+        let mut updates = Vec::new();
+        {
+            let mut sessions = self.lock();
+            for (thread, agents) in &found {
+                if let Some(session) = sessions.get_mut(thread) {
+                    updates.extend(session.subagents.processes(agents, now).into_iter().map(|u| (thread.clone(), u)));
+                }
+            }
+        }
+        for (thread, update) in updates {
+            let event = match update {
+                TrackerUpdate::Started { id, agent, merged } => {
+                    let source = if merged { SubagentSource::Command } else { SubagentSource::Process };
+                    let mut event = cli_subagent_event(id, SubagentStatus::Running, source);
+                    if let AgentEvent::SubagentUpdate { agent: a, command, pid, .. } = &mut event {
+                        *a = Some(agent.key.to_string());
+                        *pid = Some(agent.pid);
+                        // A merged sub-agent keeps the command the agent wrote (more readable).
+                        if !merged {
+                            *command = Some(shorten(&agent.command));
+                        }
+                    }
+                    event
+                }
+                TrackerUpdate::Ended { id } => {
+                    cli_subagent_event(id, SubagentStatus::Completed, SubagentSource::Process)
+                }
+            };
+            emit(events, &thread, event);
+        }
+    }
+
     /// Stop sessions idle for at least `max_idle` (their chats resume on the next message). Returns their ids.
     pub fn reap_idle(&self, max_idle: Duration) -> Vec<String> {
         let ids: Vec<String> = self
@@ -722,6 +815,12 @@ impl AgentRegistry {
                 AdapterEvent::ToolCallStart { id: tool_id, name, input, parent_id } => {
                     // First thing: the CLI writes the file right after announcing the call.
                     files.start(&tool_id, &name, &input).await;
+                    // A shell command that starts another agent CLI: a sub-agent of this chat.
+                    let launched = subagents::is_shell_tool(&name)
+                        .then(|| subagents::shell_command(&input))
+                        .flatten()
+                        .and_then(|cmd| subagents::detect_cli(cmd).map(|found| (found, shorten(cmd))));
+                    let background = input.get("run_in_background").and_then(Value::as_bool).unwrap_or(false);
                     let (status, detail) = tool_activity(&name, &input);
                     {
                         let (tid, tool, n, inp) = (id.clone(), tool_id.clone(), name.clone(), input.clone());
@@ -731,13 +830,25 @@ impl AgentRegistry {
                         sink,
                         &id,
                         AgentEvent::ToolCallStart {
-                            tool_call_id: tool_id,
+                            tool_call_id: tool_id.clone(),
                             name,
                             input,
                             activity: detail.clone(),
                             parent_tool_call_id: parent_id,
                         },
                     );
+                    if let Some((found, command_line)) = launched {
+                        if let Some(s) = self.lock().get_mut(&id) {
+                            s.subagents.command_started(&tool_id, found.key, background);
+                        }
+                        let mut event = cli_subagent_event(tool_id, SubagentStatus::Running, SubagentSource::Command);
+                        if let AgentEvent::SubagentUpdate { description, agent, command, .. } = &mut event {
+                            *description = found.prompt;
+                            *agent = Some(found.key.to_string());
+                            *command = Some(command_line);
+                        }
+                        emit(sink, &id, event);
+                    }
                     let (changed, status_changed, detail) = set_status(status, detail, &mut last_status);
                     if status_changed {
                         let tid = id.clone();
@@ -748,6 +859,24 @@ impl AgentRegistry {
                     }
                 }
                 AdapterEvent::ToolCallResult { id: tool_id, output, is_error } => {
+                    // The command of a sub-agent returned: over, unless it runs in the background.
+                    let returned = self
+                        .lock()
+                        .get_mut(&id)
+                        .filter(|s| s.subagents.is_tracked(&tool_id))
+                        .map(|s| s.subagents.command_returned(&tool_id, Instant::now()));
+                    if let Some(over) = returned {
+                        let status = match (over, is_error) {
+                            (false, _) => SubagentStatus::Running,
+                            (true, true) => SubagentStatus::Failed,
+                            (true, false) => SubagentStatus::Completed,
+                        };
+                        let mut event = cli_subagent_event(tool_id.clone(), status, SubagentSource::Command);
+                        if let AgentEvent::SubagentUpdate { output: tail, .. } = &mut event {
+                            *tail = Some(subagents::output_tail(&output, 12)).filter(|t| !t.is_empty());
+                        }
+                        emit(sink, &id, event);
+                    }
                     let status = if is_error { ToolStatus::Error } else { ToolStatus::Ok };
                     let changes = files.finish(&tool_id).await;
                     {
@@ -891,6 +1020,12 @@ impl AgentRegistry {
                             tool_uses,
                             tokens,
                             last_tool,
+                            source: SubagentSource::Task,
+                            agent: None,
+                            command: None,
+                            pid: None,
+                            output: None,
+                            parent_tool_call_id: None,
                         },
                     );
                 }
@@ -1021,6 +1156,8 @@ mod tests {
             ActiveSession {
                 commands,
                 pid: None,
+                turn_pid: None,
+                subagents: SubagentTracker::default(),
                 generation: 1,
                 pending,
                 inject,

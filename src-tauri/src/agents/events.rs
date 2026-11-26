@@ -202,8 +202,9 @@ pub enum AgentEvent {
         /// Set when Neuron can offer the fix (install the CLI, sign in).
         issue: Option<crate::agents::access::AccessIssue>,
     },
-    /// A sub-agent (Claude Code `Agent`/`Task` tool) started, progressed or ended. `toolCallId` is the call
-    /// that launched it; its own tool calls carry it as `parentToolCallId`.
+    /// A sub-agent started, progressed or ended: a Claude Code `Agent`/`Task` (its own tool calls carry
+    /// `toolCallId` as `parentToolCallId`), or another agent CLI the agent started (`agents::subagents`): then
+    /// `toolCallId` is the shell call that launched it, or `proc:<pid>` when only the process tree showed it.
     SubagentUpdate {
         tool_call_id: String,
         description: Option<String>,
@@ -214,7 +215,37 @@ pub enum AgentEvent {
         #[ts(type = "number | null")]
         tokens: Option<u64>,
         last_tool: Option<String>,
+        #[serde(default)]
+        source: SubagentSource,
+        /// Agent CLI (`claude`, `codex`, `antigravity`, `gemini`…), for sources other than `task`.
+        #[serde(default)]
+        agent: Option<String>,
+        /// Command line that started it.
+        #[serde(default)]
+        command: Option<String>,
+        #[serde(default)]
+        pid: Option<u32>,
+        /// Last lines it printed (when its command returned).
+        #[serde(default)]
+        output: Option<String>,
+        /// Tool call of the chat during which it appeared (process-tree sub-agents).
+        #[serde(default)]
+        parent_tool_call_id: Option<String>,
     },
+}
+
+/// Where a sub-agent was seen.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum SubagentSource {
+    /// The CLI's own sub-agent (Claude Code `Agent`/`Task`).
+    #[default]
+    Task,
+    /// A shell command that starts an agent CLI.
+    Command,
+    /// An agent CLI found among the chat's processes.
+    Process,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]

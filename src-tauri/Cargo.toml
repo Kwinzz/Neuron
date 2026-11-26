@@ -51,6 +51,7 @@ futures-util = "0.3"
 tokio-stream = { version = "0.1", features = ["sync"] }
 spake2 = "0.4"
 blake3 = "1"
+sysinfo = { version = "0.36.1", default-features = false, features = ["system"] }
 
 [target.'cfg(windows)'.dependencies]
 tauri-winrt-notification = "0.7"

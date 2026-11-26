@@ -41,8 +41,15 @@ impl AgentAdapter for GenericAdapter {
         }
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<SessionCommand>();
         let (ev_tx, ev_rx) = mpsc::unbounded_channel::<AdapterEvent>();
-        tauri::async_runtime::spawn(session_loop(profile, spec.clone(), cmd_rx, ev_tx));
-        Ok(SessionHandle { commands: cmd_tx, events: ev_rx, pid: None })
+        let turn_pid = crate::agents::TurnPid::default();
+        tauri::async_runtime::spawn(session_loop(
+            profile,
+            spec.clone(),
+            cmd_rx,
+            ev_tx,
+            std::sync::Arc::clone(&turn_pid),
+        ));
+        Ok(SessionHandle { commands: cmd_tx, events: ev_rx, pid: None, turn_pid: Some(turn_pid) })
     }
 }
 
@@ -96,6 +103,8 @@ enum Chunk {
 }
 
 struct Turn {
+    /// The turn's process (sub-agent process watch).
+    pid: Option<u32>,
     chunks: mpsc::UnboundedReceiver<Chunk>,
     kill: Box<dyn FnMut() + Send>,
     stderr: Option<tokio::sync::oneshot::Receiver<String>>,
@@ -137,6 +146,7 @@ fn start_pipe(profile: &GenericCliProfile, spec: &SessionSpec, prompt: &str) -> 
         let _ = tx.send(Chunk::Exit(code));
     });
     Ok(Turn {
+        pid,
         chunks: rx,
         kill: Box::new(move || {
             if let Some(pid) = pid {
@@ -167,6 +177,7 @@ fn start_pty(profile: &GenericCliProfile, spec: &SessionSpec, prompt: &str) -> A
         .spawn_command(cmd)
         .map_err(|e| spawn_error(&profile.command, std::io::Error::other(e.to_string())))?;
     drop(pair.slave);
+    let pid = child.process_id();
     let mut killer = child.clone_killer();
     let mut reader = pair.master.try_clone_reader().map_err(|e| pty_err(&e))?;
     let writer = std::sync::Arc::new(std::sync::Mutex::new(pair.master.take_writer().map_err(|e| pty_err(&e))?));
@@ -207,6 +218,7 @@ fn start_pty(profile: &GenericCliProfile, spec: &SessionSpec, prompt: &str) -> A
         let _ = tx.send(Chunk::Exit(code));
     });
     Ok(Turn {
+        pid,
         chunks: rx,
         kill: Box::new(move || {
             let _ = killer.kill();
@@ -221,6 +233,7 @@ async fn session_loop(
     spec: SessionSpec,
     mut commands: mpsc::UnboundedReceiver<SessionCommand>,
     events: mpsc::UnboundedSender<AdapterEvent>,
+    turn_pid: crate::agents::TurnPid,
 ) {
     let _ = events.send(AdapterEvent::SessionInit {
         session_ref: format!("generic-{}", profile.id),
@@ -241,7 +254,10 @@ async fn session_loop(
         let elapsed = || Some(i64::try_from(started.elapsed().as_millis()).unwrap_or(i64::MAX));
         let turn = if profile.pty { start_pty(&profile, &spec, &prompt) } else { start_pipe(&profile, &spec, &prompt) };
         let mut turn = match turn {
-            Ok(t) => t,
+            Ok(t) => {
+                turn_pid.store(t.pid.unwrap_or(0), std::sync::atomic::Ordering::Relaxed);
+                t
+            }
             Err(err) => {
                 let _ = events.send(AdapterEvent::TurnComplete {
                     usage: TokenUsage::default(),

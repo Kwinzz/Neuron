@@ -15,9 +15,11 @@ pub mod events;
 pub mod file_changes;
 pub mod generic;
 pub mod oneshot;
+pub mod proc_watch;
 pub mod process;
 pub mod registry;
 pub mod slash;
+pub mod subagents;
 pub mod summary;
 
 use std::path::PathBuf;
@@ -195,7 +197,13 @@ pub struct SessionHandle {
     pub events: mpsc::UnboundedReceiver<AdapterEvent>,
     /// OS process id, for forced termination of the whole process tree.
     pub pid: Option<u32>,
+    /// Adapters that start one process per turn (Codex, generic CLIs): pid of the current one (0 = none), for
+    /// the sub-agent process watch.
+    pub turn_pid: Option<TurnPid>,
 }
+
+/// Pid of a per-turn process, shared between an adapter and the registry.
+pub type TurnPid = std::sync::Arc<std::sync::atomic::AtomicU32>;
 
 /// A CLI agent integration.
 pub trait AgentAdapter: Send + Sync {

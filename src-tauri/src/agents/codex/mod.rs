@@ -100,8 +100,9 @@ impl AgentAdapter for CodexAdapter {
         let (ev_tx, ev_rx) = mpsc::unbounded_channel::<AdapterEvent>();
         let binary = self.binary.clone();
         let spec = spec.clone();
-        tauri::async_runtime::spawn(session_loop(binary, spec, cmd_rx, ev_tx));
-        Ok(SessionHandle { commands: cmd_tx, events: ev_rx, pid: None })
+        let turn_pid = crate::agents::TurnPid::default();
+        tauri::async_runtime::spawn(session_loop(binary, spec, cmd_rx, ev_tx, std::sync::Arc::clone(&turn_pid)));
+        Ok(SessionHandle { commands: cmd_tx, events: ev_rx, pid: None, turn_pid: Some(turn_pid) })
     }
 }
 
@@ -111,6 +112,7 @@ async fn session_loop(
     spec: SessionSpec,
     mut commands: mpsc::UnboundedReceiver<SessionCommand>,
     events: mpsc::UnboundedSender<AdapterEvent>,
+    turn_pid: crate::agents::TurnPid,
 ) {
     let mut thread = spec.resume.clone();
     let mut queue: VecDeque<crate::agents::UserTurn> = VecDeque::new();
@@ -154,6 +156,7 @@ async fn session_loop(
             }
         };
         let pid = child.id();
+        turn_pid.store(pid.unwrap_or(0), std::sync::atomic::Ordering::Relaxed);
         let (Some(stdout), Some(stderr)) = (child.stdout.take(), child.stderr.take()) else { continue };
         let tail = spawn_tail(stderr);
         let mut lines = BufReader::new(stdout).lines();
