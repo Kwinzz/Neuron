@@ -151,6 +151,8 @@ impl TokenUsage {
 #[serde(tag = "kind", rename_all_fields = "camelCase")]
 #[ts(export)]
 pub enum AgentEvent {
+    /// A user message was persisted on this chat (keeps other open windows and paired devices in sync).
+    UserMessage { message_id: String, text: String, attachments: Vec<crate::attachments::Attachment> },
     /// Incremental assistant text (or thinking) for a message.
     MessageDelta { message_id: String, channel: DeltaChannel, text: String },
     /// A text/thinking item finished streaming (its full text is persisted).
@@ -176,6 +178,8 @@ pub enum AgentEvent {
     },
     /// The agent asks for approval before running a tool.
     PermissionRequest { request_id: String, tool_name: String, description: String, input: serde_json::Value },
+    /// A pending permission request was answered (keeps other open windows and paired devices in sync).
+    PermissionResolved { request_id: String, allow: bool },
     /// Usage of the latest turn plus the running total for the thread.
     TokenUsageUpdate {
         delta: TokenUsage,

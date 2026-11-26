@@ -116,6 +116,7 @@ pub async fn call(app: &AppHandle, level: AccessLevel, method: &str, args: Value
         }
         "respond_permission" => json(
             threads::respond_permission(
+                app.clone(),
                 s(),
                 arg(a, "threadId")?,
                 arg(a, "requestId")?,

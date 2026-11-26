@@ -113,6 +113,10 @@ async fn run_agy_command(app: AppHandle, db: Db, rt: ThreadRuntime, name: &'stat
     }
 }
 
+pub(crate) fn emit_event(app: &AppHandle, thread_id: &str, event: AgentEvent) {
+    emit(app, thread_id, event);
+}
+
 fn emit(app: &AppHandle, thread_id: &str, event: AgentEvent) {
     let envelope = AgentEventEnvelope { thread_id: thread_id.to_string(), ts: now_ms(), event };
     crate::remote::hub::forward(AGENT_EVENT_CHANNEL, &envelope);
@@ -203,14 +207,16 @@ impl AgentRegistry {
         let track_status = local.is_none() || !busy;
 
         // Persist the user message first so it is never lost, even if the spawn fails.
+        let message_id = uuid::Uuid::new_v4().to_string();
         let first_message = {
-            let (id, t, project) = (thread_id.to_string(), text.clone(), runtime.project_id.clone());
+            let (id, mid, t, project) =
+                (thread_id.to_string(), message_id.clone(), text.clone(), runtime.project_id.clone());
             let meta = (!attachments.is_empty()).then(|| json!({ "attachments": attachments }));
             let first_name = attachments.first().map(|a| a.name.clone());
             db.call(move |c| {
                 let now = now_ms();
                 let first = threads::user_message_count(c, &id)? == 0;
-                chat::insert_message(c, &uuid::Uuid::new_v4().to_string(), &id, "user", &t, meta.as_ref(), now)?;
+                chat::insert_message(c, &mid, &id, "user", &t, meta.as_ref(), now)?;
                 if !t.is_empty() {
                     chat::record_prompt(c, project.as_deref(), &t, now)?;
                 }
@@ -226,6 +232,11 @@ impl AgentRegistry {
             })
             .await?
         };
+        emit(
+            app,
+            thread_id,
+            AgentEvent::UserMessage { message_id, text: text.clone(), attachments: attachments.clone() },
+        );
         if let Some(name) = local {
             if track_status {
                 emit(app, thread_id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::Starting, detail: None });

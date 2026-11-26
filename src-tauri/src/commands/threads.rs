@@ -183,6 +183,7 @@ pub async fn paste_attachment(
 
 #[tauri::command]
 pub async fn respond_permission(
+    app: AppHandle,
     state: State<'_, AppState>,
     thread_id: String,
     request_id: String,
@@ -193,7 +194,13 @@ pub async fn respond_permission(
     if let Some(m) = mode.as_deref() {
         validate_settings(m, None)?;
     }
-    state.agents.respond_permission(&thread_id, &request_id, allow, mode, answers)
+    state.agents.respond_permission(&thread_id, &request_id, allow, mode, answers)?;
+    crate::agents::registry::emit_event(
+        &app,
+        &thread_id,
+        crate::agents::events::AgentEvent::PermissionResolved { request_id, allow },
+    );
+    Ok(())
 }
 
 #[tauri::command]
