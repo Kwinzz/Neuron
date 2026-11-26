@@ -15,8 +15,10 @@ Neuron contains no AI of its own: it runs the CLIs installed on your computer, w
 
 - **Multi-agent chats**: Claude Code, Codex, Antigravity and your own CLIs, with streaming, code blocks, diffs of the
   changed files, approval requests, Plan mode, model and reasoning level picker.
-- **Several agents in parallel**: each chat runs in the background, followed live in « Live threads ».
+- **Several agents in parallel**: each chat runs in the background, followed live in « Live threads », with a
+  small terminal per sub-agent — Claude's own, and the other agent CLIs an agent starts (Gemini, Codex, Antigravity…).
 - **Projects**: a folder = a project, with its context (`.neuron/context.md`, git status) given to every agent.
+  Create a new folder or add an existing one, on this PC or on a paired device.
 - **Global memory** shared by every agent (built-in MCP server), importable from claude.ai, ChatGPT, Gemini or your
   CLIs' instruction files, with an optional AI rewrite.
 - **Quotas and costs**: usage of your subscriptions (5-hour / weekly windows), tokens and estimated cost per agent
