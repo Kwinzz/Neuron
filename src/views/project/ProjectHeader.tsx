@@ -5,9 +5,11 @@ import type { ProjectSummary } from "@/bindings/ProjectSummary";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { DeviceBadge } from "@/components/ui/DeviceBadge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { t } from "@/i18n";
+import { deviceOfProject } from "@/lib/deviceRouting";
 import { openFolder } from "@/lib/openFolder";
 import { useUi } from "@/stores/ui";
 
@@ -34,6 +36,7 @@ export function ProjectHeader({
 }: ProjectHeaderProps) {
   const name = project?.name ?? fallbackName;
   const path = project?.path;
+  const device = deviceOfProject(projectId);
   const git = overview?.git ?? null;
   const changedCount = git?.changed.length ?? 0;
 
@@ -53,9 +56,12 @@ export function ProjectHeader({
               </>
             ) : (
               <>
-                <h1 className="truncate text-lg leading-tight font-semibold text-foreground">
-                  {name ?? t("shell.project")}
-                </h1>
+                <div className="flex min-w-0 items-center gap-2">
+                  <h1 className="truncate text-lg leading-tight font-semibold text-foreground">
+                    {name ?? t("shell.project")}
+                  </h1>
+                  <DeviceBadge device={device} />
+                </div>
                 {path && (
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -120,7 +126,7 @@ export function ProjectHeader({
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {path && (
+          {path && !device && (
             <Button variant="outline" size="sm" onClick={() => void openFolder(path)}>
               <FolderOpen aria-hidden />
               <span>{t("common.openFolder")}</span>

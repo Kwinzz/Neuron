@@ -30,6 +30,7 @@ const shell: Translation<typeof fr> = {
   deviceOnline: "Connected",
   deviceOffline: "Offline",
   deviceEmpty: "No projects or chats",
+  unknownDevice: "Unknown device",
   // ErrorBoundary
   renderErrorTitle: "Neuron hit a display error",
   reload: "Reload",

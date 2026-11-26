@@ -220,16 +220,17 @@ export const ipc = {
   sendMessage: (threadId: string, text: string, attachments: Attachment[] = []) =>
     call<void>(deviceOfThread(threadId), "send_message", { threadId, text, attachments }),
   /** Slash commands of a provider in a folder (« / » menu; cached 15 min server-side). */
-  listSlashCommands: (agent: AgentKind, cwd: string | null) =>
-    invoke<SlashCommand[]>("list_slash_commands", { agent, cwd }),
+  listSlashCommands: (agent: AgentKind, cwd: string | null, device: string | null = null) =>
+    call<SlashCommand[]>(device, "list_slash_commands", { agent, cwd }),
   /** Existing image files among the paths an agent mentioned in a chat (served to the webview). */
   agentImages: (threadId: string, paths: string[]) =>
     call<Attachment[]>(deviceOfThread(threadId), "agent_images", { threadId, paths }),
   /** Copy files into Neuron's attachments folder (« + » button). */
   importAttachments: (paths: string[]) => invoke<Attachment[]>("import_attachments", { paths }),
   /** Save a pasted image (base64 without the data: prefix). */
-  pasteAttachment: (name: string, mime: string, data: string) =>
-    invoke<Attachment>("paste_attachment", { name, mime, data }),
+  /** On `device` when the message goes to a chat of another device (the attachment must live there). */
+  pasteAttachment: (name: string, mime: string, data: string, device: string | null = null) =>
+    call<Attachment>(device, "paste_attachment", { name, mime, data }),
   /** Native file picker (several files); resolves to [] when cancelled. */
   pickFiles: async (): Promise<string[]> => {
     const picked = await openDialog({ multiple: true, directory: false });
@@ -258,7 +259,8 @@ export const ipc = {
   },
   promptHistory: (projectId?: string | null) =>
     call<string[]>(deviceOfProject(projectId), "prompt_history", { projectId: projectId ?? null }),
-  defaultCwd: () => invoke<string>("default_cwd"),
+  /** Folder a chat without project starts in, on this device or on `device`. */
+  defaultCwd: (device: string | null = null) => call<string>(device, "default_cwd"),
   updateThreadSettings: (threadId: string, settings: ThreadSettingsInput) =>
     call<ThreadSummary>(deviceOfThread(threadId), "update_thread_settings", { threadId, settings }),
   createProject: (path: string, name?: string) =>
@@ -309,8 +311,12 @@ export const ipc = {
   connectAntigravityMcp: () => invoke<AgyMcpStatus>("connect_antigravity_mcp"),
   disconnectAntigravityMcp: () => invoke<AgyMcpStatus>("disconnect_antigravity_mcp"),
   /** Models per provider, read from the installed CLIs (cached 10 min server-side). */
-  listModels: (refresh = false) => invoke<ProviderCatalog[]>("list_models", { refresh }),
-  agentAccess: (refresh = false) => invoke<AgentAccess[]>("agent_access", { refresh }),
+  /** Models of the CLIs installed on this device, or on `device`. */
+  listModels: (refresh = false, device: string | null = null) =>
+    call<ProviderCatalog[]>(device, "list_models", { refresh }),
+  /** Installed / signed-in state of the CLIs on this device, or on `device`. */
+  agentAccess: (refresh = false, device: string | null = null) =>
+    call<AgentAccess[]>(device, "agent_access", { refresh }),
   checkAgentAccess: (agent: AgentKind) => invoke<AgentAccess>("check_agent_access", { agent }),
   installAgent: (agent: AgentKind) => invoke<void>("install_agent", { agent }),
   loginAgent: (agent: AgentKind) => invoke<void>("login_agent", { agent }),

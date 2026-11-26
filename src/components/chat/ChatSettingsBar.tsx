@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { type ChatSettings, PERMISSION_MODES, permissionLabel } from "@/lib/models";
-import { resolveModelId, useModels } from "@/stores/models";
+import { resolveModelId, useDeviceProviders } from "@/stores/models";
 import { EffortPicker } from "./EffortPicker";
 import { ModeSwitch, TOGGLE_PLAN_EVENT } from "./ModeSwitch";
 import { ModelPicker } from "./ModelPicker";
@@ -21,6 +21,8 @@ import { t } from "@/i18n";
 interface ChatSettingsBarProps {
   value: ChatSettings;
   onChange: (next: ChatSettings) => void;
+  /** Remote device node id, or null for this PC. */
+  device?: string | null;
   /** Existing chat: provider locked. */
   lockAgent?: boolean;
   disabled?: boolean;
@@ -35,10 +37,12 @@ const EXEC_MODES = PERMISSION_MODES.filter((p) => p.id !== "plan");
 export const ChatSettingsBar = memo(function ChatSettingsBar({
   value,
   onChange,
+  device = null,
   lockAgent,
   disabled,
 }: ChatSettingsBarProps) {
-  const note = useModels((s) => s.providers.find((p) => p.agent === value.agent)?.note);
+  const providers = useDeviceProviders(device);
+  const note = providers.find((p) => p.agent === value.agent)?.note;
 
   // Execution mode to come back to when leaving Plan (and shown by the permissions menu meanwhile).
   const plan = value.permissionMode === "plan";
@@ -65,6 +69,7 @@ export const ChatSettingsBar = memo(function ChatSettingsBar({
       <ModelPicker
         agent={value.agent}
         model={value.model}
+        device={device}
         lockAgent={lockAgent}
         disabled={disabled}
         onChange={(agent, next) => {
@@ -86,6 +91,7 @@ export const ChatSettingsBar = memo(function ChatSettingsBar({
             agent={value.agent}
             model={value.model}
             effort={value.effort}
+            device={device}
             className={TRIGGER}
             disabled={disabled}
             onChange={(effort, model) => onChange({ ...value, effort, model })}

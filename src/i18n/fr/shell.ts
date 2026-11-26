@@ -29,6 +29,7 @@ const shell = {
   deviceOnline: "Connecté",
   deviceOffline: "Hors ligne",
   deviceEmpty: "Aucun projet ni chat",
+  unknownDevice: "Appareil inconnu",
   // ErrorBoundary
   renderErrorTitle: "Neuron a rencontré une erreur d'affichage",
   reload: "Recharger",

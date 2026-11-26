@@ -17,14 +17,20 @@ const chat = {
   draftPlaceholder: "Que doit faire l'agent ? (Entrée pour démarrer le chat)",
   folderButton: "Dossier…",
   pickWorkDir: "Choisir le dossier de travail",
+  remoteDefaultFolder: "Dossier par défaut de {device}",
   folderUnavailable: "Dossier inaccessible",
   startChatFailed: "Impossible de démarrer le chat",
+  thisPc: "Ce PC",
+  runOn: "Exécuter sur : {device}",
+  runOnLabel: "Exécuter sur",
 
   // Composer
   composerPlaceholder:
     "Demandez quelque chose à l'agent… (Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne, ↑ historique)",
   attachFiles: "Joindre des fichiers",
   attachFilesHint: "Joindre des fichiers (ou coller une image)",
+  attachFilesRemoteDisabled:
+    "Joindre des fichiers vers un autre appareil arrive bientôt — collez les images avec Ctrl+V",
   attachmentRejected: "Pièce jointe refusée",
   pickFailed: "Sélection impossible",
   stopAgent: "Arrêter l'agent",

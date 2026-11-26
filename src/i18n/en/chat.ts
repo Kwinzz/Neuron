@@ -17,13 +17,19 @@ const chat: Translation<typeof fr> = {
   draftPlaceholder: "What should the agent do? (Enter to start the chat)",
   folderButton: "Folder…",
   pickWorkDir: "Choose the working folder",
+  remoteDefaultFolder: "Default folder on {device}",
   folderUnavailable: "Folder unavailable",
   startChatFailed: "Couldn't start the chat",
+  thisPc: "This PC",
+  runOn: "Run on: {device}",
+  runOnLabel: "Run on",
 
   // Composer
   composerPlaceholder: "Ask the agent something… (Enter to send, Shift+Enter for a new line, ↑ history)",
   attachFiles: "Attach files",
   attachFilesHint: "Attach files (or paste an image)",
+  attachFilesRemoteDisabled:
+    "Attaching files to another device is coming soon — paste images with Ctrl+V",
   attachmentRejected: "Attachment rejected",
   pickFailed: "Couldn't pick files",
   stopAgent: "Stop the agent",

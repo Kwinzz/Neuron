@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { t } from "@/i18n";
 import { DEFAULT_EFFORTS, effortLabel } from "@/lib/models";
-import { findModel, resolveModelId, useModels } from "@/stores/models";
+import { findModel, resolveModelId, useDeviceProviders } from "@/stores/models";
 
 const DEFAULT = "default";
 
@@ -22,6 +22,8 @@ interface EffortPickerProps {
   effort: string | null;
   /** New level, and the model id to use with it (Antigravity families: each level is its own model). */
   onChange: (effort: string | null, model: string | null) => void;
+  /** Remote device node id, or null for this PC. */
+  device?: string | null;
   className?: string;
   disabled?: boolean;
   /** Controlled opening (keyboard shortcut); uncontrolled when absent. */
@@ -37,13 +39,15 @@ export function EffortPicker({
   model: modelId,
   effort,
   onChange,
+  device = null,
   className,
   disabled,
   open,
   onOpenChange,
   onCloseAutoFocus,
 }: EffortPickerProps) {
-  const model = useModels((s) => findModel(s.providers, agent, modelId));
+  const providers = useDeviceProviders(device);
+  const model = findModel(providers, agent, modelId);
   const efforts = model && model.efforts.length > 0 ? model.efforts : [...DEFAULT_EFFORTS];
   // Families (Antigravity): the level actually used is the one of the selected variant.
   const family = model?.effortModels ?? null;

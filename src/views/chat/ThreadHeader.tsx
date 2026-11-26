@@ -6,6 +6,7 @@ import { FolderKanban, FolderOpen, MoreHorizontal, Pencil, Square, Trash2 } from
 import { AgentLogo } from "@/components/ui/AgentLogo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DeviceBadge } from "@/components/ui/DeviceBadge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +25,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { AGENTS } from "@/lib/agents";
+import { deviceOfThread } from "@/lib/deviceRouting";
 import { HeaderUsage } from "./HeaderUsage";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { openFolder } from "@/lib/openFolder";
@@ -32,7 +34,7 @@ import { useChat } from "@/stores/chat";
 import { useChatDeletion } from "@/stores/chatDeletion";
 import { useLive } from "@/stores/live";
 import { effortLabel } from "@/lib/models";
-import { findModel, useModels } from "@/stores/models";
+import { findModel, useDeviceProviders } from "@/stores/models";
 import { toast } from "@/stores/toast";
 import { useUi } from "@/stores/ui";
 import { t } from "@/i18n";
@@ -87,6 +89,7 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
   const displayTitle = activePending ?? live.title;
   const statusMeta = STATUS[live.status];
   const agentMeta = AGENTS[live.agent];
+  const device = deviceOfThread(threadId);
 
   const startEdit = () => {
     settledRef.current = false;
@@ -161,7 +164,14 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
               <Pencil className="size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
             </button>
           )}
-          <HeaderMeta agentLabel={agentMeta.label} agent={live.agent} model={live.model} effort={live.effort} cwd={live.cwd} />
+          <HeaderMeta
+            agentLabel={agentMeta.label}
+            agent={live.agent}
+            model={live.model}
+            effort={live.effort}
+            cwd={live.cwd}
+            device={device}
+          />
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
@@ -201,7 +211,7 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
                 <Pencil />
                 {t("chat.rename")}
               </DropdownMenuItem>
-              {live.cwd && (
+              {live.cwd && !device && (
                 <DropdownMenuItem onClick={() => live.cwd && void openFolder(live.cwd)}>
                   <FolderOpen />
                   {t("common.openFolder")}
@@ -226,21 +236,24 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
   );
 });
 
-/** "Claude Code · Claude Opus 5.5 · Élevé · 📁 neuron" */
+/** "Claude Code · Claude Opus 5.5 · Élevé · [PC] · 📁 neuron" */
 const HeaderMeta = memo(function HeaderMeta({
   agentLabel,
   agent,
   model,
   effort,
   cwd,
+  device,
 }: {
   agentLabel: string;
   agent: Parameters<typeof findModel>[1];
   model: string | null;
   effort: string | null;
   cwd: string | null;
+  device: string | null;
 }) {
-  const modelInfo = useModels((s) => findModel(s.providers, agent, model));
+  const providers = useDeviceProviders(device);
+  const modelInfo = findModel(providers, agent, model);
   // Antigravity families: the level is the selected variant's.
   const level =
     (modelInfo?.effortModels ? Object.entries(modelInfo.effortModels).find(([, id]) => id === model)?.[0] : undefined) ??
@@ -251,24 +264,36 @@ const HeaderMeta = memo(function HeaderMeta({
   return (
     <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
       <span className="truncate">{parts.join(" · ")}</span>
+      <DeviceBadge device={device} />
       {cwd && (
         <TooltipProvider delayDuration={300}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={() => void openFolder(cwd)}
-                aria-label={t("chat.openFolderOf", { path: cwd })}
-                className="inline-flex min-w-0 shrink items-center gap-1 rounded-sm outline-none transition-colors duration-150 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-              >
-                <span aria-hidden>·</span>
-                <FolderOpen className="size-3 shrink-0" />
-                <span className="truncate font-mono">{folderName(cwd)}</span>
-              </button>
+              {device ? (
+                <span
+                  tabIndex={0}
+                  className="inline-flex min-w-0 shrink items-center gap-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                >
+                  <span aria-hidden>·</span>
+                  <FolderOpen className="size-3 shrink-0" />
+                  <span className="truncate font-mono">{folderName(cwd)}</span>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void openFolder(cwd)}
+                  aria-label={t("chat.openFolderOf", { path: cwd })}
+                  className="inline-flex min-w-0 shrink items-center gap-1 rounded-sm outline-none transition-colors duration-150 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                >
+                  <span aria-hidden>·</span>
+                  <FolderOpen className="size-3 shrink-0" />
+                  <span className="truncate font-mono">{folderName(cwd)}</span>
+                </button>
+              )}
             </TooltipTrigger>
             <TooltipContent className="max-w-md flex-col items-start gap-0.5 break-all">
               <span className="font-mono">{cwd}</span>
-              <span className="block opacity-70">{t("common.openFolder")}</span>
+              {!device && <span className="block opacity-70">{t("common.openFolder")}</span>}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

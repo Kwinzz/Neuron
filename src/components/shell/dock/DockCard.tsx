@@ -4,11 +4,13 @@ import { ArrowUpRight, GitFork, Square } from "lucide-react";
 import { AgentLogo } from "@/components/ui/AgentLogo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DeviceBadge } from "@/components/ui/DeviceBadge";
 import { LiveTimer } from "@/components/ui/LiveTimer";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { useNow } from "@/hooks/useNow";
 import { type MessageKey, t } from "@/i18n";
 import { AGENTS } from "@/lib/agents";
+import { deviceOfThread } from "@/lib/deviceRouting";
 import { formatRelative, formatTokens } from "@/lib/format";
 import { STATUS, TONE_TEXT } from "@/lib/status";
 import { EMPTY_SUBAGENTS, useActivity } from "@/stores/activity";
@@ -44,6 +46,7 @@ export const DockCard = memo(function DockCard({ id }: { id: string }) {
   const attn = attention ? ATTENTION_LABEL[attention] : null;
   const title = thread.title || t("common.untitledChat");
   const agentLabel = AGENTS[thread.agent].label;
+  const device = deviceOfThread(id);
 
   const openChat = () => {
     useUi.getState().focusThread(id);
@@ -81,6 +84,7 @@ export const DockCard = memo(function DockCard({ id }: { id: string }) {
         <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground" title={title}>
           {title}
         </span>
+        <DeviceBadge device={device} compact />
         {attn && (
           <Badge
             variant="outline"

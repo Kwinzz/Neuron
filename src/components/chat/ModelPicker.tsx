@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useState } from "react";
 import { Check, ChevronDown, RefreshCw } from "lucide-react";
 import { cn } from "cn";
 import type { AgentKind } from "@/bindings/AgentKind";
@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AGENTS } from "@/lib/agents";
-import { findModel, useModels } from "@/stores/models";
+import { findModel, useDeviceModelsLoading, useDeviceProviders, useModels } from "@/stores/models";
 import { t } from "@/i18n";
 
 interface ModelPickerProps {
@@ -24,6 +24,8 @@ interface ModelPickerProps {
   model: string | null;
   /** `model` null = provider default. */
   onChange: (agent: AgentKind, model: ModelInfo | null) => void;
+  /** Remote device node id, or null for this PC. */
+  device?: string | null;
   /** Existing chat: the provider can't change (a different CLI = a new chat). */
   lockAgent?: boolean;
   disabled?: boolean;
@@ -39,6 +41,7 @@ export const ModelPicker = memo(function ModelPicker({
   agent,
   model,
   onChange,
+  device = null,
   lockAgent,
   disabled,
   open: openProp,
@@ -51,12 +54,8 @@ export const ModelPicker = memo(function ModelPicker({
     if (openProp === undefined) setOpenState(next);
     onOpenChange?.(next);
   };
-  const providers = useModels((s) => s.providers);
-  const loading = useModels((s) => s.loading);
-
-  useEffect(() => {
-    void useModels.getState().load();
-  }, []);
+  const providers = useDeviceProviders(device);
+  const loading = useDeviceModelsLoading(device);
 
   const current = findModel(providers, agent, model);
   const label = current?.label ?? model ?? t("chat.agentDefault", { agent: AGENTS[agent].label });
@@ -142,7 +141,7 @@ export const ModelPicker = memo(function ModelPicker({
               variant="ghost"
               size="sm"
               className="h-6 gap-1 px-1.5 text-xs"
-              onClick={() => void useModels.getState().load(true)}
+              onClick={() => void useModels.getState().loadFor(device, true)}
               disabled={loading}
             >
               <RefreshCw className={cn("size-3", loading && "animate-spin")} />

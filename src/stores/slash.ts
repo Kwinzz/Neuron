@@ -1,4 +1,4 @@
-/** Slash commands per provider + folder, fetched once (the backend caches 15 min too). */
+/** Slash commands per device + provider + folder, fetched once (the backend caches 15 min too). */
 import { create } from "zustand";
 import type { AgentKind } from "@/bindings/AgentKind";
 import type { SlashCommand } from "@/bindings/SlashCommand";
@@ -11,20 +11,21 @@ interface Entry {
 
 interface SlashState {
   entries: Record<string, Entry>;
-  load: (agent: AgentKind, cwd: string | null) => void;
+  load: (agent: AgentKind, cwd: string | null, device?: string | null) => void;
 }
 
-export const slashKey = (agent: AgentKind, cwd: string | null) => `${agent}|${cwd ?? ""}`;
+export const slashKey = (agent: AgentKind, cwd: string | null, device: string | null = null) =>
+  `${device ?? ""}|${agent}|${cwd ?? ""}`;
 export const EMPTY_COMMANDS: SlashCommand[] = [];
 
 export const useSlash = create<SlashState>((set, get) => ({
   entries: {},
-  load: (agent, cwd) => {
-    const key = slashKey(agent, cwd);
+  load: (agent, cwd, device = null) => {
+    const key = slashKey(agent, cwd, device);
     if (!isTauri() || get().entries[key]) return;
     set((s) => ({ entries: { ...s.entries, [key]: { commands: EMPTY_COMMANDS, loading: true } } }));
     ipc
-      .listSlashCommands(agent, cwd)
+      .listSlashCommands(agent, cwd, device)
       .catch(() => EMPTY_COMMANDS)
       .then((commands) => set((s) => ({ entries: { ...s.entries, [key]: { commands, loading: false } } })));
   },
