@@ -1,10 +1,12 @@
 //! Remote devices: settings, pairing, paired devices and calls to a paired host (see `crate::remote`).
 
+use base64::Engine;
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{Value, json};
 use tauri::{AppHandle, State};
 use ts_rs::TS;
 
+use crate::attachments::{self, Attachment, SharedFile};
 use crate::db::remote::{self as store, AccessLevel, RemoteClient, RemoteHost};
 use crate::error::{AppError, AppResult};
 use crate::remote::node::NearbyDevice;
@@ -190,6 +192,16 @@ pub async fn remote_forget(app: AppHandle, state: State<'_, AppState>, node_id: 
     Ok(())
 }
 
+/// The node, for a device this one controls (never dials an id that was not paired).
+async fn host_node(app: &AppHandle, state: &AppState, device: &str) -> AppResult<std::sync::Arc<remote::node::Node>> {
+    let probe = device.to_string();
+    let paired = state.db.call(move |c| Ok(store::list_hosts(c)?.iter().any(|h| h.node_id == probe))).await?;
+    if !paired {
+        return Err(AppError::NotFound(crate::tr!("appareil non appairé", "device not paired")));
+    }
+    state.remote.ensure(app).await
+}
+
 /// A command run on a paired host (same name and arguments as the local `invoke`); its result as JSON.
 #[tauri::command]
 pub async fn remote_call(
@@ -199,11 +211,73 @@ pub async fn remote_call(
     method: String,
     args: Option<Value>,
 ) -> AppResult<Value> {
-    let probe = device.clone();
-    let paired = state.db.call(move |c| Ok(store::list_hosts(c)?.iter().any(|h| h.node_id == probe))).await?;
-    if !paired {
-        return Err(AppError::NotFound(crate::tr!("appareil non appairé", "device not paired")));
-    }
-    let node = state.remote.ensure(&app).await?;
+    let node = host_node(&app, &state, &device).await?;
     node.call(&device, RpcRequest { method, args: args.unwrap_or(Value::Null) }).await
+}
+
+/// Files attached on this device to a message for a chat of a paired host: copied there (like a pasted file);
+/// returns the host's copies, to send with the message.
+#[tauri::command]
+pub async fn remote_upload_attachments(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    device: String,
+    attachments: Vec<Attachment>,
+) -> AppResult<Vec<Attachment>> {
+    let node = host_node(&app, &state, &device).await?;
+    let root = attachments::root(&state.paths.data_dir);
+    let mut uploaded = Vec::new();
+    for a in attachments::validate(&root, &attachments)? {
+        if a.size > attachments::MAX_SHARED {
+            let max = attachments::MAX_SHARED / 1_048_576;
+            return Err(AppError::Invalid(crate::tr!(
+                "{} : trop lourd pour un autre appareil (max {max} Mo)",
+                "{}: too large for another device (max {max} MB)",
+                a.name
+            )));
+        }
+        let data = base64::engine::general_purpose::STANDARD.encode(tokio::fs::read(&a.path).await?);
+        let args = json!({ "name": a.name, "mime": a.mime, "data": data });
+        let copy = node.call(&device, RpcRequest { method: "paste_attachment".into(), args }).await?;
+        uploaded.push(serde_json::from_value(copy)?);
+    }
+    Ok(uploaded)
+}
+
+/// Files of a chat on a paired host (attachments, images its agent made), copied into a local cache once so the
+/// chat displays them. A file the host refuses or can't send is left out.
+#[tauri::command]
+pub async fn remote_fetch_attachments(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    device: String,
+    thread_id: String,
+    attachments: Vec<Attachment>,
+) -> AppResult<Vec<Attachment>> {
+    let node = host_node(&app, &state, &device).await?;
+    // Inside the attachments folder: the webview may load it (asset protocol scope).
+    let cache = attachments::root(&state.paths.data_dir).join("remote").join(device.get(..16).unwrap_or(&device));
+    let mut local = Vec::new();
+    for a in attachments {
+        let key = blake3::hash(a.path.as_bytes()).to_hex();
+        let path = cache.join(&key.as_str()[..16]).join(attachments::safe_name(&a.name));
+        if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
+            let args = json!({ "threadId": thread_id, "path": a.path });
+            let fetched = node.call(&device, RpcRequest { method: "read_attachment".into(), args }).await;
+            let file: SharedFile = match fetched.and_then(|v| Ok(serde_json::from_value(v)?)) {
+                Ok(file) => file,
+                Err(err) => {
+                    tracing::debug!(%err, name = %a.name, "remote: attachment not fetched");
+                    continue;
+                }
+            };
+            let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(file.data) else { continue };
+            if let Some(dir) = path.parent() {
+                tokio::fs::create_dir_all(dir).await?;
+            }
+            tokio::fs::write(&path, bytes).await?;
+        }
+        local.push(Attachment { path: path.display().to_string(), ..a });
+    }
+    Ok(local)
 }

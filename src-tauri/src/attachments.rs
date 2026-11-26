@@ -88,7 +88,7 @@ pub fn local_image(path: &str, cwd: Option<&Path>) -> Option<Attachment> {
 }
 
 /// Keep a readable, filesystem-safe file name.
-fn safe_name(name: &str) -> String {
+pub fn safe_name(name: &str) -> String {
     let base = Path::new(name).file_name().and_then(|n| n.to_str()).unwrap_or("fichier");
     let cleaned: String =
         base.chars().map(|c| if c.is_control() || r#"<>:"/\|?*"#.contains(c) { '_' } else { c }).collect();
@@ -159,6 +159,39 @@ pub fn validate(root: &Path, list: &[Attachment]) -> AppResult<Vec<Attachment>> 
             Ok(a.clone())
         })
         .collect()
+}
+
+/// Largest file sent to a paired device in one piece (base64 inside one JSON message).
+pub const MAX_SHARED: u64 = 20 * 1024 * 1024;
+
+/// A file sent to (or received from) a paired device, as base64.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SharedFile {
+    pub name: String,
+    pub mime: String,
+    pub data: String,
+}
+
+/// A file a paired device asks to display: only one of Neuron's attachment copies, or an image inside the chat's
+/// folder — never any other file of this machine.
+pub fn read_shared(root: &Path, cwd: Option<&Path>, path: &str) -> AppResult<SharedFile> {
+    let refused = || AppError::Invalid(crate::tr!("fichier non partagé : {path}", "file not shared: {path}"));
+    let full = Path::new(path).canonicalize().map_err(|_| refused())?;
+    let name = full.file_name().and_then(|n| n.to_str()).ok_or_else(refused)?.to_string();
+    let mime = mime_of(&name);
+    let in_attachments = root.canonicalize().is_ok_and(|r| full.starts_with(r));
+    let image_of_the_chat =
+        is_displayable_image(mime) && cwd.and_then(|c| c.canonicalize().ok()).is_some_and(|c| full.starts_with(c));
+    if !in_attachments && !image_of_the_chat {
+        return Err(refused());
+    }
+    let meta = std::fs::metadata(&full)?;
+    if !meta.is_file() || meta.len() > MAX_SHARED {
+        return Err(AppError::Invalid(crate::tr!("fichier trop lourd : {name}", "file too large: {name}")));
+    }
+    let data = base64::engine::general_purpose::STANDARD.encode(std::fs::read(&full)?);
+    Ok(SharedFile { name, mime: mime.to_string(), data })
 }
 
 /// Base64 content of an image small enough to be sent inline.
@@ -235,5 +268,27 @@ mod tests {
         assert!(local_image("fox.png", None).is_none(), "relative path without a folder");
         assert!(local_image("https://example.com/a.png", Some(&dir)).is_none(), "remote");
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn shared_files_are_attachments_or_images_of_the_chat() {
+        let base = std::env::temp_dir().join(format!("neuron-shared-{}", uuid::Uuid::new_v4().simple()));
+        let (root, cwd, elsewhere) = (base.join("attachments"), base.join("project"), base.join("other"));
+        for d in [&root, &cwd, &elsewhere] {
+            std::fs::create_dir_all(d).unwrap();
+        }
+        let pasted = save_base64(&root, "note.txt", "text/plain", "aGVsbG8=").unwrap();
+        std::fs::write(cwd.join("chart.png"), b"png").unwrap();
+        std::fs::write(cwd.join("secret.env"), b"KEY=1").unwrap();
+        std::fs::write(elsewhere.join("photo.png"), b"png").unwrap();
+
+        let file = read_shared(&root, Some(&cwd), &pasted.path).unwrap();
+        assert_eq!((file.name.as_str(), file.data.as_str()), ("note.txt", "aGVsbG8="));
+        assert!(read_shared(&root, Some(&cwd), &cwd.join("chart.png").display().to_string()).is_ok());
+        // Not an image of the chat, outside the chat, or no chat folder: refused.
+        assert!(read_shared(&root, Some(&cwd), &cwd.join("secret.env").display().to_string()).is_err());
+        assert!(read_shared(&root, Some(&cwd), &elsewhere.join("photo.png").display().to_string()).is_err());
+        assert!(read_shared(&root, None, &cwd.join("chart.png").display().to_string()).is_err());
+        let _ = std::fs::remove_dir_all(base);
     }
 }

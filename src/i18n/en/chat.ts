@@ -28,8 +28,6 @@ const chat: Translation<typeof fr> = {
   composerPlaceholder: "Ask the agent something… (Enter to send, Shift+Enter for a new line, ↑ history)",
   attachFiles: "Attach files",
   attachFilesHint: "Attach files (or paste an image)",
-  attachFilesRemoteDisabled:
-    "Attaching files to another device is coming soon — paste images with Ctrl+V",
   attachmentRejected: "Attachment rejected",
   pickFailed: "Couldn't pick files",
   stopAgent: "Stop the agent",

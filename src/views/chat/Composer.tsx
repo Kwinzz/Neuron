@@ -1,7 +1,6 @@
 import {
   type ChangeEvent,
   type ClipboardEvent,
-  type DragEvent,
   type KeyboardEvent,
   memo,
   useCallback,
@@ -31,7 +30,6 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from "@/components/ui/input-group";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ThreadSettingsBar } from "@/components/chat/ThreadSettingsBar";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { toast } from "@/stores/toast";
@@ -118,7 +116,6 @@ export const Composer = memo(function Composer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const device = slashDevice !== undefined ? slashDevice : threadId ? deviceOfThread(threadId) : null;
-  const isRemote = device !== null;
   const prevDeviceRef = useRef(device);
   useEffect(() => {
     if (prevDeviceRef.current !== device) {
@@ -229,7 +226,6 @@ export const Composer = memo(function Composer({
   };
 
   const pickFiles = async () => {
-    if (isRemote) return;
     let paths: string[];
     try {
       paths = await ipc.pickFiles();
@@ -240,18 +236,6 @@ export const Composer = memo(function Composer({
     if (paths.length > 0) void addAttachments(paths.length, () => ipc.importAttachments(paths));
   };
 
-  // File drop onto a remote chat is disabled until remote file transfer exists.
-  const onDragOver = (e: DragEvent<HTMLDivElement>) => {
-    if (!isRemote || !e.dataTransfer.types.includes("Files")) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "none";
-  };
-
-  const onDrop = (e: DragEvent<HTMLDivElement>) => {
-    if (!isRemote || e.dataTransfer.files.length === 0) return;
-    e.preventDefault();
-  };
-
   // Pasted images (screenshots) and files copied from the explorer become attachments; text pastes normally.
   const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
     const files = Array.from(e.clipboardData.files);
@@ -260,7 +244,7 @@ export const Composer = memo(function Composer({
     void addAttachments(files.length, () =>
       Promise.all(
         files.map(async (file) =>
-          ipc.pasteAttachment(pastedName(file), file.type, toBase64(await file.arrayBuffer()), device),
+          ipc.pasteAttachment(pastedName(file), file.type, toBase64(await file.arrayBuffer())),
         ),
       ),
     );
@@ -394,8 +378,6 @@ export const Composer = memo(function Composer({
             </div>
           )}
           <InputGroup
-            onDragOver={onDragOver}
-            onDrop={onDrop}
             className="rounded-xl bg-card shadow-sm transition-[border-color,box-shadow,background-color] duration-200 ease-snappy dark:bg-card"
           >
             {(attachments.length > 0 || importing > 0) && (
@@ -420,35 +402,16 @@ export const Composer = memo(function Composer({
             />
             <InputGroupAddon align="block-end">
               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
-                {isRemote ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="inline-flex cursor-not-allowed">
-                        <InputGroupButton
-                          variant="ghost"
-                          size="icon-sm"
-                          disabled
-                          className="pointer-events-none rounded-full text-muted-foreground"
-                          aria-label={t("chat.attachFilesRemoteDisabled")}
-                        >
-                          <Plus />
-                        </InputGroupButton>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>{t("chat.attachFilesRemoteDisabled")}</TooltipContent>
-                  </Tooltip>
-                ) : (
-                  <InputGroupButton
-                    variant="ghost"
-                    size="icon-sm"
-                    className="rounded-full text-muted-foreground hover:text-foreground"
-                    aria-label={t("chat.attachFiles")}
-                    title={t("chat.attachFilesHint")}
-                    onClick={() => void pickFiles()}
-                  >
-                    <Plus />
-                  </InputGroupButton>
-                )}
+                <InputGroupButton
+                  variant="ghost"
+                  size="icon-sm"
+                  className="rounded-full text-muted-foreground hover:text-foreground"
+                  aria-label={t("chat.attachFiles")}
+                  title={t("chat.attachFilesHint")}
+                  onClick={() => void pickFiles()}
+                >
+                  <Plus />
+                </InputGroupButton>
                 {toolbar ?? (threadId ? <ThreadSettingsBar threadId={threadId} /> : null)}
               </div>
               <div className="ml-auto flex items-center gap-1.5">

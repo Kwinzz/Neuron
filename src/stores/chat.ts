@@ -76,7 +76,8 @@ function reduce(items: ChatItem[], { ts, event }: AgentEventEnvelope): ChatItem[
             id: event.messageId,
             text: event.text,
             ts,
-            attachments: event.attachments,
+            // The sender's own copies: for a chat of another device, the event lists that device's paths.
+            attachments: it.attachments,
           });
         }
       }

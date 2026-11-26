@@ -39,7 +39,8 @@ pub fn required_level(method: &str, args: &Value) -> Option<AccessLevel> {
         | "project_overview"
         | "thread_context"
         | "list_memories"
-        | "search_memories" => Read,
+        | "search_memories"
+        | "read_attachment" => Read,
         "create_thread" => {
             // A folder of the remote device's choosing (not one of its projects) = run an agent anywhere.
             let anywhere = args.pointer("/input/cwd").is_some_and(|v| !v.is_null());
@@ -75,6 +76,24 @@ fn arg<T: DeserializeOwned>(args: &Value, key: &str) -> AppResult<T> {
 
 fn json<T: serde::Serialize>(value: T) -> AppResult<Value> {
     Ok(serde_json::to_value(value)?)
+}
+
+/// A file of a chat (attachment, image its agent made) for a paired device to display.
+async fn read_attachment(
+    app: &AppHandle,
+    thread_id: String,
+    path: String,
+) -> AppResult<crate::attachments::SharedFile> {
+    let state = app.state::<AppState>();
+    let root = crate::attachments::root(&state.paths.data_dir);
+    let id = thread_id.clone();
+    let thread = state
+        .db
+        .call(move |c| crate::db::threads::get(c, &id))
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("thread {thread_id}")))?;
+    let cwd = thread.cwd.map(std::path::PathBuf::from);
+    tokio::task::spawn_blocking(move || crate::attachments::read_shared(&root, cwd.as_deref(), &path)).await?
 }
 
 /// Runs a remote call with the caller's level.
@@ -140,6 +159,8 @@ pub async fn call(app: &AppHandle, level: AccessLevel, method: &str, args: Value
         "delete_project" => json(threads::delete_project(s(), arg(a, "projectId")?).await?),
         "list_models" => json(threads::list_models(s(), arg(a, "refresh")?).await?),
         "agent_images" => json(threads::agent_images(app.clone(), s(), arg(a, "threadId")?, arg(a, "paths")?).await?),
+
+        "read_attachment" => json(read_attachment(&app, arg(a, "threadId")?, arg(a, "path")?).await?),
 
         "agent_access" => json(crate::commands::access::agent_access(arg(a, "refresh")?).await?),
 

@@ -159,6 +159,31 @@ function byRecent(a: ThreadSummary, b: ThreadSummary): number {
   return b.updatedAt - a.updatedAt;
 }
 
+/** Local attachments of a message for a chat of `device`: copied there first (their copies on that device). */
+async function toDevice(device: string | null, attachments: Attachment[]): Promise<Attachment[]> {
+  if (!device || attachments.length === 0) return attachments;
+  return invoke<Attachment[]>("remote_upload_attachments", { device, attachments });
+}
+
+/** Files of a chat of another device (its paths), copied into a local cache so the webview can show them. */
+async function fromDevice(threadId: string, attachments: Attachment[]): Promise<Attachment[]> {
+  const device = deviceOfThread(threadId);
+  if (!device || attachments.length === 0) return attachments;
+  return invoke<Attachment[]>("remote_fetch_attachments", { device, threadId, attachments });
+}
+
+/** History of a chat of another device: its user attachments made local (fetched once, then cached). */
+async function localHistory(threadId: string, items: ChatItem[]): Promise<ChatItem[]> {
+  if (!deviceOfThread(threadId) || !items.some((it) => it.kind === "user" && it.attachments.length > 0)) return items;
+  return Promise.all(
+    items.map(async (it) =>
+      it.kind === "user" && it.attachments.length > 0
+        ? { ...it, attachments: await fromDevice(threadId, it.attachments).catch(() => it.attachments) }
+        : it,
+    ),
+  );
+}
+
 function isAgentEnvelope(value: unknown): value is AgentEventEnvelope {
   return (
     typeof value === "object" &&
@@ -213,18 +238,23 @@ export const ipc = {
   // Threads & chat
   /** On this device, or on `device` (a project's chats are created on the project's device). */
   createThread: async (input: NewThreadInput, device: string | null = deviceOfProject(input.projectId)) => {
-    const chat = await call<ThreadSummary>(device, "create_thread", { input });
+    const attachments = await toDevice(device, input.attachments);
+    const chat = await call<ThreadSummary>(device, "create_thread", { input: { ...input, attachments } });
     rememberThread(device, chat.id);
     return chat;
   },
-  sendMessage: (threadId: string, text: string, attachments: Attachment[] = []) =>
-    call<void>(deviceOfThread(threadId), "send_message", { threadId, text, attachments }),
+  sendMessage: async (threadId: string, text: string, attachments: Attachment[] = []) => {
+    const device = deviceOfThread(threadId);
+    return call<void>(device, "send_message", { threadId, text, attachments: await toDevice(device, attachments) });
+  },
   /** Slash commands of a provider in a folder (« / » menu; cached 15 min server-side). */
   listSlashCommands: (agent: AgentKind, cwd: string | null, device: string | null = null) =>
     call<SlashCommand[]>(device, "list_slash_commands", { agent, cwd }),
   /** Existing image files among the paths an agent mentioned in a chat (served to the webview). */
   agentImages: (threadId: string, paths: string[]) =>
-    call<Attachment[]>(deviceOfThread(threadId), "agent_images", { threadId, paths }),
+    call<Attachment[]>(deviceOfThread(threadId), "agent_images", { threadId, paths }).then((found) =>
+      fromDevice(threadId, found),
+    ),
   /** Copy files into Neuron's attachments folder (« + » button). */
   importAttachments: (paths: string[]) => invoke<Attachment[]>("import_attachments", { paths }),
   /** Save a pasted image (base64 without the data: prefix). */
@@ -247,7 +277,8 @@ export const ipc = {
     answers: Record<string, string> | null = null,
   ) => call<void>(deviceOfThread(threadId), "respond_permission", { threadId, requestId, allow, mode, answers }),
   stopThread: (threadId: string) => call<void>(deviceOfThread(threadId), "stop_thread", { threadId }),
-  threadHistory: (threadId: string) => call<ChatItem[]>(deviceOfThread(threadId), "get_thread_history", { threadId }),
+  threadHistory: async (threadId: string) =>
+    localHistory(threadId, await call<ChatItem[]>(deviceOfThread(threadId), "get_thread_history", { threadId })),
   renameThread: (threadId: string, title: string) =>
     call<void>(deviceOfThread(threadId), "rename_thread", { threadId, title }),
   deleteThread: (threadId: string) => call<void>(deviceOfThread(threadId), "delete_thread", { threadId }),
@@ -336,6 +367,14 @@ export const events = {
       const { device, channel, payload } = e.payload;
       if (channel !== AGENT_EVENT_CHANNEL || !isAgentEnvelope(payload)) return;
       rememberThread(device, payload.threadId);
+      const { event } = payload;
+      // A message with files typed on that device: show local copies (the sender's own bubble keeps its copies).
+      if (event.kind === "UserMessage" && event.attachments.length > 0) {
+        void fromDevice(payload.threadId, event.attachments)
+          .catch(() => event.attachments)
+          .then((attachments) => handler({ ...payload, event: { ...event, attachments } }));
+        return;
+      }
       handler(payload);
     });
     return () => {

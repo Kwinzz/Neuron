@@ -167,6 +167,8 @@ pub fn run() {
             commands::remote::remote_revoke,
             commands::remote::remote_forget,
             commands::remote::remote_call,
+            commands::remote::remote_upload_attachments,
+            commands::remote::remote_fetch_attachments,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Neuron");
