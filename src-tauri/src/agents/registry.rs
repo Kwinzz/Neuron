@@ -55,6 +55,8 @@ pub struct AgentRegistry {
     adapters: HashMap<AgentKind, Arc<dyn AgentAdapter>>,
     /// Serializes session spawning (avoids double spawn on fast double-send).
     spawn_lock: tokio::sync::Mutex<u64>,
+    /// Chats stopped while their process was still being started: their prompt is never sent.
+    pending_stops: Mutex<std::collections::HashSet<String>>,
     /// Neuron executable + memory paths: every session gets the memory MCP server (None in tests).
     mcp: Option<(PathBuf, crate::memory::MemoryPaths)>,
 }
@@ -158,7 +160,13 @@ impl AgentRegistry {
         adapters.insert(AgentKind::Antigravity, Arc::new(AntigravityAdapter::default()));
         adapters.insert(AgentKind::Codex, Arc::new(CodexAdapter::default()));
         adapters.insert(AgentKind::Generic, Arc::new(GenericAdapter));
-        Self { sessions: Mutex::new(HashMap::new()), adapters, spawn_lock: tokio::sync::Mutex::new(0), mcp }
+        Self {
+            sessions: Mutex::new(HashMap::new()),
+            adapters,
+            spawn_lock: tokio::sync::Mutex::new(0),
+            pending_stops: Mutex::new(std::collections::HashSet::new()),
+            mcp,
+        }
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, HashMap<String, ActiveSession>> {
@@ -263,6 +271,8 @@ impl AgentRegistry {
             text
         };
         emit(app, thread_id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::Starting, detail: None });
+        // A stop from before this message must not cancel it.
+        self.pending_stops.lock().unwrap_or_else(std::sync::PoisonError::into_inner).remove(thread_id);
 
         for attempt in 0..2 {
             let sender = match self.ensure_session(app, db, &runtime).await {
@@ -293,6 +303,11 @@ impl AgentRegistry {
                 }
                 Err(err) => return Err(err),
             };
+            // Stopped while the process was starting: keep it (the next message reuses it) but never send this one.
+            if self.pending_stops.lock().unwrap_or_else(std::sync::PoisonError::into_inner).remove(thread_id) {
+                tracing::info!(thread = %thread_id, "prompt dropped: stopped while the agent was starting");
+                return Ok(());
+            }
             let turn = crate::agents::UserTurn { text: text.clone(), attachments: attachments.clone() };
             if sender.send(SessionCommand::Prompt(turn)).is_ok() {
                 if let Some(s) = self.lock().get_mut(thread_id) {
@@ -474,7 +489,27 @@ impl AgentRegistry {
     pub fn stop(self: &Arc<Self>, app: &AppHandle, db: &Db, thread_id: &str) -> AppResult<()> {
         let pid = {
             let mut sessions = self.lock();
-            let Some(session) = sessions.get_mut(thread_id) else { return Ok(()) };
+            let Some(session) = sessions.get_mut(thread_id) else {
+                // No process yet (still starting): remember the stop and end the turn now.
+                drop(sessions);
+                self.pending_stops
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .insert(thread_id.to_string());
+                let (db, id, app) = (db.clone(), thread_id.to_string(), app.clone());
+                tauri::async_runtime::spawn(async move {
+                    let tid = id.clone();
+                    let _ = db
+                        .call(move |c| {
+                            let now = now_ms();
+                            chat::close_dangling_tools(c, &tid, now)?;
+                            threads::set_status(c, &tid, ThreadStatus::Cancelled, now)
+                        })
+                        .await;
+                    emit(&app, &id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::Cancelled, detail: None });
+                });
+                return Ok(());
+            };
             session.stop_requested = true;
             // Deny pending permissions so the agent is not left waiting.
             for (request_id, (_, input)) in session.pending.drain() {
@@ -858,8 +893,9 @@ impl AgentRegistry {
                     };
                     let was_active = last_status.as_ref().is_some_and(|(s, _)| s.is_active());
                     tracing::info!(thread = %id, ?code, was_active, "agent session exited");
-                    if was_active && stopped && !shutdown {
-                        // Stop on an agent without an interrupt message = kill: that's a cancellation.
+                    if stopped && !shutdown {
+                        // Stop on an agent without an interrupt message = kill: that's a cancellation — also when
+                        // it was killed before reporting anything (Antigravity still starting: no status yet).
                         let tid = id.clone();
                         persist!(move |c| {
                             let now = now_ms();
