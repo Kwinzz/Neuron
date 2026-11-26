@@ -84,7 +84,6 @@ export const DockCard = memo(function DockCard({ id }: { id: string }) {
         <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground" title={title}>
           {title}
         </span>
-        <DeviceBadge device={device} compact />
         {attn && (
           <Badge
             variant="outline"
@@ -141,6 +140,7 @@ export const DockCard = memo(function DockCard({ id }: { id: string }) {
       <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
         <StatusDot status={thread.status} />
         <span className={cn("shrink-0", TONE_TEXT[meta.tone])}>{meta.label}</span>
+        {device && <DeviceBadge device={device} className="max-w-28 text-[11px]" />}
         {thread.projectName && (
           <>
             <span aria-hidden>·</span>

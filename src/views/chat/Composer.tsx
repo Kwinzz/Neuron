@@ -356,7 +356,12 @@ export const Composer = memo(function Composer({
   };
 
   return (
-    <div className="sticky bottom-0 z-10 -mx-4 bg-linear-to-t from-background via-background/90 to-transparent px-4 pb-4 pt-6 md:-mx-6 md:px-6">
+    // Opaque from the input card down: the chat never shows through it. Only a short fade above it.
+    <div className="sticky bottom-0 z-10 -mx-4 bg-background px-4 pb-4 pt-2 md:-mx-6 md:px-6">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-full h-6 bg-linear-to-t from-background to-transparent"
+      />
       <div className={cn("mx-auto w-full max-w-3xl", timelineGutter && "pl-10")}>
         <div className="relative">
           {slashOpen && agent && (
