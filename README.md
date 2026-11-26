@@ -32,13 +32,14 @@ Neuron contains no AI of its own: it runs the CLIs installed on your computer, w
 1. Download the `Neuron_<version>_x64-setup.exe` installer from the
    [latest release](https://github.com/Kwinzz/Neuron/releases/latest).
 2. Run it and accept the administrator prompt (installs into *Program Files*).
-3. Pick the language (English or French) at the start of the installer, then whether Neuron starts with Windows,
-   and launch it from the Start menu.
+3. Pick the language (English or French) at the start of the installer, then whether Neuron starts with Windows
+   and whether to add the `neuron` command to the terminal, and launch it from the Start menu.
 
 > Windows SmartScreen may say « Windows protected your PC » (the installer isn't signed): click
 > **More info** → **Run anyway**.
 
-Update: download the new version and run it, it replaces the old one (your data is kept).
+Update: Neuron tells you when a new version is out (**Settings → Updates**, or `neuron update` in a terminal) and
+installs it in one click; your data and choices are kept. You can also download the new installer and run it.
 
 > The release may lag a little behind the code in this repository: to get the very latest version, build it
 > (below).
@@ -139,6 +140,28 @@ for a `.rpm`). For other distributions, see the [Tauri prerequisites for Linux](
   after editing `~/.bashrc`, `~/.zshrc` or your fish config.
 
 More details: [`packaging/arch/README.md`](packaging/arch/README.md).
+
+---
+
+## Run Neuron on a server (no screen)
+
+Neuron can run on a machine without a desktop (a Debian box on your network, a VPS) and be driven from the Neuron
+app on your PC: its chats then appear in your sidebar, under **Devices**.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh | bash   # install (as for Linux)
+neuron service install            # runs in the background, starts with the machine (systemd user service)
+neuron remote enable --internet   # let your other devices control it (--internet: from outside the network too)
+neuron remote code                # shows a 6-digit code and an invitation to enter on your PC
+```
+
+On your PC: **Settings → Devices → Add a device**, then pick the server on your network and type the code, or paste
+the invitation under « Pair with an invitation » (turn on « Reachable outside the local network » first).
+Sign the agents in on the server once (`claude`, `codex login`…); `neuron status` shows what is installed.
+
+Other commands: `neuron serve` (run in the foreground instead of the service), `neuron remote devices`,
+`neuron remote level <device> read|chat|full`, `neuron remote revoke <device>`, `neuron update`, `neuron help`.
+Logs: `journalctl --user -u neuron -f`. Firewall: allow UDP port 47831 (`ufw allow 47831/udp`).
 
 ---
 
