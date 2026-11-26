@@ -142,6 +142,8 @@ pub fn run() {
             commands::projects::save_project_context,
             commands::projects::project_overview,
             commands::projects::thread_context,
+            commands::projects::list_directory,
+            commands::projects::create_project_folder,
             commands::settings::get_app_settings,
             commands::settings::update_app_settings,
             commands::settings::test_generic_cli,

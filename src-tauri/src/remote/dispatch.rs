@@ -60,7 +60,15 @@ pub fn required_level(method: &str, args: &Value) -> Option<AccessLevel> {
             }
         }
         "send_message" | "paste_attachment" | "stop_thread" | "rename_thread" | "save_project_context" => Chat,
-        "delete_thread" | "create_project" | "delete_project" | "create_memory" | "update_memory" | "delete_memory"
+        // Browsing folders shows the host's disk: same level as creating a project there.
+        "delete_thread"
+        | "create_project"
+        | "create_project_folder"
+        | "list_directory"
+        | "delete_project"
+        | "create_memory"
+        | "update_memory"
+        | "delete_memory"
         | "update_provider" => Full,
         _ => return None,
     };
@@ -153,6 +161,10 @@ pub async fn call(state: &Shared, level: AccessLevel, method: &str, args: Value)
         }
         "create_project" => json(threads::create_project_inner(state, arg(a, "path")?, arg(a, "name")?).await?),
         "delete_project" => json(threads::delete_project_inner(state, arg(a, "projectId")?).await?),
+        "list_directory" => json(projects::list_directory_inner(arg(a, "path")?).await?),
+        "create_project_folder" => {
+            json(projects::create_project_folder_inner(state, arg(a, "parent")?, arg(a, "name")?).await?)
+        }
         "list_models" => json(threads::list_models_inner(state, arg(a, "refresh")?).await?),
         "agent_images" => json(threads::agent_images_inner(state, arg(a, "threadId")?, arg(a, "paths")?).await?),
 

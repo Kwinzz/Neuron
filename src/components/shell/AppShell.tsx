@@ -2,6 +2,7 @@ import { whenIdle } from "@/lib/idle";
 import { type CSSProperties, Suspense, lazy, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { cn } from "cn";
 import { DeleteChatDialog } from "@/components/chat/DeleteChatDialog";
+import { NewProjectDialog } from "@/components/projects/NewProjectDialog";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { ShortcutsDialog } from "@/components/shortcuts/ShortcutsDialog";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -153,6 +154,7 @@ export function AppShell() {
       <CommandPalette />
       <ShortcutsDialog />
       <DeleteChatDialog />
+      <NewProjectDialog />
       <Toaster theme="dark" position="bottom-right" richColors={false} />
     </TooltipProvider>
   );

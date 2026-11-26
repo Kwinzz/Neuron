@@ -56,6 +56,7 @@ import { STATUS } from "@/lib/status";
 import { useDashboard } from "@/stores/dashboard";
 import { useDevices } from "@/stores/devices";
 import { useLive } from "@/stores/live";
+import { useNewProject } from "@/stores/newProject";
 import { type SidebarSection, useNav } from "@/stores/nav";
 import { useChatDeletion } from "@/stores/chatDeletion";
 import { toast } from "@/stores/toast";
@@ -308,20 +309,6 @@ function SectionGroup({
   );
 }
 
-async function addProject() {
-  try {
-    const path = await ipc.pickDirectory();
-    if (!path) return;
-    const localProjects = await ipc.createProject(path);
-    const created = localProjects.find((p) => p.path === path);
-    await useNav.getState().load();
-    if (created) useNav.getState().setProjectOpen(created.id, true);
-    void useDashboard.getState().load();
-  } catch (err) {
-    toast({ tone: "danger", title: t("shell.projectAddFailed"), description: ipcErrorMessage(err) });
-  }
-}
-
 function ProjectsNav({
   projects,
   byProject,
@@ -337,7 +324,7 @@ function ProjectsNav({
       label={t("shell.projects")}
       activeCount={activeCount}
       action={
-        <SidebarGroupAction title={t("shell.addProjectTitle")} onClick={() => void addProject()}>
+        <SidebarGroupAction title={t("shell.addProjectTitle")} onClick={() => useNewProject.getState().show(null)}>
           <FolderPlus />
           <span className="sr-only">{t("shell.addProject")}</span>
         </SidebarGroupAction>
@@ -346,7 +333,7 @@ function ProjectsNav({
       <SidebarMenu>
         {projects.length === 0 && (
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={() => void addProject()} className="text-muted-foreground">
+            <SidebarMenuButton onClick={() => useNewProject.getState().show(null)} className="text-muted-foreground">
               <FolderPlus />
               <span>{t("shell.addFolder")}</span>
             </SidebarMenuButton>
@@ -601,6 +588,17 @@ const DeviceFolder = memo(function DeviceFolder({
 
         <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
           <SidebarMenuSub className="mr-0 pr-0">
+            {host.connected && (
+              <SidebarMenuSubItem>
+                <SidebarMenuSubButton
+                  onClick={() => useNewProject.getState().show(host.nodeId)}
+                  className="text-muted-foreground"
+                >
+                  <FolderPlus />
+                  <span>{t("shell.newProjectOnDevice")}</span>
+                </SidebarMenuSubButton>
+              </SidebarMenuSubItem>
+            )}
             {projects.map((p) => (
               <ProjectFolder key={p.id} project={p} chats={byProject.get(p.id) ?? EMPTY} nested />
             ))}

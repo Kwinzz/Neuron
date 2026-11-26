@@ -35,6 +35,7 @@ import type { ThreadSettingsInput } from "@/bindings/ThreadSettingsInput";
 import type { DashboardSnapshot } from "@/bindings/DashboardSnapshot";
 import type { IpcError } from "@/bindings/IpcError";
 import type { ProjectSummary } from "@/bindings/ProjectSummary";
+import type { DirListing } from "@/bindings/DirListing";
 import type { ProviderUpdate } from "@/bindings/ProviderUpdate";
 import type { ProviderUsage } from "@/bindings/ProviderUsage";
 import type { ThreadSummary } from "@/bindings/ThreadSummary";
@@ -296,8 +297,21 @@ export const ipc = {
   defaultCwd: (device: string | null = null) => call<string>(device, "default_cwd"),
   updateThreadSettings: (threadId: string, settings: ThreadSettingsInput) =>
     call<ThreadSummary>(deviceOfThread(threadId), "update_thread_settings", { threadId, settings }),
-  createProject: (path: string, name?: string) =>
-    invoke<ProjectSummary[]>("create_project", { path, name: name ?? null }),
+  /** Registers an existing folder of this device (or of `device`) as a project; that device's project list. */
+  createProject: async (path: string, name?: string, device: string | null = null): Promise<ProjectSummary[]> => {
+    const list = await call<ProjectSummary[]>(device, "create_project", { path, name: name ?? null });
+    for (const p of list) rememberProject(device, p.id);
+    return list;
+  },
+  /** Creates the folder `parent/name` on this device (or on `device`) and registers it as a project. */
+  createProjectFolder: async (parent: string, name: string, device: string | null = null): Promise<ProjectSummary[]> => {
+    const list = await call<ProjectSummary[]>(device, "create_project_folder", { parent, name });
+    for (const p of list) rememberProject(device, p.id);
+    return list;
+  },
+  /** Sub-folders of `path` (home folder when null) on this device or on `device`. */
+  listDirectory: (path: string | null, device: string | null = null) =>
+    call<DirListing>(device, "list_directory", { path }),
   deleteProject: (projectId: string) => call<ProjectSummary[]>(deviceOfProject(projectId), "delete_project", { projectId }),
   // Project context (.neuron/context.md) & injected context
   projectContext: (projectId: string) =>

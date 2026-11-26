@@ -4,11 +4,13 @@ import {
   Keyboard,
   Settings,
   FolderGit2,
+  FolderPlus,
   LayoutDashboard,
   PanelRight,
   Plus,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
+import { useNewProject } from "@/stores/newProject";
 import { AgentBadge } from "@/components/ui/AgentBadge";
 import { AgentLogo } from "@/components/ui/AgentLogo";
 import {
@@ -89,6 +91,15 @@ function useCommands(): Command[] {
         icon: <Plus size={15} />,
         hint: <CommandShortcut>{MOD_LABEL}+N</CommandShortcut>,
         run: () => ui().startChat(null),
+      },
+      {
+        id: "project:new",
+        group: t("shell.paletteGroupActions"),
+        title: t("shell.newProjectTitle"),
+        subtitle: t("shell.paletteNewProjectSubtitle"),
+        keywords: t("shell.paletteNewProjectKeywords"),
+        icon: <FolderPlus size={15} />,
+        run: () => useNewProject.getState().show(null),
       },
       {
         id: "nav:home",
