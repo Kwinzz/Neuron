@@ -189,10 +189,7 @@ mod tests {
         let root = if cfg!(windows) { "C:/repo" } else { "/repo" };
         let cwd = Path::new(root);
         let abs = format!("{root}/a.rs");
-        assert_eq!(
-            edited_paths("Edit", &json!({"file_path": abs}), Some(cwd)),
-            [PathBuf::from(&abs)]
-        );
+        assert_eq!(edited_paths("Edit", &json!({"file_path": abs}), Some(cwd)), [PathBuf::from(&abs)]);
         assert_eq!(edited_paths("write_file", &json!({"Path": "b.txt"}), Some(cwd)), [cwd.join("b.txt")]);
         assert_eq!(
             edited_paths(

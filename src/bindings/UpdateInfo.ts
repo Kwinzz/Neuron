@@ -16,4 +16,9 @@ pageUrl: string,
 /**
  * Windows installer of the release (`…_x64-setup.exe`).
  */
-assetUrl: string | null, assetName: string | null, checkedAt: number, };
+assetUrl: string | null, assetName: string | null, checkedAt: number, 
+/**
+ * Linux build from source: commit installed and head of `main` (`current` / `latest` then read
+ * `<version>+<short commit>`). `None` for a release install.
+ */
+installedCommit: string | null, latestCommit: string | null, };

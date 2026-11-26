@@ -13,7 +13,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/Kwinzz/Neuron.git"
-# NEURON_BRANCH=<branch>: build another branch; later updates stay on it (remembered in the sources' git config).
+# NEURON_BRANCH=<branch>: build another branch, for a test. Updates always come back to main.
 BRANCH="${NEURON_BRANCH:-main}"
 SRC_DIR="${NEURON_SRC_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/neuron-src}"
 NODE_MIN_MAJOR=20
@@ -220,9 +220,6 @@ ensure_node() {
 fetch_sources() {
   step "$(m "Sources de Neuron" "Neuron sources")"
   if [ -d "$SRC_DIR/.git" ]; then
-    if [ -z "${NEURON_BRANCH:-}" ]; then
-      BRANCH="$(git -C "$SRC_DIR" config --get neuron.branch || echo "$BRANCH")"
-    fi
     info "$(m "Mise à jour de $SRC_DIR (branche $BRANCH)" "Updating $SRC_DIR (branch $BRANCH)")"
     # Explicit refspec: a --depth 1 clone only tracks the branch it was cloned from.
     git -C "$SRC_DIR" fetch --depth 1 origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
@@ -232,7 +229,7 @@ fetch_sources() {
     mkdir -p "$(dirname "$SRC_DIR")"
     git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$SRC_DIR"
   fi
-  git -C "$SRC_DIR" config neuron.branch "$BRANCH"
+  git -C "$SRC_DIR" config --unset neuron.branch || true
   LATEST="$(sed -n 's/^[[:space:]]*"version": "\(.*\)",/\1/p' "$SRC_DIR/src-tauri/tauri.conf.json" | head -n1)"
   ok "$(m "Version disponible : $LATEST" "Available version: $LATEST")"
 }
@@ -265,6 +262,8 @@ build_and_install() {
       fi
       ;;
   esac
+  # Commit actually installed: `neuron update` compares it with the head of main.
+  git -C "$SRC_DIR" config neuron.installed "$(git -C "$SRC_DIR" rev-parse HEAD)"
   ok "$(m "Neuron $(installed_version) est installé. Lance-le depuis le menu des applications (ou : neuron)." "Neuron $(installed_version) is installed. Start it from the applications menu (or: neuron).")"
   if [ -n "${WAYLAND_DISPLAY:-}" ]; then
     info "${DIM}$(m "Wayland : pour la demande rapide, lie « neuron --quick » à un raccourci de ton bureau." "Wayland: for the quick prompt, bind \"neuron --quick\" to a shortcut of your desktop.")${RESET}"

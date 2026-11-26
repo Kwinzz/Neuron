@@ -1,6 +1,11 @@
-//! New versions of Neuron: checked on GitHub's latest release, installed by the Windows installer (passive update
-//! mode) or by `install.sh` on Linux. Used by the app (background check, Paramètres → Mises à jour) and by
-//! `neuron update`. Besides model prices, this is the app's only network call (none when the check is turned off).
+//! New versions of Neuron. Updates only ever deliver what is on `main`:
+//! - installed from a release (Windows installer, downloaded package): GitHub's latest release, installed by the
+//!   Windows installer (passive update mode);
+//! - built on Linux by `install.sh` (sources in `~/.local/share/neuron-src`, commit recorded as `neuron.installed` in
+//!   their git config): the head of `main` against the installed commit, rebuilt by `install.sh --update`.
+//!
+//! Used by the app (background check, Paramètres → Mises à jour) and by `neuron update`. Besides model prices, this
+//! is the app's only network call (none when the check is turned off).
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -14,6 +19,9 @@ use crate::state::Shared;
 use crate::util::now_ms;
 
 const RELEASES_API: &str = "https://api.github.com/repos/Kwinzz/Neuron/releases/latest";
+const MAIN_HEAD_API: &str = "https://api.github.com/repos/Kwinzz/Neuron/commits/main";
+const RAW_FILES: &str = "https://raw.githubusercontent.com/Kwinzz/Neuron";
+const REPO_URL: &str = "https://github.com/Kwinzz/Neuron";
 const RAW_INSTALL_SH: &str = "https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh";
 /// A newer version was found (payload: [`UpdateInfo`]); emitted once per version.
 pub const UPDATE_AVAILABLE_EVENT: &str = "update://available";
@@ -41,6 +49,12 @@ pub struct UpdateInfo {
     pub asset_name: Option<String>,
     #[ts(type = "number")]
     pub checked_at: i64,
+    /// Linux build from source: commit installed and head of `main` (`current` / `latest` then read
+    /// `<version>+<short commit>`). `None` for a release install.
+    #[serde(default)]
+    pub installed_commit: Option<String>,
+    #[serde(default)]
+    pub latest_commit: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]
@@ -98,7 +112,50 @@ pub fn parse_release(release: &Value, current: &str, now: i64) -> AppResult<Upda
         asset_url,
         asset_name,
         checked_at: now,
+        installed_commit: None,
+        latest_commit: None,
     })
+}
+
+fn short(commit: &str) -> &str {
+    commit.get(..7).unwrap_or(commit)
+}
+
+/// [`UpdateInfo`] of a build from source: available as soon as `main` moved past the installed commit.
+pub fn source_info(version: &str, installed: &str, latest_version: &str, latest: &str, now: i64) -> UpdateInfo {
+    UpdateInfo {
+        current: format!("{version}+{}", short(installed)),
+        latest: format!("{latest_version}+{}", short(latest)),
+        available: installed != latest,
+        page_url: format!("{REPO_URL}/compare/{installed}...{latest}"),
+        asset_url: None,
+        asset_name: None,
+        checked_at: now,
+        installed_commit: Some(installed.to_string()),
+        latest_commit: Some(latest.to_string()),
+    }
+}
+
+/// Linux: sources kept by `install.sh` (`NEURON_SRC_DIR`, else `~/.local/share/neuron-src`).
+fn source_dir() -> Option<PathBuf> {
+    std::env::var_os("NEURON_SRC_DIR").map(PathBuf::from).or_else(|| dirs::data_dir().map(|d| d.join("neuron-src")))
+}
+
+/// Commit this Linux install was built from (recorded by `install.sh` once the package is installed).
+pub async fn installed_commit() -> Option<String> {
+    if !cfg!(target_os = "linux") {
+        return None;
+    }
+    let dir = source_dir().filter(|d| d.join(".git").exists())?;
+    let out = tokio::process::Command::new("git")
+        .arg("-C")
+        .arg(&dir)
+        .args(["config", "--get", "neuron.installed"])
+        .output()
+        .await
+        .ok()?;
+    let commit = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    (out.status.success() && !commit.is_empty()).then_some(commit)
 }
 
 fn client(timeout: Option<Duration>) -> AppResult<reqwest::Client> {
@@ -113,10 +170,9 @@ fn network_error(e: reqwest::Error) -> AppError {
     AppError::Other(crate::tr!("impossible de joindre GitHub ({e})", "could not reach GitHub ({e})"))
 }
 
-/// Asks GitHub for the latest release (no state: usable by the command line).
-pub async fn fetch_latest() -> AppResult<UpdateInfo> {
-    let response = client(Some(FETCH_TIMEOUT))?
-        .get(RELEASES_API)
+async fn get_json(http: &reqwest::Client, url: &str) -> AppResult<Value> {
+    let response = http
+        .get(url)
         .header("Accept", "application/vnd.github+json")
         .send()
         .await
@@ -124,8 +180,25 @@ pub async fn fetch_latest() -> AppResult<UpdateInfo> {
         .error_for_status()
         .map_err(network_error)?;
     let body = response.bytes().await.map_err(network_error)?;
-    let release: Value = serde_json::from_slice(&body)?;
-    parse_release(&release, current_version(), now_ms())
+    Ok(serde_json::from_slice(&body)?)
+}
+
+/// Asks GitHub what the latest version is (no state: usable by the command line): the head of `main` for a build
+/// from source, the latest release otherwise.
+pub async fn fetch_latest() -> AppResult<UpdateInfo> {
+    let http = client(Some(FETCH_TIMEOUT))?;
+    let Some(installed) = installed_commit().await else {
+        return parse_release(&get_json(&http, RELEASES_API).await?, current_version(), now_ms());
+    };
+    let head = get_json(&http, MAIN_HEAD_API).await?;
+    let latest = head
+        .get("sha")
+        .and_then(Value::as_str)
+        .ok_or_else(|| AppError::Other(crate::tr!("réponse de GitHub inattendue", "unexpected answer from GitHub")))?;
+    // Version number on `main` (display only: the commit decides).
+    let conf = get_json(&http, &format!("{RAW_FILES}/{latest}/src-tauri/tauri.conf.json")).await.ok();
+    let latest_version = conf.as_ref().and_then(|c| c.get("version")).and_then(Value::as_str).unwrap_or("?");
+    Ok(source_info(current_version(), &installed, latest_version, latest, now_ms()))
 }
 
 /// Checks now and remembers the answer.
@@ -139,11 +212,19 @@ pub async fn check(state: &Shared) -> AppResult<UpdateInfo> {
 /// Last known answer (availability recomputed: the app may have been updated since).
 pub async fn cached(state: &Shared) -> AppResult<Option<UpdateInfo>> {
     let stored = state.db.call(|c| crate::db::settings::get(c, CACHE_KEY)).await?;
-    Ok(stored.and_then(|v| serde_json::from_value::<UpdateInfo>(v).ok()).map(|mut info| {
-        info.current = current_version().to_string();
-        info.available = is_newer(&info.latest, &info.current);
-        info
-    }))
+    let Some(mut info) = stored.and_then(|v| serde_json::from_value::<UpdateInfo>(v).ok()) else { return Ok(None) };
+    match (info.latest_commit.clone(), installed_commit().await) {
+        (Some(latest), Some(installed)) => {
+            info.current = format!("{}+{}", current_version(), short(&installed));
+            info.available = installed != latest;
+            info.installed_commit = Some(installed);
+        }
+        _ => {
+            info.current = current_version().to_string();
+            info.available = info.latest_commit.is_none() && is_newer(&info.latest, &info.current);
+        }
+    }
+    Ok(Some(info))
 }
 
 /// 30 s after the start then every 12 h, when the automatic check is on: a version not announced yet is
@@ -242,10 +323,7 @@ pub fn launch_installer(path: &Path, relaunch: bool) -> AppResult<()> {
 
 /// Linux: the update command (`install.sh` from the local sources if they are there, else downloaded).
 pub fn linux_update_command() -> String {
-    let src = std::env::var_os("NEURON_SRC_DIR")
-        .map(PathBuf::from)
-        .or_else(|| dirs::data_dir().map(|d| d.join("neuron-src")))
-        .map(|d| d.join("install.sh"));
+    let src = source_dir().map(|d| d.join("install.sh"));
     match src.filter(|p| p.is_file()) {
         Some(script) => format!("bash '{}' --update --yes", script.display().to_string().replace('\'', "")),
         None => format!("curl -fsSL {RAW_INSTALL_SH} | bash -s -- --update --yes"),
@@ -293,5 +371,24 @@ mod tests {
         assert!(!same.available);
         assert!(same.asset_url.is_none());
         assert!(parse_release(&json!({ "message": "Not Found" }), "0.2.1", 0).is_err());
+    }
+
+    #[test]
+    fn build_from_source_follows_main() {
+        let installed = "8ff9f92aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let head = "9a2c798bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        let info = source_info("0.2.1", installed, "0.2.1", head, 7);
+        assert!(info.available, "same version number, new commits on main");
+        assert_eq!(info.current, "0.2.1+8ff9f92");
+        assert_eq!(info.latest, "0.2.1+9a2c798");
+        assert_eq!(info.page_url, format!("https://github.com/Kwinzz/Neuron/compare/{installed}...{head}"));
+        assert!(!source_info("0.2.1", head, "0.2.1", head, 7).available);
+        // Older caches (no commit fields) still read.
+        let old: UpdateInfo = serde_json::from_value(json!({
+            "current": "0.2.1", "latest": "0.2.1", "available": false, "pageUrl": "x",
+            "assetUrl": null, "assetName": null, "checkedAt": 1
+        }))
+        .unwrap();
+        assert!(old.latest_commit.is_none());
     }
 }

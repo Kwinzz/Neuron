@@ -87,9 +87,12 @@ curl -fsSL https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh | bas
 ```
 
 (`--yes` answers yes to the questions; deleting your data is never automatic.)
-The built sources stay in `~/.local/share/neuron-src` so updates are faster. To build another branch of this
-repository, put `NEURON_BRANCH=<branch>` before `bash` (`... | NEURON_BRANCH=<branch> bash`): later updates stay on
-that branch.
+The built sources stay in `~/.local/share/neuron-src` so updates are faster. To test another branch of this
+repository, put `NEURON_BRANCH=<branch>` before `bash` (`... | NEURON_BRANCH=<branch> bash`); updates always come
+back to `main`.
+
+Updates follow `main`: **Settings → Updates** (or `neuron update`) tells you when commits were added to `main` since
+your build, and rebuilds Neuron in a terminal.
 
 > Debian 12 and Ubuntu 24.04 ship Node.js 18, too old for the build: install Node 20.19+ first (for example from
 > [NodeSource](https://github.com/nodesource/distributions)).
