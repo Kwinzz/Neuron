@@ -11,6 +11,10 @@ pub enum Command {
     Remote(RemoteCmd),
     /// systemd user service (Linux).
     Service(ServiceCmd),
+    /// `--cli-path add|remove` (Windows installer): `neuron` in the user's PATH.
+    CliPath {
+        add: bool,
+    },
     Version,
     Help,
 }
@@ -37,6 +41,11 @@ pub fn parse(args: &[String]) -> Option<Result<Command, String>> {
         "serve" => no_more(rest).map(|()| Command::Serve),
         "status" => no_more(rest).map(|()| Command::Status),
         "version" | "--version" | "-V" => Ok(Command::Version),
+        "--cli-path" => match rest {
+            [v] if v == "add" => Ok(Command::CliPath { add: true }),
+            [v] if v == "remove" => Ok(Command::CliPath { add: false }),
+            _ => Err("usage: neuron --cli-path add|remove".to_string()),
+        },
         "help" | "--help" | "-h" => Ok(Command::Help),
         "remote" => parse_remote(rest).map(Command::Remote),
         "service" => match rest {
@@ -200,6 +209,7 @@ mod tests {
             p("remote level PC de Kim chat"),
             Some(Ok(Command::Remote(RemoteCmd::Level { device: "PC de Kim".into(), level: AccessLevel::Chat })))
         );
+        assert_eq!(p("--cli-path remove"), Some(Ok(Command::CliPath { add: false })));
         assert_eq!(p("service install"), Some(Ok(Command::Service(ServiceCmd::Install))));
         assert!(matches!(p("service start"), Some(Err(_))));
         assert_eq!(p("remote revoke ab12"), Some(Ok(Command::Remote(RemoteCmd::Revoke { device: "ab12".into() }))));

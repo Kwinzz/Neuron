@@ -5,6 +5,7 @@
 //! Every command but `serve` talks to the running instance over the local control channel ([`crate::control`]).
 
 pub mod args;
+mod cli_path;
 mod client;
 pub mod output;
 mod serve;
@@ -46,6 +47,7 @@ pub fn entry_from_args() -> Option<i32> {
         }
         Ok(Command::Serve) => serve::run(paths),
         Ok(Command::Service(cmd)) => service::run(cmd),
+        Ok(Command::CliPath { add }) => cli_path::run(add),
         Ok(cmd) => {
             let result = tauri::async_runtime::block_on(client::run(cmd, &paths));
             match result {
