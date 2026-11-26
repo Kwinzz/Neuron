@@ -31,7 +31,7 @@ build() {
   # No LTO, incremental build, mold when available (see the file).
   # shellcheck disable=SC1091
   . "$(_root)/packaging/linux-build-env.sh"
-  npm ci
+  neuron_npm_ci
   npm run tauri build -- --no-bundle
 }
 

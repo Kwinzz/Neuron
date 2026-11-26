@@ -1,0 +1,156 @@
+# Prebuilt Linux packages of `main`, so that install.sh and `neuron update` install in seconds instead of compiling.
+#
+# Every push to main builds .deb / .rpm (x86_64 and aarch64) and a pacman package (x86_64), then replaces the assets
+# of the `main-build` pre-release (never « latest »: the Windows update check ignores it). `build-info.txt`
+# (commit=…, version=…) is uploaded last: install.sh and `neuron update` read it to know which commit is offered.
+name: Linux packages (main)
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "docs/**", ".github/workflows/windows-release.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: linux-main
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04 # oldest glibc of the supported distributions → runs on all of them
+            arch: x86_64
+          - runner: ubuntu-22.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev \
+            libssl-dev build-essential file patchelf rpm mold
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: ${{ matrix.arch }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Build
+        run: |
+          . packaging/linux-build-env.sh
+          npm ci
+          npm run tauri build -- --bundles deb,rpm
+
+      - name: Collect
+        run: |
+          set -euo pipefail
+          arch=${{ matrix.arch }}
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          mkdir -p out pkg/neuron/icons
+          cp src-tauri/target/release/bundle/deb/*.deb "out/neuron-$arch.deb"
+          cp src-tauri/target/release/bundle/rpm/*.rpm "out/neuron-$arch.rpm"
+          # Plain binary + desktop entry + icons (used for the pacman package).
+          cp src-tauri/target/release/neuron pkg/neuron/
+          cp packaging/arch/neuron.desktop pkg/neuron/
+          cp src-tauri/icons/32x32.png pkg/neuron/icons/32.png
+          cp src-tauri/icons/64x64.png pkg/neuron/icons/64.png
+          cp src-tauri/icons/128x128.png pkg/neuron/icons/128.png
+          cp src-tauri/icons/128x128@2x.png pkg/neuron/icons/256.png
+          cp src-tauri/icons/icon.png pkg/neuron/icons/512.png
+          tar -C pkg -czf "out/neuron-$arch.tar.gz" neuron
+          printf 'commit=%s\nversion=%s\n' "$GITHUB_SHA" "$version" > out/build-info.txt
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: out/*
+          retention-days: 7
+
+  arch-package:
+    needs: build
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-x86_64
+          path: dist
+
+      - name: makepkg
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^version=//p' dist/build-info.txt)
+          useradd -m builder
+          mkdir -p /home/builder/pkg out
+          cp packaging/arch/PKGBUILD-bin /home/builder/pkg/PKGBUILD
+          cp dist/neuron-x86_64.tar.gz /home/builder/pkg/neuron-linux.tar.gz
+          chown -R builder /home/builder/pkg
+          su builder -c "cd ~/pkg && NEURON_PKGVER='$version' PKGEXT=.pkg.tar.zst makepkg --nodeps --noconfirm"
+          cp /home/builder/pkg/neuron-*.pkg.tar.zst out/neuron-x86_64.pkg.tar.zst
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arch-x86_64
+          path: out/*
+          retention-days: 7
+
+  publish:
+    needs: [build, arch-package]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish the main-build pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ls -la dist
+          if [ ! -f dist/neuron-x86_64.deb ] || [ ! -f dist/build-info.txt ]; then
+            echo "::error::x86_64 build missing: nothing published"
+            exit 1
+          fi
+          version=$(sed -n 's/^version=//p' dist/build-info.txt)
+          short=${GITHUB_SHA:0:7}
+          title="Neuron main ($version+$short)"
+          notes="Automatic build of \`main\` at $GITHUB_SHA, used by install.sh and \`neuron update\` on Linux. Not a release: Windows installers are on the [latest release](https://github.com/$GITHUB_REPOSITORY/releases/latest)."
+          git push -f origin "$GITHUB_SHA:refs/tags/main-build"
+          if gh release view main-build >/dev/null 2>&1; then
+            # Packages first, build-info.txt last: a reader never sees a commit whose packages are not there yet.
+            gh release upload main-build dist/neuron-* --clobber
+            gh release edit main-build --prerelease --title "$title" --notes "$notes"
+            # Asset of an architecture that failed this time: removed rather than offered under the new commit.
+            for asset in $(gh release view main-build --json assets --jq '.assets[].name'); do
+              if [ "$asset" != build-info.txt ] && [ ! -f "dist/$asset" ]; then
+                gh release delete-asset main-build "$asset" --yes
+              fi
+            done
+          else
+            gh release create main-build dist/neuron-* --prerelease --latest=false --title "$title" --notes "$notes"
+          fi
+          gh release upload main-build dist/build-info.txt --clobber

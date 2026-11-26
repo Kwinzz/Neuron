@@ -1,0 +1,55 @@
+# Windows installer of a release: pushing a tag `vX.Y.Z` (same version as src-tauri/tauri.conf.json) builds
+# `Neuron_X.Y.Z_x64-setup.exe` and creates a DRAFT release with it. Review the notes on GitHub, then publish: the
+# apps already installed then offer the update (they read releases/latest, drafts are invisible to them).
+name: Windows release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag matches the version
+        id: version
+        shell: bash
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          cargo_version=$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -n1)
+          if [ "v$version" != "$GITHUB_REF_NAME" ] || [ "$cargo_version" != "$version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME, tauri.conf.json $version, Cargo.toml $cargo_version: they must match"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run tauri build
+
+      - name: Draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          installer="src-tauri/target/release/bundle/nsis/Neuron_${VERSION}_x64-setup.exe"
+          sed "s/{version}/$VERSION/g" .github/release-notes.md > notes.md
+          gh release create "$GITHUB_REF_NAME" "$installer" --draft --title "Neuron $VERSION" --notes-file notes.md

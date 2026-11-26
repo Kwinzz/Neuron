@@ -5,10 +5,13 @@
 #
 # Already installed? The script offers to update, reinstall or uninstall.
 # Non-interactive:  ... | bash -s -- --install | --update | --reinstall | --uninstall  [--yes] [--lang en|fr]
+#                   [--from-source]
 #
-# Arch (and derivatives): pacman package built with makepkg (packaging/arch/PKGBUILD).
-# Debian / Ubuntu: .deb package; Fedora: .rpm package — built from source with Tauri.
-# The language chosen here is Neuron's interface language at first launch (~/.config/neuron/language).
+# Installs the package built by GitHub for the last commit of main (pre-release `main-build`: pacman package on
+# Arch x86_64, .deb on Debian / Ubuntu, .rpm on Fedora; x86_64 and aarch64), in a few seconds. Builds from source
+# (packaging/arch/PKGBUILD, or Tauri for .deb / .rpm) when there is none for this machine, with --from-source or
+# with NEURON_BRANCH. The language chosen here is Neuron's interface language at first launch
+# (~/.config/neuron/language).
 
 set -euo pipefail
 
@@ -16,6 +19,11 @@ REPO_URL="https://github.com/Kwinzz/Neuron.git"
 # NEURON_BRANCH=<branch>: build another branch, for a test. Updates always come back to main.
 BRANCH="${NEURON_BRANCH:-main}"
 SRC_DIR="${NEURON_SRC_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/neuron-src}"
+PREBUILT_URL="https://github.com/Kwinzz/Neuron/releases/download/main-build"
+# commit=<installed commit> / method=prebuilt|source: read by `neuron update` (compared with main).
+INSTALL_STATE="${XDG_CONFIG_HOME:-$HOME/.config}/neuron/install"
+FROM_SOURCE="${NEURON_FROM_SOURCE:-0}"
+if [ -n "${NEURON_BRANCH:-}" ] && [ "$NEURON_BRANCH" != main ]; then FROM_SOURCE=1; fi
 NODE_MIN_MAJOR=20
 NODE_MIN_MINOR=19
 
@@ -35,10 +43,11 @@ for arg in "$@"; do
     --reinstall) ACTION=reinstall ;;
     --uninstall) ACTION=uninstall ;;
     -y | --yes) ASSUME_YES=1 ;;
+    --from-source) FROM_SOURCE=1 ;;
     --lang) expect_lang=1 ;;
     --lang=*) UI_LANG="${arg#--lang=}" ;;
     -h | --help)
-      sed -n '2,11p' "$0" 2>/dev/null || true
+      sed -n '2,15p' "$0" 2>/dev/null || true
       exit 0
       ;;
     *)
@@ -234,6 +243,94 @@ fetch_sources() {
   ok "$(m "Version disponible : $LATEST" "Available version: $LATEST")"
 }
 
+# ---------------------------------------------------------------- prebuilt package
+
+record_install() {
+  mkdir -p "$(dirname "$INSTALL_STATE")"
+  printf 'commit=%s\nmethod=%s\n' "$1" "$2" >"$INSTALL_STATE"
+}
+
+# Name of the prebuilt package for this machine (nothing for a combination GitHub doesn't build).
+prebuilt_asset() {
+  local arch
+  case "$(uname -m)" in
+    x86_64 | amd64) arch=x86_64 ;;
+    aarch64 | arm64) arch=aarch64 ;;
+    *) return 1 ;;
+  esac
+  case "$FAMILY" in
+    arch) [ "$arch" = x86_64 ] && echo "neuron-x86_64.pkg.tar.zst" ;;
+    debian) echo "neuron-$arch.deb" ;;
+    fedora) echo "neuron-$arch.rpm" ;;
+  esac
+}
+
+# Downloads the prebuilt package of main into PREBUILT_FILE (PREBUILT_COMMIT, PREBUILT_VERSION). Fails quietly: the
+# caller then builds from source.
+PREBUILT_FILE="" PREBUILT_COMMIT="" PREBUILT_VERSION=""
+fetch_prebuilt() {
+  [ "$FROM_SOURCE" != 1 ] || return 1
+  local asset tmp
+  asset="$(prebuilt_asset)" || return 1
+  [ -n "$asset" ] && command -v curl >/dev/null 2>&1 || return 1
+  step "$(m "Version précompilée de main" "Prebuilt version of main")"
+  tmp="$(mktemp -d)"
+  chmod 755 "$tmp" # apt reads the .deb as its own user
+  if ! curl -fsSL --retry 2 "$PREBUILT_URL/build-info.txt" -o "$tmp/build-info.txt"; then
+    warn "$(m "Pas de version précompilée disponible : compilation depuis les sources." "No prebuilt version available: building from source.")"
+    rm -rf "$tmp"
+    return 1
+  fi
+  PREBUILT_COMMIT="$(sed -n 's/^commit=//p' "$tmp/build-info.txt")"
+  PREBUILT_VERSION="$(sed -n 's/^version=//p' "$tmp/build-info.txt")"
+  info "$(m "Téléchargement de Neuron $PREBUILT_VERSION (${PREBUILT_COMMIT:0:7})" "Downloading Neuron $PREBUILT_VERSION (${PREBUILT_COMMIT:0:7})")"
+  if [ -z "$PREBUILT_COMMIT" ] || ! curl -fL --retry 2 --progress-bar "$PREBUILT_URL/$asset" -o "$tmp/$asset"; then
+    warn "$(m "Téléchargement impossible : compilation depuis les sources." "Download failed: building from source.")"
+    rm -rf "$tmp"
+    return 1
+  fi
+  PREBUILT_FILE="$tmp/$asset"
+}
+
+# Installs a package file, its dependencies included; the same version is reinstalled (an update of main often
+# keeps the version number).
+install_package_file() {
+  local file="$1"
+  step "$(m "Installation du paquet" "Installing the package")"
+  case "$FAMILY" in
+    arch)
+      if ! sudo pacman -U --noconfirm "$file"; then
+        warn "$(m "pacman n'a pas pu installer les dépendances : la liste des paquets du système n'est plus à jour." "pacman could not install the dependencies: the system's package list is out of date.")"
+        ask "$(m "Mettre à jour le système (sudo pacman -Syu) puis réessayer ?" "Upgrade the system (sudo pacman -Syu) and try again?")" y ||
+          die "$(m "Lance « sudo pacman -Syu », puis relance ce script." "Run \"sudo pacman -Syu\", then run this script again.")"
+        sudo pacman -Syu --noconfirm
+        sudo pacman -U --noconfirm "$file"
+      fi
+      ;;
+    debian)
+      sudo apt-get update
+      sudo apt-get install -y --reinstall --allow-downgrades "$file"
+      ;;
+    fedora)
+      local current file_version
+      current="$(installed_version)"
+      file_version="$(rpm -qp --qf '%{VERSION}-%{RELEASE}' "$file" 2>/dev/null || true)"
+      if [ -n "$current" ] && [ "$current" = "$file_version" ]; then
+        sudo dnf reinstall -y "$file"
+      else
+        sudo dnf install -y "$file"
+      fi
+      ;;
+  esac
+}
+
+install_prebuilt() {
+  stop_running
+  install_package_file "$PREBUILT_FILE"
+  rm -rf "$(dirname "$PREBUILT_FILE")"
+  record_install "$PREBUILT_COMMIT" prebuilt
+}
+
 # ---------------------------------------------------------------- build + install
 
 build_and_install() {
@@ -249,21 +346,19 @@ build_and_install() {
         cd "$SRC_DIR"
         # shellcheck disable=SC1091
         . packaging/linux-build-env.sh
-        npm ci && npm run tauri build -- --bundles "$bundle"
+        neuron_npm_ci && npm run tauri build -- --bundles "$bundle"
       )
       local pkg
       pkg="$(ls -t "$SRC_DIR"/src-tauri/target/release/bundle/"$bundle"/*."$bundle" 2>/dev/null | head -n1)"
       [ -n "$pkg" ] || die "$(m "Paquet .$bundle introuvable après la compilation." ".$bundle package not found after the build.")"
-      step "$(m "Installation du paquet" "Installing the package")"
-      if [ "$FAMILY" = debian ]; then
-        sudo apt-get install -y "$pkg"
-      else
-        sudo dnf install -y "$pkg"
-      fi
+      install_package_file "$pkg"
       ;;
   esac
   # Commit actually installed: `neuron update` compares it with the head of main.
-  git -C "$SRC_DIR" config neuron.installed "$(git -C "$SRC_DIR" rev-parse HEAD)"
+  record_install "$(git -C "$SRC_DIR" rev-parse HEAD)" source
+}
+
+after_install() {
   ok "$(m "Neuron $(installed_version) est installé. Lance-le depuis le menu des applications (ou : neuron)." "Neuron $(installed_version) is installed. Start it from the applications menu (or: neuron).")"
   if [ -n "${WAYLAND_DISPLAY:-}" ]; then
     info "${DIM}$(m "Wayland : pour la demande rapide, lie « neuron --quick » à un raccourci de ton bureau." "Wayland: for the quick prompt, bind \"neuron --quick\" to a shortcut of your desktop.")${RESET}"
@@ -284,10 +379,15 @@ build_and_install() {
 
 do_install() {
   save_language
-  install_deps
-  fetch_sources
-  stop_running
-  build_and_install
+  if fetch_prebuilt; then
+    install_prebuilt
+  else
+    install_deps
+    fetch_sources
+    stop_running
+    build_and_install
+  fi
+  after_install
 }
 
 do_uninstall() {

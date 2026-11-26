@@ -1,8 +1,9 @@
 //! New versions of Neuron. Updates only ever deliver what is on `main`:
-//! - installed from a release (Windows installer, downloaded package): GitHub's latest release, installed by the
-//!   Windows installer (passive update mode);
-//! - built on Linux by `install.sh` (sources in `~/.local/share/neuron-src`, commit recorded as `neuron.installed` in
-//!   their git config): the head of `main` against the installed commit, rebuilt by `install.sh --update`.
+//! - Windows (and any install without `install.sh`): GitHub's latest release, installed by the Windows installer
+//!   (passive update mode);
+//! - Linux, installed by `install.sh` (`~/.config/neuron/install`: `commit=…`, `method=prebuilt|source`): the
+//!   installed commit against the package GitHub built for `main` (`main-build` pre-release, `build-info.txt`), or
+//!   against the head of `main` for a build from source; `install.sh --update` installs it.
 //!
 //! Used by the app (background check, Paramètres → Mises à jour) and by `neuron update`. Besides model prices, this
 //! is the app's only network call (none when the check is turned off).
@@ -23,6 +24,8 @@ const MAIN_HEAD_API: &str = "https://api.github.com/repos/Kwinzz/Neuron/commits/
 const RAW_FILES: &str = "https://raw.githubusercontent.com/Kwinzz/Neuron";
 const REPO_URL: &str = "https://github.com/Kwinzz/Neuron";
 const RAW_INSTALL_SH: &str = "https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh";
+/// Written last by `.github/workflows/linux-main.yml` once the packages of that commit are uploaded.
+const PREBUILT_INFO: &str = "https://github.com/Kwinzz/Neuron/releases/download/main-build/build-info.txt";
 /// A newer version was found (payload: [`UpdateInfo`]); emitted once per version.
 pub const UPDATE_AVAILABLE_EVENT: &str = "update://available";
 /// Download of the installer (payload: [`UpdateProgress`]).
@@ -121,7 +124,7 @@ fn short(commit: &str) -> &str {
     commit.get(..7).unwrap_or(commit)
 }
 
-/// [`UpdateInfo`] of a build from source: available as soon as `main` moved past the installed commit.
+/// [`UpdateInfo`] of a Linux install: available as soon as `main` moved past the installed commit.
 pub fn source_info(version: &str, installed: &str, latest_version: &str, latest: &str, now: i64) -> UpdateInfo {
     UpdateInfo {
         current: format!("{version}+{}", short(installed)),
@@ -136,26 +139,52 @@ pub fn source_info(version: &str, installed: &str, latest_version: &str, latest:
     }
 }
 
-/// Linux: sources kept by `install.sh` (`NEURON_SRC_DIR`, else `~/.local/share/neuron-src`).
-fn source_dir() -> Option<PathBuf> {
-    std::env::var_os("NEURON_SRC_DIR").map(PathBuf::from).or_else(|| dirs::data_dir().map(|d| d.join("neuron-src")))
+/// `key=value` lines (`install.sh`'s state file, the workflow's `build-info.txt`).
+fn key_value<'a>(text: &'a str, key: &str) -> Option<&'a str> {
+    text.lines()
+        .find_map(|line| line.trim().strip_prefix(key)?.strip_prefix('='))
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
 }
 
-/// Commit this Linux install was built from (recorded by `install.sh` once the package is installed).
-pub async fn installed_commit() -> Option<String> {
+/// What `install.sh` installed on this Linux machine.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LinuxInstall {
+    pub commit: String,
+    /// Package downloaded from GitHub (`false`: built from source).
+    pub prebuilt: bool,
+}
+
+pub fn parse_install_state(text: &str) -> Option<LinuxInstall> {
+    Some(LinuxInstall {
+        commit: key_value(text, "commit")?.to_string(),
+        prebuilt: key_value(text, "method") != Some("source"),
+    })
+}
+
+/// `None` on Windows / macOS, and on Linux when Neuron was not installed by `install.sh`.
+pub async fn linux_install() -> Option<LinuxInstall> {
     if !cfg!(target_os = "linux") {
         return None;
     }
-    let dir = source_dir().filter(|d| d.join(".git").exists())?;
+    let state = dirs::config_dir()?.join("neuron").join("install");
+    if let Ok(text) = tokio::fs::read_to_string(&state).await {
+        return parse_install_state(&text);
+    }
+    // install.sh of 2026-11-26 (before the state file): commit in the sources' git config.
+    let src = std::env::var_os("NEURON_SRC_DIR")
+        .map(PathBuf::from)
+        .or_else(|| dirs::data_dir().map(|d| d.join("neuron-src")))
+        .filter(|d| d.join(".git").exists())?;
     let out = tokio::process::Command::new("git")
         .arg("-C")
-        .arg(&dir)
+        .arg(&src)
         .args(["config", "--get", "neuron.installed"])
         .output()
         .await
         .ok()?;
     let commit = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    (out.status.success() && !commit.is_empty()).then_some(commit)
+    (out.status.success() && !commit.is_empty()).then_some(LinuxInstall { commit, prebuilt: false })
 }
 
 fn client(timeout: Option<Duration>) -> AppResult<reqwest::Client> {
@@ -183,18 +212,31 @@ async fn get_json(http: &reqwest::Client, url: &str) -> AppResult<Value> {
     Ok(serde_json::from_slice(&body)?)
 }
 
-/// Asks GitHub what the latest version is (no state: usable by the command line): the head of `main` for a build
-/// from source, the latest release otherwise.
+async fn get_text(http: &reqwest::Client, url: &str) -> AppResult<String> {
+    let response = http.get(url).send().await.map_err(network_error)?.error_for_status().map_err(network_error)?;
+    response.text().await.map_err(network_error)
+}
+
+fn unexpected_answer() -> AppError {
+    AppError::Other(crate::tr!("réponse de GitHub inattendue", "unexpected answer from GitHub"))
+}
+
+/// Asks GitHub what the latest version is (no state: usable by the command line). Linux install by `install.sh`:
+/// the package built for `main` (prebuilt) or the head of `main` (from source); otherwise the latest release.
 pub async fn fetch_latest() -> AppResult<UpdateInfo> {
     let http = client(Some(FETCH_TIMEOUT))?;
-    let Some(installed) = installed_commit().await else {
+    let Some(install) = linux_install().await else {
         return parse_release(&get_json(&http, RELEASES_API).await?, current_version(), now_ms());
     };
+    let installed = install.commit;
+    if install.prebuilt {
+        let info = get_text(&http, PREBUILT_INFO).await?;
+        let latest = key_value(&info, "commit").ok_or_else(unexpected_answer)?;
+        let latest_version = key_value(&info, "version").unwrap_or("?");
+        return Ok(source_info(current_version(), &installed, latest_version, latest, now_ms()));
+    }
     let head = get_json(&http, MAIN_HEAD_API).await?;
-    let latest = head
-        .get("sha")
-        .and_then(Value::as_str)
-        .ok_or_else(|| AppError::Other(crate::tr!("réponse de GitHub inattendue", "unexpected answer from GitHub")))?;
+    let latest = head.get("sha").and_then(Value::as_str).ok_or_else(unexpected_answer)?;
     // Version number on `main` (display only: the commit decides).
     let conf = get_json(&http, &format!("{RAW_FILES}/{latest}/src-tauri/tauri.conf.json")).await.ok();
     let latest_version = conf.as_ref().and_then(|c| c.get("version")).and_then(Value::as_str).unwrap_or("?");
@@ -213,7 +255,7 @@ pub async fn check(state: &Shared) -> AppResult<UpdateInfo> {
 pub async fn cached(state: &Shared) -> AppResult<Option<UpdateInfo>> {
     let stored = state.db.call(|c| crate::db::settings::get(c, CACHE_KEY)).await?;
     let Some(mut info) = stored.and_then(|v| serde_json::from_value::<UpdateInfo>(v).ok()) else { return Ok(None) };
-    match (info.latest_commit.clone(), installed_commit().await) {
+    match (info.latest_commit.clone(), linux_install().await.map(|i| i.commit)) {
         (Some(latest), Some(installed)) => {
             info.current = format!("{}+{}", current_version(), short(&installed));
             info.available = installed != latest;
@@ -321,13 +363,9 @@ pub fn launch_installer(path: &Path, relaunch: bool) -> AppResult<()> {
     Ok(())
 }
 
-/// Linux: the update command (`install.sh` from the local sources if they are there, else downloaded).
+/// Linux: the update command (always the `install.sh` of `main`: it knows how the packages are published today).
 pub fn linux_update_command() -> String {
-    let src = source_dir().map(|d| d.join("install.sh"));
-    match src.filter(|p| p.is_file()) {
-        Some(script) => format!("bash '{}' --update --yes", script.display().to_string().replace('\'', "")),
-        None => format!("curl -fsSL {RAW_INSTALL_SH} | bash -s -- --update --yes"),
-    }
+    format!("curl -fsSL {RAW_INSTALL_SH} | bash -s -- --update --yes")
 }
 
 #[cfg(test)]
@@ -390,5 +428,18 @@ mod tests {
         }))
         .unwrap();
         assert!(old.latest_commit.is_none());
+    }
+
+    #[test]
+    fn install_state_and_build_info() {
+        let state = parse_install_state("commit=9a2c798bbb\nmethod=prebuilt\n").unwrap();
+        assert_eq!(state, LinuxInstall { commit: "9a2c798bbb".into(), prebuilt: true });
+        assert!(!parse_install_state("method=source\ncommit=abc\n").unwrap().prebuilt);
+        assert!(parse_install_state("method=prebuilt\ncommit=\n").is_none());
+        let info = "commit=0123456789abcdef\nversion=0.2.2\n";
+        assert_eq!(key_value(info, "commit"), Some("0123456789abcdef"));
+        assert_eq!(key_value(info, "version"), Some("0.2.2"));
+        assert_eq!(key_value(info, "missing"), None);
+        assert_eq!(key_value("commitx=1\n", "commit"), None);
     }
 }

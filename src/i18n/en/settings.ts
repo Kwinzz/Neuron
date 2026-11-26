@@ -298,7 +298,7 @@ const settings: Translation<typeof fr> = {
   updatesHowWindows:
     "The installer starts in update mode (administrator permission asked), then Neuron restarts by itself. Your settings and install choices are kept.",
   updatesHowLinux:
-    "The update runs in a terminal (install.sh): Neuron closes during the build, start it again afterwards.",
+    "The update runs in a terminal (install.sh): Neuron closes while it is installed (a few seconds), start it again afterwards.",
   updatesAuto: "Check automatically",
   updatesAutoDescription: "At startup then every 12 h; one notification per new version.",
 };

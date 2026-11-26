@@ -15,3 +15,15 @@ if command -v mold >/dev/null 2>&1; then
   export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-fuse-ld=mold"
 fi
 export npm_config_audit=false npm_config_fund=false npm_config_prefer_offline=true
+
+# `npm ci` empties node_modules and downloads everything again: only when package-lock.json (or the Node version)
+# changed since the last build in this folder.
+neuron_npm_ci() {
+  local stamp=node_modules/.neuron-lock want
+  want="$(sha256sum package-lock.json | cut -d' ' -f1) $(node -v)"
+  if [ -d node_modules ] && [ "$(cat "$stamp" 2>/dev/null)" = "$want" ]; then
+    echo "npm: dependencies unchanged, npm ci skipped"
+    return 0
+  fi
+  npm ci && printf '%s\n' "$want" >"$stamp"
+}

@@ -1,0 +1,29 @@
+# Neuron — Arch Linux package of the prebuilt binary (built by .github/workflows/linux-main.yml, installed by
+# install.sh with `pacman -U`). To build from source instead: packaging/arch/PKGBUILD.
+pkgname=neuron
+pkgver="${NEURON_PKGVER:-0.0.0}"
+pkgrel=1
+pkgdesc="Desktop cockpit for command-line AI agents (Claude Code, Codex, Antigravity)"
+arch=('x86_64')
+url="https://github.com/Kwinzz/Neuron"
+license=('custom')
+depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator' 'openssl' 'hicolor-icon-theme')
+optdepends=(
+  'claude-code: Claude Code agent (or the Install button in Neuron)'
+  'libnotify: desktop notifications'
+  'kitty: terminal opened to install / sign in to the agents (or alacritty, konsole, gnome-terminal…)'
+)
+options=('!strip' '!debug')
+# neuron/{neuron, neuron.desktop, icons/<size>.png}
+source=("neuron-linux.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+  cd "$srcdir/neuron"
+  install -Dm755 neuron "$pkgdir/usr/bin/neuron"
+  install -Dm644 neuron.desktop "$pkgdir/usr/share/applications/neuron.desktop"
+  local size
+  for size in 32 64 128 256 512; do
+    install -Dm644 "icons/$size.png" "$pkgdir/usr/share/icons/hicolor/${size}x${size}/apps/neuron.png"
+  done
+}

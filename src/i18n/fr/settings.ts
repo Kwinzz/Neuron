@@ -299,7 +299,7 @@ const settings = {
   updatesHowWindows:
     "L'installateur se lance en mode mise à jour (autorisation administrateur demandée), puis Neuron redémarre tout seul. Vos réglages et choix d'installation sont conservés.",
   updatesHowLinux:
-    "La mise à jour s'exécute dans un terminal (install.sh) : Neuron se ferme pendant la compilation, relancez-le ensuite.",
+    "La mise à jour s'exécute dans un terminal (install.sh) : Neuron se ferme le temps de l'installer (quelques secondes), relancez-le ensuite.",
   updatesAuto: "Vérifier automatiquement",
   updatesAutoDescription: "Au démarrage puis toutes les 12 h ; une notification par nouvelle version.",
 } satisfies Record<string, Message>;

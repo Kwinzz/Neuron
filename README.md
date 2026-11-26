@@ -72,9 +72,13 @@ curl -fsSL https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh | bas
 ```
 
 The script first asks for the language (English or French, the system's by default; `--lang en` to skip the
-question), installs the dependencies (sudo is asked for), fetches the sources, builds Neuron (a few minutes the first
-time) and installs it with your distribution's package manager: `pacman` on Arch and derivatives (EndeavourOS,
-Manjaro, CachyOS…), `.deb` on Debian / Ubuntu, `.rpm` on Fedora.
+question), then downloads the package GitHub built for the last version of `main` and installs it with your
+distribution's package manager (sudo is asked for): `pacman` on Arch and derivatives (EndeavourOS, Manjaro,
+CachyOS…), `.deb` on Debian / Ubuntu, `.rpm` on Fedora. It takes a few seconds; nothing is compiled.
+
+Prebuilt packages exist for x86_64 (all three families) and ARM64 (`.deb`, `.rpm`). Elsewhere, or with
+`--from-source`, the script builds Neuron from source instead (a few minutes the first time: it installs Rust,
+Node.js and the build dependencies).
 
 **Already installed?** Run the same command again: it offers to **update**, **reinstall** or **uninstall** (your
 chats and memory are kept unless you ask to delete them).
@@ -87,15 +91,16 @@ curl -fsSL https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh | bas
 ```
 
 (`--yes` answers yes to the questions; deleting your data is never automatic.)
-The built sources stay in `~/.local/share/neuron-src` so updates are faster. To test another branch of this
-repository, put `NEURON_BRANCH=<branch>` before `bash` (`... | NEURON_BRANCH=<branch> bash`); updates always come
-back to `main`.
 
-Updates follow `main`: **Settings → Updates** (or `neuron update`) tells you when commits were added to `main` since
-your build, and rebuilds Neuron in a terminal.
+Updates follow `main`: **Settings → Updates** (or `neuron update`) tells you when a newer build of `main` is
+available and installs it in a terminal.
 
-> Debian 12 and Ubuntu 24.04 ship Node.js 18, too old for the build: install Node 20.19+ first (for example from
-> [NodeSource](https://github.com/nodesource/distributions)).
+Building from source: the sources stay in `~/.local/share/neuron-src` so later builds are faster. To test another
+branch of this repository, put `NEURON_BRANCH=<branch>` before `bash` (`... | NEURON_BRANCH=<branch> bash`; always
+built from source); updates always come back to `main`.
+
+> Building from source on Debian 12 / Ubuntu 24.04: they ship Node.js 18, too old for the build. Install Node
+> 20.19+ first (for example from [NodeSource](https://github.com/nodesource/distributions)).
 
 ### Arch Linux by hand
 
@@ -157,7 +162,7 @@ Neuron can run on a machine without a desktop (a Debian box on your network, a V
 app on your PC: its chats then appear in your sidebar, under **Devices**.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh | bash   # install (as for Linux)
+curl -fsSL https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh | bash   # install (prebuilt package, seconds)
 neuron service install            # runs in the background, starts with the machine (systemd user service)
 neuron remote enable --internet   # let your other devices control it (--internet: from outside the network too)
 neuron remote code                # shows a 6-digit code and an invitation to enter on your PC
@@ -170,6 +175,7 @@ Sign the agents in on the server once (`claude`, `codex login`…); `neuron stat
 Other commands: `neuron serve` (run in the foreground instead of the service), `neuron remote devices`,
 `neuron remote level <device> read|chat|full`, `neuron remote revoke <device>`, `neuron update`, `neuron help`.
 Logs: `journalctl --user -u neuron -f`. Firewall: allow UDP port 47831 (`ufw allow 47831/udp`).
+Updates: `neuron update` installs the latest build of `main` and restarts the service.
 
 ---
 
