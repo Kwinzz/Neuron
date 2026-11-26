@@ -17,8 +17,12 @@ const chat = {
   draftPlaceholder: "Que doit faire l'agent ? (Entrée pour démarrer le chat)",
   folderButton: "Dossier…",
   pickWorkDir: "Choisir le dossier de travail",
+  remoteDefaultFolder: "Dossier par défaut de {device}",
   folderUnavailable: "Dossier inaccessible",
   startChatFailed: "Impossible de démarrer le chat",
+  thisPc: "Ce PC",
+  runOn: "Exécuter sur : {device}",
+  runOnLabel: "Exécuter sur",
 
   // Composer
   composerPlaceholder:

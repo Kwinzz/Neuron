@@ -2,8 +2,10 @@ import { cn } from "cn";
 import { memo } from "react";
 import type { ThreadSummary } from "@/bindings/ThreadSummary";
 import { AgentBadge } from "@/components/ui/AgentBadge";
+import { DeviceBadge } from "@/components/ui/DeviceBadge";
 import { LiveTimer } from "@/components/ui/LiveTimer";
 import { StatusIconBox } from "@/components/ui/StatusIconBox";
+import { deviceOfThread } from "@/lib/deviceRouting";
 import { formatTokens } from "@/lib/format";
 import { describeStatus, STATUS, TONE_TEXT } from "@/lib/status";
 import { useLive } from "@/stores/live";
@@ -21,6 +23,7 @@ export const ActiveThreadRow = memo(function ActiveThreadRow({
   const live = useLive((s) => s.threads[id]);
   const t = live ?? fallback;
   const meta = STATUS[t.status];
+  const device = deviceOfThread(id);
 
   const handleClick = () => {
     useUi.getState().focusThread(id);
@@ -36,7 +39,10 @@ export const ActiveThreadRow = memo(function ActiveThreadRow({
       <StatusIconBox status={t.status} />
 
       <div className="min-w-0 flex-1">
-        <p className="truncate font-medium">{t.title}</p>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <p className="min-w-0 truncate font-medium">{t.title}</p>
+          <DeviceBadge device={device} compact />
+        </div>
         <p className={cn("truncate text-xs", TONE_TEXT[meta.tone])}>
           {describeStatus(t.status, live?.detail)}
         </p>

@@ -1,17 +1,18 @@
 //! Paramètres: read/update the app settings, test a generic CLI, idle-shutdown reaper.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use serde::Serialize;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, State};
 use ts_rs::TS;
 
 use crate::app_settings::{self, AppSettings, GenericCliProfile};
 use crate::error::{AppError, AppResult};
-use crate::state::AppState;
+use crate::state::Shared;
 
 #[tauri::command]
-pub async fn get_app_settings(state: State<'_, AppState>) -> AppResult<AppSettings> {
+pub async fn get_app_settings(state: State<'_, Shared>) -> AppResult<AppSettings> {
     state.db.call(|c| app_settings::load(c)).await
 }
 
@@ -20,7 +21,7 @@ pub async fn get_app_settings(state: State<'_, AppState>) -> AppResult<AppSettin
 #[tauri::command]
 pub async fn update_app_settings(
     app: AppHandle,
-    state: State<'_, AppState>,
+    state: State<'_, Shared>,
     settings: AppSettings,
 ) -> AppResult<AppSettings> {
     let previous = state.db.call(|c| app_settings::load(c)).await?;
@@ -58,8 +59,8 @@ pub struct GenericCliTest {
 
 /// Run the profile once with a tiny prompt (in the user's home directory).
 #[tauri::command]
-pub async fn test_generic_cli(app: AppHandle, profile: GenericCliProfile) -> AppResult<GenericCliTest> {
-    let cwd = app.path().home_dir().unwrap_or_else(|_| std::env::temp_dir());
+pub async fn test_generic_cli(profile: GenericCliProfile) -> AppResult<GenericCliTest> {
+    let cwd = dirs::home_dir().unwrap_or_else(std::env::temp_dir);
     let started = std::time::Instant::now();
     let result = crate::agents::generic::test_profile(profile, cwd).await;
     let duration_ms = i64::try_from(started.elapsed().as_millis()).unwrap_or(i64::MAX);
@@ -70,12 +71,11 @@ pub async fn test_generic_cli(app: AppHandle, profile: GenericCliProfile) -> App
 }
 
 /// Every minute, stop agent processes idle longer than `idleShutdownMinutes` (0 = never).
-pub fn spawn_idle_reaper(app: &AppHandle) {
-    let app = app.clone();
+pub fn spawn_idle_reaper(state: &Shared) {
+    let state = Arc::clone(state);
     tauri::async_runtime::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(60)).await;
-            let Some(state) = app.try_state::<AppState>() else { continue };
             let minutes = match state.db.call(|c| app_settings::load(c)).await {
                 Ok(s) => s.idle_shutdown_minutes,
                 Err(_) => continue,

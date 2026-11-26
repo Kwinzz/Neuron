@@ -16,5 +16,9 @@ fn main() {
     if let Some(code) = neuron_lib::memory::mcp::entry_from_args() {
         std::process::exit(code);
     }
+    // `neuron serve`, `neuron status`, `neuron remote …`: the command line (no window).
+    if let Some(code) = neuron_lib::cli::entry_from_args() {
+        std::process::exit(code);
+    }
     neuron_lib::run()
 }

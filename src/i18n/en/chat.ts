@@ -17,8 +17,12 @@ const chat: Translation<typeof fr> = {
   draftPlaceholder: "What should the agent do? (Enter to start the chat)",
   folderButton: "Folder…",
   pickWorkDir: "Choose the working folder",
+  remoteDefaultFolder: "Default folder on {device}",
   folderUnavailable: "Folder unavailable",
   startChatFailed: "Couldn't start the chat",
+  thisPc: "This PC",
+  runOn: "Run on: {device}",
+  runOnLabel: "Run on",
 
   // Composer
   composerPlaceholder: "Ask the agent something… (Enter to send, Shift+Enter for a new line, ↑ history)",

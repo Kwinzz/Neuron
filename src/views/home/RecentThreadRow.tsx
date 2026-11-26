@@ -2,9 +2,11 @@ import { type KeyboardEvent, memo } from "react";
 import type { ThreadSummary } from "@/bindings/ThreadSummary";
 import { AgentBadge } from "@/components/ui/AgentBadge";
 import { Badge } from "@/components/ui/badge";
+import { DeviceBadge } from "@/components/ui/DeviceBadge";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { t } from "@/i18n";
+import { deviceOfThread } from "@/lib/deviceRouting";
 import { formatTokens } from "@/lib/format";
 import { STATUS, TONE_TEXT } from "@/lib/status";
 import { useLive } from "@/stores/live";
@@ -19,6 +21,7 @@ export const RecentThreadRow = memo(function RecentThreadRow({ thread }: RecentT
   const live = useLive((s) => s.threads[thread.id]);
   const th = live ?? thread;
   const meta = STATUS[th.status];
+  const device = deviceOfThread(th.id);
 
   const openThread = () => {
     useUi.getState().focusThread(th.id);
@@ -41,7 +44,10 @@ export const RecentThreadRow = memo(function RecentThreadRow({ thread }: RecentT
       className="cursor-pointer duration-150 outline-none focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
     >
       <TableCell>
-        <div className="max-w-[280px] truncate font-medium">{th.title}</div>
+        <div className="flex max-w-[280px] items-center gap-1.5">
+          <span className="min-w-0 truncate font-medium">{th.title}</span>
+          <DeviceBadge device={device} compact />
+        </div>
         <div className="max-w-[280px] truncate text-xs text-muted-foreground">
           {th.projectName ?? t("home.noProject")}
         </div>

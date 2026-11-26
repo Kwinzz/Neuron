@@ -2,8 +2,10 @@ import { cn } from "cn";
 import {
   AppWindow,
   Bell,
+  Download,
   Keyboard,
   Layers,
+  MonitorSmartphone,
   Plug,
   SlidersHorizontal,
   SquareTerminal,
@@ -22,10 +24,12 @@ const NAV_ITEMS: readonly SettingsNavItem[] = [
   { id: "general", label: "settings.navGeneral", icon: SlidersHorizontal },
   { id: "background", label: "settings.navBackground", icon: AppWindow },
   { id: "agents", label: "settings.navAgents", icon: Plug },
+  { id: "devices", label: "settings.navDevices", icon: MonitorSmartphone },
   { id: "notifications", label: "settings.navNotifications", icon: Bell },
   { id: "context", label: "settings.navContext", icon: Layers },
   { id: "generic", label: "settings.navGeneric", icon: SquareTerminal },
   { id: "shortcuts", label: "settings.navShortcuts", icon: Keyboard },
+  { id: "updates", label: "settings.navUpdates", icon: Download },
 ];
 
 interface SettingsNavProps {

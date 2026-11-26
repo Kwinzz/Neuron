@@ -12,12 +12,21 @@ import { useLive } from "@/stores/live";
 const CHAT_LIMIT = 500;
 const REFRESH_THROTTLE_MS = 3000;
 const OPEN_KEY = "neuron.openProjects";
+const OPEN_DEVICES_KEY = "neuron.openDevices";
 
-function readOpen(): Record<string, boolean> {
+function readOpen(key: string): Record<string, boolean> {
   try {
-    return JSON.parse(localStorage.getItem(OPEN_KEY) ?? "{}") as Record<string, boolean>;
+    return JSON.parse(localStorage.getItem(key) ?? "{}") as Record<string, boolean>;
   } catch {
     return {};
+  }
+}
+
+function writeOpen(key: string, value: Record<string, boolean>): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* not persisted */
   }
 }
 
@@ -27,9 +36,12 @@ interface NavState {
   loaded: boolean;
   /** Expanded project folders. */
   openProjects: Record<string, boolean>;
+  /** Expanded remote-device folders (absent = follow connected state). */
+  openDevices: Record<string, boolean>;
   load: () => Promise<void>;
   scheduleRefresh: () => void;
   setProjectOpen: (projectId: string, open: boolean) => void;
+  setDeviceOpen: (deviceId: string, open: boolean) => void;
   setProjects: (projects: ProjectSummary[]) => void;
 }
 
@@ -39,7 +51,8 @@ export const useNav = create<NavState>((set, get) => ({
   projects: [],
   chats: [],
   loaded: false,
-  openProjects: readOpen(),
+  openProjects: readOpen(OPEN_KEY),
+  openDevices: readOpen(OPEN_DEVICES_KEY),
 
   load: async () => {
     try {
@@ -63,12 +76,14 @@ export const useNav = create<NavState>((set, get) => ({
 
   setProjectOpen: (projectId, open) => {
     const openProjects = { ...get().openProjects, [projectId]: open };
-    try {
-      localStorage.setItem(OPEN_KEY, JSON.stringify(openProjects));
-    } catch {
-      /* not persisted */
-    }
+    writeOpen(OPEN_KEY, openProjects);
     set({ openProjects });
+  },
+
+  setDeviceOpen: (deviceId, open) => {
+    const openDevices = { ...get().openDevices, [deviceId]: open };
+    writeOpen(OPEN_DEVICES_KEY, openDevices);
+    set({ openDevices });
   },
 
   setProjects: (projects) => set({ projects }),

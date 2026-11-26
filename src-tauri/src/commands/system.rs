@@ -6,7 +6,7 @@ use ts_rs::TS;
 
 use crate::db::migrations;
 use crate::error::{AppError, AppResult};
-use crate::state::AppState;
+use crate::state::Shared;
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,7 @@ pub struct AppInfo {
 
 /// Basic runtime information, read from local state and SQLite only.
 #[tauri::command]
-pub async fn app_info(state: State<'_, AppState>) -> AppResult<AppInfo> {
+pub async fn app_info(state: State<'_, Shared>) -> AppResult<AppInfo> {
     let (schema_version, table_count) = state
         .db
         .call(|conn| {

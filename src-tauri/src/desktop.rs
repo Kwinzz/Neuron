@@ -178,7 +178,7 @@ fn sync_autostart_setting(app: &AppHandle, settings: &AppSettings) -> AppSetting
     }
     if enabled != settings.background.launch_at_login {
         settings.background.launch_at_login = enabled;
-        let state = app.state::<crate::state::AppState>();
+        let state = app.state::<crate::state::Shared>();
         let next = settings.clone();
         if let Err(err) = tauri::async_runtime::block_on(state.db.call(move |c| crate::app_settings::save(c, next))) {
             tracing::warn!(%err, "autostart setting not synced");

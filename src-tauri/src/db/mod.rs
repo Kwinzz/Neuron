@@ -6,6 +6,7 @@ pub mod memories;
 pub mod migrations;
 pub mod projects;
 pub mod providers;
+pub mod remote;
 pub mod settings;
 pub mod threads;
 pub mod usage;

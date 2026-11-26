@@ -5,6 +5,8 @@ pub mod dashboard;
 pub mod memory;
 pub mod pricing;
 pub mod projects;
+pub mod remote;
 pub mod settings;
 pub mod system;
 pub mod threads;
+pub mod update;

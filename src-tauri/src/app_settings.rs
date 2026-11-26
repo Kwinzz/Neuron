@@ -24,6 +24,7 @@ pub struct AppSettings {
     pub generic_clis: Vec<GenericCliProfile>,
     pub background: BackgroundSettings,
     pub quick_launcher: QuickLauncherSettings,
+    pub updates: UpdateSettings,
 }
 
 impl Default for AppSettings {
@@ -36,7 +37,23 @@ impl Default for AppSettings {
             generic_clis: Vec::new(),
             background: BackgroundSettings::default(),
             quick_launcher: QuickLauncherSettings::default(),
+            updates: UpdateSettings::default(),
         }
+    }
+}
+
+/// New versions of Neuron (see `crate::update`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", default)]
+#[ts(export)]
+pub struct UpdateSettings {
+    /// Look for a new version at startup and every 12 h (GitHub), and announce it once.
+    pub auto_check: bool,
+}
+
+impl Default for UpdateSettings {
+    fn default() -> Self {
+        Self { auto_check: true }
     }
 }
 

@@ -20,10 +20,12 @@ export type SettingsSection =
   | "general"
   | "background"
   | "agents"
+  | "devices"
   | "notifications"
   | "context"
   | "generic"
-  | "shortcuts";
+  | "shortcuts"
+  | "updates";
 
 const DOCK_KEY = "neuron.dockOpen";
 

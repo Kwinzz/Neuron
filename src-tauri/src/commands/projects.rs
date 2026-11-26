@@ -9,7 +9,7 @@ use ts_rs::TS;
 use crate::context::{self, ContextBundle, GitSnapshot, RecentFile};
 use crate::db::{projects, threads};
 use crate::error::{AppError, AppResult};
-use crate::state::AppState;
+use crate::state::{AppState, Shared};
 use crate::util::now_ms;
 
 #[derive(Debug, Clone, Serialize, TS)]
@@ -44,10 +44,8 @@ async fn project(state: &AppState, project_id: &str) -> AppResult<projects::Proj
         .ok_or_else(|| AppError::NotFound(crate::tr!("projet {project_id}", "project {project_id}")))
 }
 
-/// Read `.neuron/context.md` (created from the template when missing).
-#[tauri::command]
-pub async fn project_context(state: State<'_, AppState>, project_id: String) -> AppResult<ProjectContextFile> {
-    let p = project(&state, &project_id).await?;
+pub(crate) async fn project_context_inner(state: &AppState, project_id: String) -> AppResult<ProjectContextFile> {
+    let p = project(state, &project_id).await?;
     tokio::task::spawn_blocking(move || {
         let root = PathBuf::from(&p.path);
         let (path, created) = context::ensure_context_file(&root, &p.name)?;
@@ -63,16 +61,24 @@ pub async fn project_context(state: State<'_, AppState>, project_id: String) -> 
     .await?
 }
 
+/// Read `.neuron/context.md` (created from the template when missing).
 #[tauri::command]
-pub async fn save_project_context(state: State<'_, AppState>, project_id: String, content: String) -> AppResult<()> {
-    let p = project(&state, &project_id).await?;
+pub async fn project_context(state: State<'_, Shared>, project_id: String) -> AppResult<ProjectContextFile> {
+    project_context_inner(&state, project_id).await
+}
+
+pub(crate) async fn save_project_context_inner(state: &AppState, project_id: String, content: String) -> AppResult<()> {
+    let p = project(state, &project_id).await?;
     tokio::task::spawn_blocking(move || context::write_context(&PathBuf::from(&p.path), &content)).await?
 }
 
-/// Git snapshot, recent files and the context a new chat would get right now.
 #[tauri::command]
-pub async fn project_overview(state: State<'_, AppState>, project_id: String) -> AppResult<ProjectOverview> {
-    let p = project(&state, &project_id).await?;
+pub async fn save_project_context(state: State<'_, Shared>, project_id: String, content: String) -> AppResult<()> {
+    save_project_context_inner(&state, project_id, content).await
+}
+
+pub(crate) async fn project_overview_inner(state: &AppState, project_id: String) -> AppResult<ProjectOverview> {
+    let p = project(state, &project_id).await?;
     let memory_items = state.db.call(|c| crate::db::memories::list(c)).await?;
     let opts = state.db.call(|c| crate::app_settings::load(c)).await?.context;
     tokio::task::spawn_blocking(move || {
@@ -86,8 +92,18 @@ pub async fn project_overview(state: State<'_, AppState>, project_id: String) ->
     .await?
 }
 
+/// Git snapshot, recent files and the context a new chat would get right now.
+#[tauri::command]
+pub async fn project_overview(state: State<'_, Shared>, project_id: String) -> AppResult<ProjectOverview> {
+    project_overview_inner(&state, project_id).await
+}
+
+pub(crate) async fn thread_context_inner(state: &AppState, thread_id: String) -> AppResult<Option<ContextBundle>> {
+    state.db.call(move |c| threads::context(c, &thread_id)).await
+}
+
 /// Context injected into a chat when it was created (None for chats outside a project).
 #[tauri::command]
-pub async fn thread_context(state: State<'_, AppState>, thread_id: String) -> AppResult<Option<ContextBundle>> {
-    state.db.call(move |c| threads::context(c, &thread_id)).await
+pub async fn thread_context(state: State<'_, Shared>, thread_id: String) -> AppResult<Option<ContextBundle>> {
+    thread_context_inner(&state, thread_id).await
 }

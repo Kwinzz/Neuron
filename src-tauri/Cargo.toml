@@ -8,7 +8,9 @@ rust-version = "1.85"
 [lib]
 # `_lib` suffix avoids a name clash with the bin target on Windows.
 name = "neuron_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# Desktop only: the binary links the rlib. The template's "staticlib" / "cdylib" are only for Tauri mobile (iOS /
+# Android) and doubled every build (the huge cdylib even crashed lld on Linux). Mobile: ["staticlib", "cdylib", "rlib"].
+crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2.7", features = [] }
@@ -33,9 +35,22 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 base64 = "0.22"
 similar = "2"
 sys-locale = "0.3"
+dirs = "7"
 tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-global-shortcut = "2"
+# Remote devices (see src/remote): QUIC connections dialed by public key, multi-interface mDNS discovery on the local
+# network, SPAKE2 pairing code exchange.
+iroh = { version = "1.5", default-features = false, features = ["tls-ring"] }
+swarm-discovery = "0.6.6"
+netwatch = "0.20"
+n0-future = "0.3"
+n0-watcher = "1"
+data-encoding = "2"
+futures-util = "0.3"
+tokio-stream = { version = "0.1", features = ["sync"] }
+spake2 = "0.4"
+blake3 = "1"
 
 [target.'cfg(windows)'.dependencies]
 tauri-winrt-notification = "0.7"

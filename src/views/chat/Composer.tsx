@@ -19,6 +19,7 @@ import type { SlashCommand } from "@/bindings/SlashCommand";
 import { TOGGLE_PLAN_EVENT } from "@/components/chat/ModeSwitch";
 import { SlashMenu } from "@/components/chat/SlashMenu";
 import { AGENTS } from "@/lib/agents";
+import { deviceOfThread } from "@/lib/deviceRouting";
 import { fuzzyScore, normalize } from "@/lib/fuzzy";
 import { useLive } from "@/stores/live";
 import { EMPTY_COMMANDS, slashKey, useSlash } from "@/stores/slash";
@@ -70,9 +71,10 @@ interface ComposerProps {
   /** Show the floating "Nouveaux messages" pill above the input. */
   showPill: boolean;
   onPillClick: () => void;
-  /** Provider + folder for the « / » menu (draft chat). Existing chats read them from the live store. */
+  /** Provider + folder + device for the « / » menu (draft chat). Existing chats read them from the live store. */
   slashAgent?: AgentKind;
   slashCwd?: string | null;
+  slashDevice?: string | null;
   /** Same column as the timeline, whose left gutter (pl-10) holds the agent cursor. */
   timelineGutter?: boolean;
 }
@@ -104,6 +106,7 @@ export const Composer = memo(function Composer({
   onPillClick,
   slashAgent,
   slashCwd,
+  slashDevice,
   timelineGutter = false,
 }: ComposerProps) {
   const [value, setValue] = useState("");
@@ -111,6 +114,15 @@ export const Composer = memo(function Composer({
   /** Files being copied/saved (skeleton tiles; sending waits for them). */
   const [importing, setImporting] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const device = slashDevice !== undefined ? slashDevice : threadId ? deviceOfThread(threadId) : null;
+  const prevDeviceRef = useRef(device);
+  useEffect(() => {
+    if (prevDeviceRef.current !== device) {
+      prevDeviceRef.current = device;
+      setAttachments([]);
+    }
+  }, [device]);
 
   // « / » menu: provider commands while the message is a single « /word ».
   const liveAgent = useLive((st) => (threadId ? st.threads[threadId]?.agent : undefined));
@@ -121,15 +133,15 @@ export const Composer = memo(function Composer({
   const [slashDismissedAt, setSlashDismissedAt] = useState<string | null>(null);
   const [slashIndex, setSlashIndex] = useState(0);
   const slashOpen = slashQuery !== null && agent !== undefined && agent !== "generic" && slashDismissedAt !== value;
-  const slashEntry = useSlash((st) => (agent ? st.entries[slashKey(agent, cwd)] : undefined));
+  const slashEntry = useSlash((st) => (agent ? st.entries[slashKey(agent, cwd, device)] : undefined));
   const slashCommands = slashEntry?.commands ?? EMPTY_COMMANDS;
   const slashFiltered = useMemo(
     () => (slashOpen ? rankCommands(slashCommands, slashQuery ?? "") : EMPTY_COMMANDS),
     [slashOpen, slashCommands, slashQuery],
   );
   useEffect(() => {
-    if (slashOpen && agent) useSlash.getState().load(agent, cwd);
-  }, [slashOpen, agent, cwd]);
+    if (slashOpen && agent) useSlash.getState().load(agent, cwd, device);
+  }, [slashOpen, agent, cwd, device]);
   useEffect(() => setSlashIndex(0), [slashQuery]);
 
   // Stable: the menu rows are memoized.
@@ -365,7 +377,9 @@ export const Composer = memo(function Composer({
               <NewMessagesPill onClick={onPillClick} />
             </div>
           )}
-          <InputGroup className="rounded-xl bg-card shadow-sm transition-[border-color,box-shadow,background-color] duration-200 ease-snappy dark:bg-card">
+          <InputGroup
+            className="rounded-xl bg-card shadow-sm transition-[border-color,box-shadow,background-color] duration-200 ease-snappy dark:bg-card"
+          >
             {(attachments.length > 0 || importing > 0) && (
               <InputGroupAddon align="block-start" className="p-0">
                 <AttachmentTray items={attachments} pending={importing} onRemove={removeAttachment} />

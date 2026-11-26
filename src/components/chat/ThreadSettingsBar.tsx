@@ -1,4 +1,5 @@
 import { memo, useCallback } from "react";
+import { deviceOfThread } from "@/lib/deviceRouting";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import type { ChatSettings } from "@/lib/models";
 import { useLive } from "@/stores/live";
@@ -17,6 +18,7 @@ export const ThreadSettingsBar = memo(function ThreadSettingsBar({ threadId }: {
   const effort = useLive((s) => s.threads[threadId]?.effort ?? null);
   const permissionMode = useLive((s) => s.threads[threadId]?.permissionMode ?? "manual");
   const known = useLive((s) => threadId in s.threads);
+  const device = deviceOfThread(threadId);
 
   const onChange = useCallback(
     (next: ChatSettings) => {
@@ -35,6 +37,7 @@ export const ThreadSettingsBar = memo(function ThreadSettingsBar({ threadId }: {
       key={threadId}
       value={{ agent, model, effort, permissionMode }}
       onChange={onChange}
+      device={device}
       lockAgent
       disabled={!known}
     />

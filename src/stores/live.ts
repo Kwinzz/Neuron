@@ -150,6 +150,12 @@ export const useLive = create<LiveState>((set, get) => ({
           next = { ...next, status: "awaiting_approval", detail: event.toolName };
           if (threadId !== focusedThreadId) attention = { ...attention, [threadId]: "approval" };
           break;
+        case "PermissionResolved":
+          if (attention[threadId] === "approval") {
+            attention = { ...attention };
+            delete attention[threadId];
+          }
+          break;
         case "PermissionModeChanged":
           next = { ...next, permissionMode: event.mode };
           break;

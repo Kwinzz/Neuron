@@ -9,6 +9,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAgentEventBridge } from "@/hooks/useAgentEventBridge";
 import { useHotkey } from "@/hooks/useHotkey";
+import { useRemoteDevices } from "@/hooks/useRemoteDevices";
+import { useUpdates } from "@/hooks/useUpdates";
 import { ipc } from "@/lib/ipc";
 import { useDashboard } from "@/stores/dashboard";
 import { useLayout } from "@/stores/layout";
@@ -85,6 +87,8 @@ export function AppShell() {
   );
   const [scrollRoot, setScrollRoot] = useState<HTMLElement | null>(null);
   useAgentEventBridge();
+  useRemoteDevices();
+  useUpdates();
   useHydrateOpenThread();
   usePrefetchViews();
 

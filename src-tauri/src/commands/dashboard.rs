@@ -1,9 +1,10 @@
 //! Mission Control, Live Dock and palette data. Everything comes from local SQLite.
 
+use std::sync::Arc;
 use std::time::Instant;
 
 use serde::Serialize;
-use tauri::{AppHandle, State};
+use tauri::State;
 use ts_rs::TS;
 
 use crate::db::projects::{self, ProjectSummary};
@@ -11,7 +12,7 @@ use crate::db::providers::{self, AgentLiveQuotas, ProviderUpdate, ProviderUsage}
 use crate::db::threads::{self, ThreadSummary};
 use crate::db::usage::{self, UsageRange, UsageReport};
 use crate::error::{AppError, AppResult};
-use crate::state::AppState;
+use crate::state::{AppState, Shared};
 use crate::util::now_ms;
 
 /// Everything the home screen needs, in one round-trip.
@@ -33,8 +34,10 @@ pub struct DashboardSnapshot {
 
 const RECENT_LIMIT: u32 = 12;
 
-#[tauri::command]
-pub async fn dashboard_snapshot(state: State<'_, AppState>, range: Option<UsageRange>) -> AppResult<DashboardSnapshot> {
+pub(crate) async fn dashboard_snapshot_inner(
+    state: &AppState,
+    range: Option<UsageRange>,
+) -> AppResult<DashboardSnapshot> {
     let range = range.unwrap_or(UsageRange::Week);
     state
         .db
@@ -60,22 +63,37 @@ pub async fn dashboard_snapshot(state: State<'_, AppState>, range: Option<UsageR
         .await
 }
 
-/// Home screen shown: ask for fresh subscription windows (Antigravity `/quota`, Codex / Claude logs). Both are
-/// throttled; the dashboard reloads on `quotas://changed` / `usage://changed`.
 #[tauri::command]
-pub async fn refresh_quotas(app: AppHandle, state: State<'_, AppState>) -> AppResult<()> {
-    crate::usage_import::trigger(&app);
-    tauri::async_runtime::spawn(crate::agents::antigravity::quota::refresh(state.db.clone(), app));
+pub async fn dashboard_snapshot(state: State<'_, Shared>, range: Option<UsageRange>) -> AppResult<DashboardSnapshot> {
+    dashboard_snapshot_inner(&state, range).await
+}
+
+pub(crate) async fn refresh_quotas_inner(state: &Shared) -> AppResult<()> {
+    crate::usage_import::trigger(state);
+    tauri::async_runtime::spawn(crate::agents::antigravity::quota::refresh(
+        state.db.clone(),
+        Arc::clone(&state.events),
+    ));
     Ok(())
 }
 
+/// Home screen shown: ask for fresh subscription windows (Antigravity `/quota`, Codex / Claude logs). Both are
+/// throttled; the dashboard reloads on `quotas://changed` / `usage://changed`.
 #[tauri::command]
-pub async fn usage_report(state: State<'_, AppState>, range: UsageRange) -> AppResult<UsageReport> {
+pub async fn refresh_quotas(state: State<'_, Shared>) -> AppResult<()> {
+    refresh_quotas_inner(&state).await
+}
+
+pub(crate) async fn usage_report_inner(state: &AppState, range: UsageRange) -> AppResult<UsageReport> {
     state.db.call(move |conn| usage::report(conn, range, now_ms())).await
 }
 
 #[tauri::command]
-pub async fn update_provider(state: State<'_, AppState>, update: ProviderUpdate) -> AppResult<ProviderUsage> {
+pub async fn usage_report(state: State<'_, Shared>, range: UsageRange) -> AppResult<UsageReport> {
+    usage_report_inner(&state, range).await
+}
+
+pub(crate) async fn update_provider_inner(state: &AppState, update: ProviderUpdate) -> AppResult<ProviderUsage> {
     state
         .db
         .call(move |conn| {
@@ -89,17 +107,34 @@ pub async fn update_provider(state: State<'_, AppState>, update: ProviderUpdate)
 }
 
 #[tauri::command]
-pub async fn list_projects(state: State<'_, AppState>) -> AppResult<Vec<ProjectSummary>> {
+pub async fn update_provider(state: State<'_, Shared>, update: ProviderUpdate) -> AppResult<ProviderUsage> {
+    update_provider_inner(&state, update).await
+}
+
+pub(crate) async fn list_projects_inner(state: &AppState) -> AppResult<Vec<ProjectSummary>> {
     state.db.call(|conn| projects::list(conn)).await
 }
 
 #[tauri::command]
-pub async fn list_threads(state: State<'_, AppState>, limit: Option<u32>) -> AppResult<Vec<ThreadSummary>> {
+pub async fn list_projects(state: State<'_, Shared>) -> AppResult<Vec<ProjectSummary>> {
+    list_projects_inner(&state).await
+}
+
+pub(crate) async fn list_threads_inner(state: &AppState, limit: Option<u32>) -> AppResult<Vec<ThreadSummary>> {
     let limit = limit.unwrap_or(50).min(500);
     state.db.call(move |conn| threads::list_recent(conn, limit)).await
 }
 
 #[tauri::command]
-pub async fn get_thread(state: State<'_, AppState>, id: String) -> AppResult<ThreadSummary> {
+pub async fn list_threads(state: State<'_, Shared>, limit: Option<u32>) -> AppResult<Vec<ThreadSummary>> {
+    list_threads_inner(&state, limit).await
+}
+
+pub(crate) async fn get_thread_inner(state: &AppState, id: String) -> AppResult<ThreadSummary> {
     state.db.call(move |conn| threads::get(conn, &id)?.ok_or_else(|| AppError::NotFound(format!("thread {id}")))).await
+}
+
+#[tauri::command]
+pub async fn get_thread(state: State<'_, Shared>, id: String) -> AppResult<ThreadSummary> {
+    get_thread_inner(&state, id).await
 }

@@ -9,7 +9,6 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
-use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
 
 use crate::agents::access;
@@ -24,6 +23,8 @@ use crate::db::Db;
 use crate::db::chat::{self, ToolStatus};
 use crate::db::threads::{self, ThreadRuntime};
 use crate::error::{AppError, AppResult};
+use crate::events::{self, EventSink};
+use crate::state::Shared;
 use crate::util::now_ms;
 
 /// How long a stop request may take before the process tree is killed.
@@ -55,6 +56,8 @@ pub struct AgentRegistry {
     adapters: HashMap<AgentKind, Arc<dyn AgentAdapter>>,
     /// Serializes session spawning (avoids double spawn on fast double-send).
     spawn_lock: tokio::sync::Mutex<u64>,
+    /// Chats stopped while their process was still being started: their prompt is never sent.
+    pending_stops: Mutex<std::collections::HashSet<String>>,
     /// Neuron executable + memory paths: every session gets the memory MCP server (None in tests).
     mcp: Option<(PathBuf, crate::memory::MemoryPaths)>,
 }
@@ -66,7 +69,13 @@ impl Default for AgentRegistry {
 }
 
 /// Run an Antigravity local command (`/quota`…) for a chat: its output becomes a command card.
-async fn run_agy_command(app: AppHandle, db: Db, rt: ThreadRuntime, name: &'static str, track_status: bool) {
+async fn run_agy_command(
+    events: Arc<dyn EventSink>,
+    db: Db,
+    rt: ThreadRuntime,
+    name: &'static str,
+    track_status: bool,
+) {
     use crate::agents::antigravity::quota;
     let cwd = rt.cwd.as_deref().map(PathBuf::from).filter(|p| p.is_dir()).unwrap_or_else(std::env::temp_dir);
     let id = rt.id.clone();
@@ -77,7 +86,7 @@ async fn run_agy_command(app: AppHandle, db: Db, rt: ThreadRuntime, name: &'stat
         }
         Err(err) => (Err(err.to_string()), Vec::new()),
     };
-    quota::store(&db, &app, windows).await;
+    quota::store(&db, events.as_ref(), windows).await;
     let status = if outcome.is_ok() { ThreadStatus::Done } else { ThreadStatus::Error };
     let item_id = uuid::Uuid::new_v4().to_string();
     let saved = {
@@ -102,24 +111,26 @@ async fn run_agy_command(app: AppHandle, db: Db, rt: ThreadRuntime, name: &'stat
         tracing::warn!(thread = %id, %err, "agy command not saved");
     }
     match outcome {
-        Ok(text) => emit(&app, &id, AgentEvent::CommandOutput { message_id: item_id, name: name.to_string(), text }),
+        Ok(text) => {
+            emit(events.as_ref(), &id, AgentEvent::CommandOutput { message_id: item_id, name: name.to_string(), text })
+        }
         Err(message) => {
             let issue = access::classify_error(&message);
-            emit(&app, &id, AgentEvent::ThreadError { message, fatal: false, issue })
+            emit(events.as_ref(), &id, AgentEvent::ThreadError { message, fatal: false, issue })
         }
     }
     if track_status {
-        emit(&app, &id, AgentEvent::ThreadStatusChanged { status, detail: None });
+        emit(events.as_ref(), &id, AgentEvent::ThreadStatusChanged { status, detail: None });
     }
 }
 
-fn emit(app: &AppHandle, thread_id: &str, event: AgentEvent) {
+pub(crate) fn emit_event(events: &dyn EventSink, thread_id: &str, event: AgentEvent) {
+    emit(events, thread_id, event);
+}
+
+fn emit(events: &dyn EventSink, thread_id: &str, event: AgentEvent) {
     let envelope = AgentEventEnvelope { thread_id: thread_id.to_string(), ts: now_ms(), event };
-    // Main window only: it is the single consumer (`useAgentEventBridge`). Broadcasting also ran every token
-    // through the hidden quick-prompt webview — one script evaluation per event, costly in WebKitGTK.
-    if let Err(err) = app.emit_to("main", AGENT_EVENT_CHANNEL, envelope) {
-        tracing::warn!(%err, "emit failed");
-    }
+    events::emit(events, AGENT_EVENT_CHANNEL, &envelope);
 }
 
 /// "Corrige le bug de login\n…" → "Corrige le bug de login" (≤ 60 chars).
@@ -153,7 +164,13 @@ impl AgentRegistry {
         adapters.insert(AgentKind::Antigravity, Arc::new(AntigravityAdapter::default()));
         adapters.insert(AgentKind::Codex, Arc::new(CodexAdapter::default()));
         adapters.insert(AgentKind::Generic, Arc::new(GenericAdapter));
-        Self { sessions: Mutex::new(HashMap::new()), adapters, spawn_lock: tokio::sync::Mutex::new(0), mcp }
+        Self {
+            sessions: Mutex::new(HashMap::new()),
+            adapters,
+            spawn_lock: tokio::sync::Mutex::new(0),
+            pending_stops: Mutex::new(std::collections::HashSet::new()),
+            mcp,
+        }
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, HashMap<String, ActiveSession>> {
@@ -176,12 +193,13 @@ impl AgentRegistry {
     /// Send a user turn, spawning (or resuming) the session if needed.
     pub async fn send_prompt(
         self: &Arc<Self>,
-        app: &AppHandle,
-        db: &Db,
+        state: &Shared,
         thread_id: &str,
         text: &str,
         attachments: Vec<crate::attachments::Attachment>,
     ) -> AppResult<()> {
+        let db = &state.db;
+        let sink = state.events.as_ref();
         let text = text.trim().to_string();
         if text.is_empty() && attachments.is_empty() {
             return Err(AppError::Invalid(crate::tr!("message vide", "empty message")));
@@ -202,14 +220,16 @@ impl AgentRegistry {
         let track_status = local.is_none() || !busy;
 
         // Persist the user message first so it is never lost, even if the spawn fails.
+        let message_id = uuid::Uuid::new_v4().to_string();
         let first_message = {
-            let (id, t, project) = (thread_id.to_string(), text.clone(), runtime.project_id.clone());
+            let (id, mid, t, project) =
+                (thread_id.to_string(), message_id.clone(), text.clone(), runtime.project_id.clone());
             let meta = (!attachments.is_empty()).then(|| json!({ "attachments": attachments }));
             let first_name = attachments.first().map(|a| a.name.clone());
             db.call(move |c| {
                 let now = now_ms();
                 let first = threads::user_message_count(c, &id)? == 0;
-                chat::insert_message(c, &uuid::Uuid::new_v4().to_string(), &id, "user", &t, meta.as_ref(), now)?;
+                chat::insert_message(c, &mid, &id, "user", &t, meta.as_ref(), now)?;
                 if !t.is_empty() {
                     chat::record_prompt(c, project.as_deref(), &t, now)?;
                 }
@@ -225,12 +245,17 @@ impl AgentRegistry {
             })
             .await?
         };
+        emit(
+            sink,
+            thread_id,
+            AgentEvent::UserMessage { message_id, text: text.clone(), attachments: attachments.clone() },
+        );
         if let Some(name) = local {
             if track_status {
-                emit(app, thread_id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::Starting, detail: None });
+                emit(sink, thread_id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::Starting, detail: None });
             }
-            let (app, db, runtime) = (app.clone(), db.clone(), runtime.clone());
-            tauri::async_runtime::spawn(async move { run_agy_command(app, db, runtime, name, track_status).await });
+            let (events, db, runtime) = (Arc::clone(&state.events), db.clone(), runtime.clone());
+            tauri::async_runtime::spawn(async move { run_agy_command(events, db, runtime, name, track_status).await });
             return Ok(());
         }
         // Agents without a system-prompt option get the Neuron intro + project context in front of the first
@@ -250,10 +275,12 @@ impl AgentRegistry {
         } else {
             text
         };
-        emit(app, thread_id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::Starting, detail: None });
+        emit(sink, thread_id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::Starting, detail: None });
+        // A stop from before this message must not cancel it.
+        self.pending_stops.lock().unwrap_or_else(std::sync::PoisonError::into_inner).remove(thread_id);
 
         for attempt in 0..2 {
-            let sender = match self.ensure_session(app, db, &runtime).await {
+            let sender = match self.ensure_session(state, &runtime).await {
                 Ok(sender) => sender,
                 // CLI missing: a chat error with the « Installer » action rather than a failed send.
                 Err(err @ AppError::AgentNotInstalled(_)) => {
@@ -275,12 +302,21 @@ impl AgentRegistry {
                         threads::set_status(c, &tid, ThreadStatus::Error, now)
                     })
                     .await?;
-                    emit(app, thread_id, AgentEvent::ThreadError { message, fatal: false, issue });
-                    emit(app, thread_id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::Error, detail: None });
+                    emit(sink, thread_id, AgentEvent::ThreadError { message, fatal: false, issue });
+                    emit(
+                        sink,
+                        thread_id,
+                        AgentEvent::ThreadStatusChanged { status: ThreadStatus::Error, detail: None },
+                    );
                     return Ok(());
                 }
                 Err(err) => return Err(err),
             };
+            // Stopped while the process was starting: keep it (the next message reuses it) but never send this one.
+            if self.pending_stops.lock().unwrap_or_else(std::sync::PoisonError::into_inner).remove(thread_id) {
+                tracing::info!(thread = %thread_id, "prompt dropped: stopped while the agent was starting");
+                return Ok(());
+            }
             let turn = crate::agents::UserTurn { text: text.clone(), attachments: attachments.clone() };
             if sender.send(SessionCommand::Prompt(turn)).is_ok() {
                 if let Some(s) = self.lock().get_mut(thread_id) {
@@ -303,8 +339,7 @@ impl AgentRegistry {
 
     async fn ensure_session(
         self: &Arc<Self>,
-        app: &AppHandle,
-        db: &Db,
+        state: &Shared,
         runtime: &ThreadRuntime,
     ) -> AppResult<mpsc::UnboundedSender<SessionCommand>> {
         let mut generation = self.spawn_lock.lock().await;
@@ -328,7 +363,7 @@ impl AgentRegistry {
         // Generic CLIs: the chat's model is the profile id, resolved from Paramètres at each spawn.
         let generic = if runtime.agent == AgentKind::Generic {
             let wanted = runtime.model.clone().unwrap_or_default();
-            db.call(|c| crate::app_settings::load(c)).await?.generic_clis.into_iter().find(|p| p.id == wanted)
+            state.db.call(|c| crate::app_settings::load(c)).await?.generic_clis.into_iter().find(|p| p.id == wanted)
         } else {
             None
         };
@@ -388,9 +423,9 @@ impl AgentRegistry {
         tracing::info!(thread = %runtime.id, pid = ?handle.pid, resume = spec.resume.is_some(), "agent session started");
 
         let registry = Arc::clone(self);
-        let (app, db, rt) = (app.clone(), db.clone(), runtime.clone());
+        let (state, rt) = (Arc::clone(state), runtime.clone());
         tauri::async_runtime::spawn(async move {
-            registry.pump(app, db, rt, handle.events, injected, gen_id).await;
+            registry.pump(state, rt, handle.events, injected, gen_id).await;
         });
         Ok(commands)
     }
@@ -459,10 +494,34 @@ impl AgentRegistry {
     }
 
     /// Stop the current turn: interrupt, then kill the process tree if it doesn't comply in time.
-    pub fn stop(self: &Arc<Self>, app: &AppHandle, db: &Db, thread_id: &str) -> AppResult<()> {
+    pub fn stop(self: &Arc<Self>, events: &Arc<dyn EventSink>, db: &Db, thread_id: &str) -> AppResult<()> {
         let pid = {
             let mut sessions = self.lock();
-            let Some(session) = sessions.get_mut(thread_id) else { return Ok(()) };
+            let Some(session) = sessions.get_mut(thread_id) else {
+                // No process yet (still starting): remember the stop and end the turn now.
+                drop(sessions);
+                self.pending_stops
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .insert(thread_id.to_string());
+                let (db, id, events) = (db.clone(), thread_id.to_string(), Arc::clone(events));
+                tauri::async_runtime::spawn(async move {
+                    let tid = id.clone();
+                    let _ = db
+                        .call(move |c| {
+                            let now = now_ms();
+                            chat::close_dangling_tools(c, &tid, now)?;
+                            threads::set_status(c, &tid, ThreadStatus::Cancelled, now)
+                        })
+                        .await;
+                    emit(
+                        events.as_ref(),
+                        &id,
+                        AgentEvent::ThreadStatusChanged { status: ThreadStatus::Cancelled, detail: None },
+                    );
+                });
+                return Ok(());
+            };
             session.stop_requested = true;
             // Deny pending permissions so the agent is not left waiting.
             for (request_id, (_, input)) in session.pending.drain() {
@@ -479,7 +538,7 @@ impl AgentRegistry {
         };
 
         let registry = Arc::clone(self);
-        let (app, db, id) = (app.clone(), db.clone(), thread_id.to_string());
+        let (events, db, id) = (Arc::clone(events), db.clone(), thread_id.to_string());
         tauri::async_runtime::spawn(async move {
             tokio::time::sleep(STOP_GRACE).await;
             let still_stopping = registry.lock().get(&id).is_some_and(|s| s.stop_requested);
@@ -497,7 +556,11 @@ impl AgentRegistry {
                         threads::set_status(c, &tid, ThreadStatus::Cancelled, now)
                     })
                     .await;
-                emit(&app, &id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::Cancelled, detail: None });
+                emit(
+                    events.as_ref(),
+                    &id,
+                    AgentEvent::ThreadStatusChanged { status: ThreadStatus::Cancelled, detail: None },
+                );
             }
         });
         Ok(())
@@ -561,13 +624,14 @@ impl AgentRegistry {
 
     async fn pump(
         self: Arc<Self>,
-        app: AppHandle,
-        db: Db,
+        state: Shared,
         rt: ThreadRuntime,
         mut events: mpsc::UnboundedReceiver<AdapterEvent>,
         mut injected: mpsc::UnboundedReceiver<AdapterEvent>,
         generation: u64,
     ) {
+        let db = &state.db;
+        let sink = state.events.as_ref();
         let id = rt.id.clone();
         let mut model = rt.model.clone();
         let mut cumulative = {
@@ -622,16 +686,16 @@ impl AgentRegistry {
                         persist!(move |c| threads::set_status(c, &tid, status, now_ms()));
                     }
                     if changed {
-                        emit(&app, &id, AgentEvent::ThreadStatusChanged { status, detail });
+                        emit(sink, &id, AgentEvent::ThreadStatusChanged { status, detail });
                     }
                 }
                 AdapterEvent::ModeChanged(mode) => {
                     let (tid, m) = (id.clone(), mode.clone());
                     persist!(move |c| threads::set_permission_mode(c, &tid, &m));
-                    emit(&app, &id, AgentEvent::PermissionModeChanged { mode });
+                    emit(sink, &id, AgentEvent::PermissionModeChanged { mode });
                 }
                 AdapterEvent::TextDelta { item_id, channel, text } => {
-                    emit(&app, &id, AgentEvent::MessageDelta { message_id: item_id, channel, text });
+                    emit(sink, &id, AgentEvent::MessageDelta { message_id: item_id, channel, text });
                 }
                 AdapterEvent::BlockCompleted { item_id, channel, text } => {
                     let role = match channel {
@@ -643,7 +707,7 @@ impl AgentRegistry {
                     }
                     let (tid, mid) = (id.clone(), item_id.clone());
                     persist!(move |c| chat::insert_message(c, &mid, &tid, role, &text, None, now_ms()));
-                    emit(&app, &id, AgentEvent::MessageCompleted { message_id: item_id });
+                    emit(sink, &id, AgentEvent::MessageCompleted { message_id: item_id });
                 }
                 AdapterEvent::CommandOutput { item_id, name, text } => {
                     command_turn = true;
@@ -653,7 +717,7 @@ impl AgentRegistry {
                             chat::insert_message(c, &mid, &tid, "command", &out, Some(&json!({ "name": n })), now_ms())
                         });
                     }
-                    emit(&app, &id, AgentEvent::CommandOutput { message_id: item_id, name, text });
+                    emit(sink, &id, AgentEvent::CommandOutput { message_id: item_id, name, text });
                 }
                 AdapterEvent::ToolCallStart { id: tool_id, name, input, parent_id } => {
                     // First thing: the CLI writes the file right after announcing the call.
@@ -664,7 +728,7 @@ impl AgentRegistry {
                         persist!(move |c| chat::insert_tool_call(c, &tool, &tid, &n, &inp, now_ms()));
                     }
                     emit(
-                        &app,
+                        sink,
                         &id,
                         AgentEvent::ToolCallStart {
                             tool_call_id: tool_id,
@@ -680,7 +744,7 @@ impl AgentRegistry {
                         persist!(move |c| threads::set_status(c, &tid, status, now_ms()));
                     }
                     if changed {
-                        emit(&app, &id, AgentEvent::ThreadStatusChanged { status, detail });
+                        emit(sink, &id, AgentEvent::ThreadStatusChanged { status, detail });
                     }
                 }
                 AdapterEvent::ToolCallResult { id: tool_id, output, is_error } => {
@@ -690,7 +754,7 @@ impl AgentRegistry {
                         let (tool, out, ch) = (tool_id.clone(), output.clone(), changes.clone());
                         persist!(move |c| chat::finish_tool_call(c, &tool, &out, status, &ch, now_ms()));
                     }
-                    emit(&app, &id, AgentEvent::ToolCallResult { tool_call_id: tool_id, output, is_error, changes });
+                    emit(sink, &id, AgentEvent::ToolCallResult { tool_call_id: tool_id, output, is_error, changes });
                 }
                 AdapterEvent::PermissionRequest { request_id, tool_name, description, input, .. } => {
                     if let Some(s) = self.lock().get_mut(&id) {
@@ -703,8 +767,8 @@ impl AgentRegistry {
                         let tid = id.clone();
                         persist!(move |c| threads::set_status(c, &tid, ThreadStatus::AwaitingApproval, now_ms()));
                     }
-                    emit(&app, &id, AgentEvent::PermissionRequest { request_id, tool_name, description, input });
-                    emit(&app, &id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::AwaitingApproval, detail });
+                    emit(sink, &id, AgentEvent::PermissionRequest { request_id, tool_name, description, input });
+                    emit(sink, &id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::AwaitingApproval, detail });
                 }
                 AdapterEvent::TurnComplete { mut usage, duration_ms, error } => {
                     let (stopped, shutdown) = self.take_flags(&id, generation);
@@ -717,13 +781,13 @@ impl AgentRegistry {
                     }
                     // The CLI logged this turn: bring it into the dashboard now (logs are its source of truth).
                     if matches!(rt.agent, AgentKind::ClaudeCode | AgentKind::Codex) {
-                        crate::usage_import::trigger(&app);
+                        crate::usage_import::trigger(&state);
                     }
                     // Antigravity doesn't stream its quotas: ask for them after each turn (no token used).
                     if rt.agent == AgentKind::Antigravity {
                         tauri::async_runtime::spawn(crate::agents::antigravity::quota::refresh(
                             db.clone(),
-                            app.clone(),
+                            Arc::clone(&state.events),
                         ));
                     }
                     // CLIs that only report tokens (Codex, Antigravity): price them at the public API rate.
@@ -777,7 +841,7 @@ impl AgentRegistry {
                             chat::close_dangling_tools(c, &tid, now)
                         });
                     }
-                    emit(&app, &id, AgentEvent::TokenUsageUpdate { delta: usage, cumulative, duration_ms });
+                    emit(sink, &id, AgentEvent::TokenUsageUpdate { delta: usage, cumulative, duration_ms });
                     let text = std::mem::take(&mut last_text);
                     if !silent && !stopped {
                         use crate::agents::summary::{TurnOutcome, turn_summary};
@@ -785,13 +849,13 @@ impl AgentRegistry {
                             Some(message) => (TurnOutcome::Failure, turn_summary(message).1),
                             None => turn_summary(&text),
                         };
-                        emit(&app, &id, AgentEvent::TurnSummary { outcome, summary });
+                        emit(sink, &id, AgentEvent::TurnSummary { outcome, summary });
                     }
                     let status = if stopped {
                         ThreadStatus::Cancelled
                     } else if let Some(message) = error {
                         let issue = access::classify_error(&message);
-                        emit(&app, &id, AgentEvent::ThreadError { message, fatal: false, issue });
+                        emit(sink, &id, AgentEvent::ThreadError { message, fatal: false, issue });
                         ThreadStatus::Error
                     } else {
                         ThreadStatus::Done
@@ -799,13 +863,13 @@ impl AgentRegistry {
                     last_status = Some((status, None));
                     let tid = id.clone();
                     persist!(move |c| threads::set_status(c, &tid, status, now_ms()));
-                    emit(&app, &id, AgentEvent::ThreadStatusChanged { status, detail: None });
+                    emit(sink, &id, AgentEvent::ThreadStatusChanged { status, detail: None });
                 }
                 AdapterEvent::RateLimits(windows) => {
                     let agent = rt.agent;
                     persist!(move |c| crate::db::providers::store_live_windows(c, agent, &windows, now_ms()));
                     // The bars move during the turn, not only at its end.
-                    let _ = app.emit(crate::agents::antigravity::quota::QUOTAS_CHANGED_EVENT, ());
+                    events::emit(sink, crate::agents::antigravity::quota::QUOTAS_CHANGED_EVENT, &());
                 }
                 AdapterEvent::Subagent {
                     tool_call_id,
@@ -817,7 +881,7 @@ impl AgentRegistry {
                     last_tool,
                 } => {
                     emit(
-                        &app,
+                        sink,
                         &id,
                         AgentEvent::SubagentUpdate {
                             tool_call_id,
@@ -845,8 +909,9 @@ impl AgentRegistry {
                     };
                     let was_active = last_status.as_ref().is_some_and(|(s, _)| s.is_active());
                     tracing::info!(thread = %id, ?code, was_active, "agent session exited");
-                    if was_active && stopped && !shutdown {
-                        // Stop on an agent without an interrupt message = kill: that's a cancellation.
+                    if stopped && !shutdown {
+                        // Stop on an agent without an interrupt message = kill: that's a cancellation — also when
+                        // it was killed before reporting anything (Antigravity still starting: no status yet).
                         let tid = id.clone();
                         persist!(move |c| {
                             let now = now_ms();
@@ -854,7 +919,7 @@ impl AgentRegistry {
                             threads::set_status(c, &tid, ThreadStatus::Cancelled, now)
                         });
                         emit(
-                            &app,
+                            sink,
                             &id,
                             AgentEvent::ThreadStatusChanged { status: ThreadStatus::Cancelled, detail: None },
                         );
@@ -891,8 +956,8 @@ impl AgentRegistry {
                                 threads::set_status(c, &tid, ThreadStatus::Error, now)
                             });
                         }
-                        emit(&app, &id, AgentEvent::ThreadError { message, fatal: true, issue });
-                        emit(&app, &id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::Error, detail: None });
+                        emit(sink, &id, AgentEvent::ThreadError { message, fatal: true, issue });
+                        emit(sink, &id, AgentEvent::ThreadStatusChanged { status: ThreadStatus::Error, detail: None });
                     }
                     break;
                 }

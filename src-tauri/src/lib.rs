@@ -3,26 +3,34 @@
 pub mod agents;
 pub mod app_settings;
 pub mod attachments;
+pub mod background;
+pub mod cli;
 pub mod commands;
 pub mod context;
+pub mod control;
 pub mod db;
 pub mod desktop;
 pub mod env_path;
 pub mod error;
+pub mod events;
 pub mod i18n;
 pub mod memory;
 pub mod notifications;
 pub mod pricing;
+pub mod remote;
 pub mod state;
+pub mod update;
 pub mod usage_import;
 pub mod util;
 
+use std::sync::Arc;
 use std::time::Instant;
 
 use tauri::{Manager, RunEvent};
 use tracing_subscriber::EnvFilter;
 
-use crate::state::AppState;
+use crate::events::{EventSink, TauriSink};
+use crate::state::{AppPaths, AppState, Shared};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -50,7 +58,12 @@ pub fn run() {
             // CLIs installed since the session started (or in the installers' folders) are found right away.
             env_path::probe_login_shell();
             env_path::refresh_path();
-            let state = AppState::init(app.handle(), started)?;
+            let paths = AppPaths::resolve()?;
+            // `neuron serve` running on the same data (server mode, before the app was opened): it stops, the app
+            // takes over its chats and endpoint.
+            tauri::async_runtime::block_on(control::take_over(&paths.data_dir));
+            let events: Arc<dyn EventSink> = Arc::new(TauriSink(app.handle().clone()));
+            let state: Shared = Arc::new(AppState::open(paths, events, started)?);
             tracing::info!(
                 setup_ms = state.setup_ms,
                 db_open_us = state.db_open_us,
@@ -81,14 +94,13 @@ pub fn run() {
                 }
             }
             i18n::set(settings.language.unwrap_or(i18n::Language::En));
-            app.manage(state);
+            app.manage(Arc::clone(&state));
             // Tray, global shortcut, start with Windows; shows the main window unless started in the background.
             desktop::setup(app.handle(), &settings);
-            commands::memory::spawn_memory_watcher(app.handle());
-            commands::settings::spawn_idle_reaper(app.handle());
-            commands::pricing::spawn_price_refresh(app.handle());
-            commands::pricing::spawn_agy_quota_refresh(app.handle());
-            usage_import::spawn_periodic(app.handle());
+            background::start(&state);
+            // Only here, not in `neuron serve`: a version is announced once, to the app that can show it.
+            update::spawn_periodic(&state);
+            spawn_control(app.handle(), &state);
             Ok(())
         })
         .on_window_event(desktop::on_window_event)
@@ -152,6 +164,25 @@ pub fn run() {
             commands::memory::disconnect_antigravity_mcp,
             commands::threads::create_project,
             commands::threads::delete_project,
+            commands::remote::remote_status,
+            commands::remote::remote_set_enabled,
+            commands::remote::remote_set_device_name,
+            commands::remote::remote_set_internet,
+            commands::remote::remote_start_pairing,
+            commands::remote::remote_cancel_pairing,
+            commands::remote::remote_nearby,
+            commands::remote::remote_pair,
+            commands::remote::remote_pair_invite,
+            commands::remote::remote_devices,
+            commands::remote::remote_set_level,
+            commands::remote::remote_revoke,
+            commands::remote::remote_forget,
+            commands::remote::remote_call,
+            commands::remote::remote_upload_attachments,
+            commands::remote::remote_fetch_attachments,
+            commands::update::update_status,
+            commands::update::update_check,
+            commands::update::update_install,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Neuron");
@@ -159,9 +190,31 @@ pub fn run() {
     app.run(|handle, event| {
         if let RunEvent::Exit = event {
             // Never leave orphan agent processes behind.
-            if let Some(state) = handle.try_state::<AppState>() {
+            if let Some(state) = handle.try_state::<Shared>() {
                 state.agents.shutdown_all();
+                // Tell the connected devices we are leaving (bounded: never hold the exit).
+                let remote = state.remote.clone();
+                tauri::async_runtime::block_on(async move {
+                    let _ = tokio::time::timeout(std::time::Duration::from_secs(1), remote.shutdown()).await;
+                });
             }
+        }
+    });
+}
+
+/// The `neuron` command line talks to this instance through the control channel (also the instance lock).
+fn spawn_control(app: &tauri::AppHandle, state: &Shared) {
+    let handle = app.clone();
+    let ctl = control::Control {
+        state: Arc::clone(state),
+        mode: control::InstanceMode::App,
+        on_shutdown: Box::new(move || handle.exit(0)),
+    };
+    let data_dir = state.paths.data_dir.clone();
+    tauri::async_runtime::spawn(async move {
+        match control::bind(&data_dir).await {
+            Ok(listener) => control::spawn(listener, ctl),
+            Err(err) => tracing::warn!(%err, "control channel not available"),
         }
     });
 }

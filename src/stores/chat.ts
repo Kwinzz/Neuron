@@ -60,6 +60,32 @@ function reduce(items: ChatItem[], { ts, event }: AgentEventEnvelope): ChatItem[
     list.map((it) => ((it.kind === "text" || it.kind === "thinking") && it.streaming ? { ...it, streaming: false } : it));
 
   switch (event.kind) {
+    case "UserMessage": {
+      if (indexOf(event.messageId) >= 0) return items;
+      // Upgrade an optimistic bubble from `send()` on this device to the persisted id without duplicating it.
+      for (let i = items.length - 1; i >= 0; i--) {
+        const it = items[i];
+        if (
+          it?.kind === "user" &&
+          it.id.startsWith("user-") &&
+          it.text === event.text &&
+          it.attachments.length === event.attachments.length
+        ) {
+          return replaceAt(i, {
+            kind: "user",
+            id: event.messageId,
+            text: event.text,
+            ts,
+            // The sender's own copies: for a chat of another device, the event lists that device's paths.
+            attachments: it.attachments,
+          });
+        }
+      }
+      return [
+        ...endStreaming(items),
+        { kind: "user", id: event.messageId, text: event.text, ts, attachments: event.attachments },
+      ];
+    }
     case "MessageDelta": {
       const i = indexOf(event.messageId);
       const existing = i >= 0 ? items[i] : undefined;
@@ -119,6 +145,14 @@ function reduce(items: ChatItem[], { ts, event }: AgentEventEnvelope): ChatItem[
           state: "pending",
         },
       ];
+    case "PermissionResolved": {
+      const i = indexOf(event.requestId);
+      const it = items[i];
+      if (!it || it.kind !== "permission") return items;
+      const state = event.allow ? "allowed" : "denied";
+      if (it.state === state) return items;
+      return replaceAt(i, { ...it, state });
+    }
     case "CommandOutput":
       if (indexOf(event.messageId) >= 0) return items;
       return [...endStreaming(items), { kind: "command", id: event.messageId, name: event.name, output: event.text }];
