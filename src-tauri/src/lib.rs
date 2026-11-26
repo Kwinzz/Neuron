@@ -4,8 +4,10 @@ pub mod agents;
 pub mod app_settings;
 pub mod attachments;
 pub mod background;
+pub mod cli;
 pub mod commands;
 pub mod context;
+pub mod control;
 pub mod db;
 pub mod desktop;
 pub mod env_path;
@@ -56,6 +58,9 @@ pub fn run() {
             env_path::probe_login_shell();
             env_path::refresh_path();
             let paths = AppPaths::resolve()?;
+            // `neuron serve` running on the same data (server mode, before the app was opened): it stops, the app
+            // takes over its chats and endpoint.
+            tauri::async_runtime::block_on(control::take_over(&paths.data_dir));
             let events: Arc<dyn EventSink> = Arc::new(TauriSink(app.handle().clone()));
             let state: Shared = Arc::new(AppState::open(paths, events, started)?);
             tracing::info!(
@@ -92,6 +97,7 @@ pub fn run() {
             // Tray, global shortcut, start with Windows; shows the main window unless started in the background.
             desktop::setup(app.handle(), &settings);
             background::start(&state);
+            spawn_control(app.handle(), &state);
             Ok(())
         })
         .on_window_event(desktop::on_window_event)
@@ -185,6 +191,23 @@ pub fn run() {
                     let _ = tokio::time::timeout(std::time::Duration::from_secs(1), remote.shutdown()).await;
                 });
             }
+        }
+    });
+}
+
+/// The `neuron` command line talks to this instance through the control channel (also the instance lock).
+fn spawn_control(app: &tauri::AppHandle, state: &Shared) {
+    let handle = app.clone();
+    let ctl = control::Control {
+        state: Arc::clone(state),
+        mode: control::InstanceMode::App,
+        on_shutdown: Box::new(move || handle.exit(0)),
+    };
+    let data_dir = state.paths.data_dir.clone();
+    tauri::async_runtime::spawn(async move {
+        match control::bind(&data_dir).await {
+            Ok(listener) => control::spawn(listener, ctl),
+            Err(err) => tracing::warn!(%err, "control channel not available"),
         }
     });
 }

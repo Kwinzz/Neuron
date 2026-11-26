@@ -2,7 +2,7 @@
 //! ids (themselves authenticated by QUIC/TLS), then confirmed both ways: a wrong code never pairs, and a device
 //! that listens or impersonates the host can test at most one guess per attempt (no offline brute force).
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use spake2::{Ed25519Group, Identity, Password, Spake2};
 use ts_rs::TS;
 
@@ -14,7 +14,7 @@ pub const CODE_TTL_MS: i64 = 2 * 60 * 1000;
 pub const MAX_ATTEMPTS: u8 = 3;
 
 /// The pairing window opened on the host.
-#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct PairingCode {

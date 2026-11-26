@@ -1,7 +1,7 @@
 //! Remote devices: settings, pairing, paired devices and calls to a paired host (see `crate::remote`).
 
 use base64::Engine;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tauri::State;
 use ts_rs::TS;
@@ -15,7 +15,7 @@ use crate::remote::protocol::RpcRequest;
 use crate::remote::{self, RemoteSettings};
 use crate::state::{AppState, Shared};
 
-#[derive(Debug, Clone, Serialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct RemoteStatus {
@@ -30,7 +30,7 @@ pub struct RemoteStatus {
     pub pairing: Option<PairingCode>,
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct RemoteDevices {
@@ -52,14 +52,16 @@ async fn status(state: &AppState) -> AppResult<RemoteStatus> {
     })
 }
 
-#[tauri::command]
-pub async fn remote_status(state: State<'_, Shared>) -> AppResult<RemoteStatus> {
-    status(&state).await
+pub async fn remote_status_inner(state: &Shared) -> AppResult<RemoteStatus> {
+    status(state).await
 }
 
-/// Allow (or stop allowing) other devices to pair with and control this one.
 #[tauri::command]
-pub async fn remote_set_enabled(state: State<'_, Shared>, enabled: bool) -> AppResult<RemoteStatus> {
+pub async fn remote_status(state: State<'_, Shared>) -> AppResult<RemoteStatus> {
+    remote_status_inner(&state).await
+}
+
+pub async fn remote_set_enabled_inner(state: &Shared, enabled: bool) -> AppResult<RemoteStatus> {
     state
         .db
         .call(move |c| {
@@ -68,14 +70,17 @@ pub async fn remote_set_enabled(state: State<'_, Shared>, enabled: bool) -> AppR
             remote::save_settings(c, &settings)
         })
         .await?;
-    state.remote.sync(&state).await?;
-    status(&state).await
+    state.remote.sync(state).await?;
+    status(state).await
 }
 
-/// Reach (and be reached by) paired devices outside the local network, through public relays. Pairing itself
-/// stays local-only.
+/// Allow (or stop allowing) other devices to pair with and control this one.
 #[tauri::command]
-pub async fn remote_set_internet(state: State<'_, Shared>, enabled: bool) -> AppResult<RemoteStatus> {
+pub async fn remote_set_enabled(state: State<'_, Shared>, enabled: bool) -> AppResult<RemoteStatus> {
+    remote_set_enabled_inner(&state, enabled).await
+}
+
+pub async fn remote_set_internet_inner(state: &Shared, enabled: bool) -> AppResult<RemoteStatus> {
     state
         .db
         .call(move |c| {
@@ -84,12 +89,18 @@ pub async fn remote_set_internet(state: State<'_, Shared>, enabled: bool) -> App
             remote::save_settings(c, &settings)
         })
         .await?;
-    state.remote.sync(&state).await?;
-    status(&state).await
+    state.remote.sync(state).await?;
+    status(state).await
 }
 
+/// Reach (and be reached by) paired devices outside the local network, through public relays. Pairing itself
+/// stays local-only.
 #[tauri::command]
-pub async fn remote_set_device_name(state: State<'_, Shared>, name: String) -> AppResult<RemoteStatus> {
+pub async fn remote_set_internet(state: State<'_, Shared>, enabled: bool) -> AppResult<RemoteStatus> {
+    remote_set_internet_inner(&state, enabled).await
+}
+
+pub async fn remote_set_device_name_inner(state: &Shared, name: String) -> AppResult<RemoteStatus> {
     let name = name.trim().to_string();
     if name.is_empty() {
         return Err(AppError::Invalid(crate::tr!("le nom est requis", "the name is required")));
@@ -102,22 +113,35 @@ pub async fn remote_set_device_name(state: State<'_, Shared>, name: String) -> A
             remote::save_settings(c, &settings)
         })
         .await?;
-    state.remote.sync(&state).await?;
-    status(&state).await
+    state.remote.sync(state).await?;
+    status(state).await
+}
+
+#[tauri::command]
+pub async fn remote_set_device_name(state: State<'_, Shared>, name: String) -> AppResult<RemoteStatus> {
+    remote_set_device_name_inner(&state, name).await
+}
+
+pub async fn remote_start_pairing_inner(state: &Shared) -> AppResult<PairingCode> {
+    state.remote.ensure(state).await?.open_pairing()
 }
 
 /// Opens a pairing window on this device: the code to type on the other one (2 minutes, 3 attempts).
 #[tauri::command]
 pub async fn remote_start_pairing(state: State<'_, Shared>) -> AppResult<PairingCode> {
-    state.remote.ensure(&state).await?.open_pairing()
+    remote_start_pairing_inner(&state).await
 }
 
-#[tauri::command]
-pub async fn remote_cancel_pairing(state: State<'_, Shared>) -> AppResult<()> {
+pub async fn remote_cancel_pairing_inner(state: &Shared) -> AppResult<()> {
     if let Some(node) = state.remote.node().await {
         node.cancel_pairing();
     }
     Ok(())
+}
+
+#[tauri::command]
+pub async fn remote_cancel_pairing(state: State<'_, Shared>) -> AppResult<()> {
+    remote_cancel_pairing_inner(&state).await
 }
 
 /// Neuron instances that accept connections on the local network (starts listening if needed).
@@ -138,8 +162,7 @@ pub async fn remote_pair(state: State<'_, Shared>, node_id: String, code: String
     Ok(name)
 }
 
-#[tauri::command]
-pub async fn remote_devices(state: State<'_, Shared>) -> AppResult<RemoteDevices> {
+pub async fn remote_devices_inner(state: &Shared) -> AppResult<RemoteDevices> {
     let (mut clients, mut hosts) = state.db.call(|c| Ok((store::list_clients(c)?, store::list_hosts(c)?))).await?;
     if let Some(node) = state.remote.node().await {
         let (live_clients, live_hosts) = (node.connected_clients(), node.connected_hosts());
@@ -154,15 +177,22 @@ pub async fn remote_devices(state: State<'_, Shared>) -> AppResult<RemoteDevices
     Ok(RemoteDevices { clients, hosts })
 }
 
-/// What a paired client may do on this device (applies to its next request).
 #[tauri::command]
-pub async fn remote_set_level(state: State<'_, Shared>, node_id: String, level: AccessLevel) -> AppResult<()> {
+pub async fn remote_devices(state: State<'_, Shared>) -> AppResult<RemoteDevices> {
+    remote_devices_inner(&state).await
+}
+
+pub async fn remote_set_level_inner(state: &Shared, node_id: String, level: AccessLevel) -> AppResult<()> {
     state.db.call(move |c| store::set_client_level(c, &node_id, level)).await
 }
 
-/// A paired client loses access right away (its connections are closed).
+/// What a paired client may do on this device (applies to its next request).
 #[tauri::command]
-pub async fn remote_revoke(state: State<'_, Shared>, node_id: String) -> AppResult<()> {
+pub async fn remote_set_level(state: State<'_, Shared>, node_id: String, level: AccessLevel) -> AppResult<()> {
+    remote_set_level_inner(&state, node_id, level).await
+}
+
+pub async fn remote_revoke_inner(state: &Shared, node_id: String) -> AppResult<()> {
     let id = node_id.clone();
     state.db.call(move |c| store::delete_client(c, &id)).await?;
     if let Some(node) = state.remote.node().await {
@@ -171,16 +201,26 @@ pub async fn remote_revoke(state: State<'_, Shared>, node_id: String) -> AppResu
     Ok(())
 }
 
-/// This device stops controlling a host.
+/// A paired client loses access right away (its connections are closed).
 #[tauri::command]
-pub async fn remote_forget(state: State<'_, Shared>, node_id: String) -> AppResult<()> {
+pub async fn remote_revoke(state: State<'_, Shared>, node_id: String) -> AppResult<()> {
+    remote_revoke_inner(&state, node_id).await
+}
+
+pub async fn remote_forget_inner(state: &Shared, node_id: String) -> AppResult<()> {
     let id = node_id.clone();
     state.db.call(move |c| store::delete_host(c, &id)).await?;
     if let Some(node) = state.remote.node().await {
         node.drop_host(&node_id);
     }
-    state.remote.sync(&state).await?;
+    state.remote.sync(state).await?;
     Ok(())
+}
+
+/// This device stops controlling a host.
+#[tauri::command]
+pub async fn remote_forget(state: State<'_, Shared>, node_id: String) -> AppResult<()> {
+    remote_forget_inner(&state, node_id).await
 }
 
 /// The node, for a device this one controls (never dials an id that was not paired).

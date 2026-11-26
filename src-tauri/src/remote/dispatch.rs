@@ -68,12 +68,12 @@ pub fn required_level(method: &str, args: &Value) -> Option<AccessLevel> {
 }
 
 /// One argument by its camelCase name (a missing optional argument is `None`).
-fn arg<T: DeserializeOwned>(args: &Value, key: &str) -> AppResult<T> {
+pub(crate) fn arg<T: DeserializeOwned>(args: &Value, key: &str) -> AppResult<T> {
     serde_json::from_value(args.get(key).cloned().unwrap_or(Value::Null))
         .map_err(|e| AppError::Invalid(format!("{key}: {e}")))
 }
 
-fn json<T: serde::Serialize>(value: T) -> AppResult<Value> {
+pub(crate) fn json<T: serde::Serialize>(value: T) -> AppResult<Value> {
     Ok(serde_json::to_value(value)?)
 }
 

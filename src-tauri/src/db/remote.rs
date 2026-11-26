@@ -39,7 +39,7 @@ impl AccessLevel {
 }
 
 /// A device allowed to control this one.
-#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct RemoteClient {
@@ -55,7 +55,7 @@ pub struct RemoteClient {
 }
 
 /// A device this one controls.
-#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct RemoteHost {

@@ -14,7 +14,7 @@ use iroh::address_lookup::MemoryLookup;
 use iroh::endpoint::{BindOpts, Connection, Incoming, RecvStream, SendStream, presets};
 use iroh::{Endpoint, EndpointAddr, EndpointId, RelayMode, SecretKey};
 use n0_future::StreamExt;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
@@ -88,7 +88,7 @@ pub struct NodeConfig {
 }
 
 /// How a connection to a host currently goes.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct HostPath {
