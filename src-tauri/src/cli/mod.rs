@@ -8,6 +8,7 @@ pub mod args;
 mod client;
 pub mod output;
 mod serve;
+pub mod service;
 
 use crate::error::AppError;
 use crate::state::AppPaths;
@@ -44,6 +45,7 @@ pub fn entry_from_args() -> Option<i32> {
             0
         }
         Ok(Command::Serve) => serve::run(paths),
+        Ok(Command::Service(cmd)) => service::run(cmd),
         Ok(cmd) => {
             let result = tauri::async_runtime::block_on(client::run(cmd, &paths));
             match result {

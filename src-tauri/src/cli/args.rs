@@ -1,5 +1,6 @@
 //! Command line of `neuron` (hand-parsed: a handful of subcommands, no dependency).
 
+use super::service::ServiceCmd;
 use crate::db::remote::AccessLevel;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -8,6 +9,8 @@ pub enum Command {
     Serve,
     Status,
     Remote(RemoteCmd),
+    /// systemd user service (Linux).
+    Service(ServiceCmd),
     Version,
     Help,
 }
@@ -36,6 +39,15 @@ pub fn parse(args: &[String]) -> Option<Result<Command, String>> {
         "version" | "--version" | "-V" => Ok(Command::Version),
         "help" | "--help" | "-h" => Ok(Command::Help),
         "remote" => parse_remote(rest).map(Command::Remote),
+        "service" => match rest {
+            [sub] if sub == "install" => Ok(Command::Service(ServiceCmd::Install)),
+            [sub] if sub == "uninstall" => Ok(Command::Service(ServiceCmd::Uninstall)),
+            [sub] if sub == "status" => Ok(Command::Service(ServiceCmd::Status)),
+            _ => Err(crate::tr!(
+                "usage : neuron service install|uninstall|status",
+                "usage: neuron service install|uninstall|status"
+            )),
+        },
         _ => return None,
     };
     Some(cmd)
@@ -128,6 +140,7 @@ Usage : neuron <commande>
   remote level <appareil> read|chat|full
   remote revoke <appareil>        retire l'accès d'un appareil
   remote forget <appareil>        cesse de piloter un appareil
+  service install|uninstall|status   service systemd : démarre avec la machine (Linux)
   version | help
 
 Un appareil se désigne par le début de son nom ou de son identifiant.
@@ -147,6 +160,7 @@ Usage: neuron <command>
   remote level <device> read|chat|full
   remote revoke <device>          remove a device's access
   remote forget <device>          stop controlling a device
+  service install|uninstall|status   systemd service: starts with the machine (Linux)
   version | help
 
 A device is named by the start of its name or id.
@@ -186,6 +200,8 @@ mod tests {
             p("remote level PC de Kim chat"),
             Some(Ok(Command::Remote(RemoteCmd::Level { device: "PC de Kim".into(), level: AccessLevel::Chat })))
         );
+        assert_eq!(p("service install"), Some(Ok(Command::Service(ServiceCmd::Install))));
+        assert!(matches!(p("service start"), Some(Err(_))));
         assert_eq!(p("remote revoke ab12"), Some(Ok(Command::Remote(RemoteCmd::Revoke { device: "ab12".into() }))));
     }
 

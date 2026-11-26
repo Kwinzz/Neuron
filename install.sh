@@ -263,6 +263,18 @@ build_and_install() {
   if [ -n "${WAYLAND_DISPLAY:-}" ]; then
     info "${DIM}$(m "Wayland : pour la demande rapide, lie « neuron --quick » à un raccourci de ton bureau." "Wayland: for the quick prompt, bind \"neuron --quick\" to a shortcut of your desktop.")${RESET}"
   fi
+  # `neuron service install` was used: the server restarts on the new version.
+  if [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/neuron.service" ]; then
+    systemctl --user restart neuron.service >/dev/null 2>&1 &&
+      ok "$(m "Service neuron redémarré sur la nouvelle version." "neuron service restarted on the new version.")"
+    return 0
+  fi
+  if [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
+    info "$(m "Pas de session graphique : pour piloter cette machine depuis Neuron sur ton PC :" "No graphical session: to control this machine from Neuron on your PC:")"
+    info "  neuron service install            $(m "# tourne en arrière-plan, démarre avec la machine" "# runs in the background, starts with the machine")"
+    info "  neuron remote enable --internet   $(m "# accessible depuis tes autres appareils" "# reachable from your other devices")"
+    info "  neuron remote code                $(m "# code / invitation à saisir sur ton PC" "# code / invitation to enter on your PC")"
+  fi
 }
 
 do_install() {
@@ -274,6 +286,12 @@ do_install() {
 }
 
 do_uninstall() {
+  local unit="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/neuron.service"
+  if [ -f "$unit" ]; then
+    systemctl --user disable --now neuron.service >/dev/null 2>&1 || true
+    rm -f "$unit"
+    systemctl --user daemon-reload >/dev/null 2>&1 || true
+  fi
   stop_running
   step "$(m "Désinstallation" "Uninstalling")"
   case "$FAMILY" in
