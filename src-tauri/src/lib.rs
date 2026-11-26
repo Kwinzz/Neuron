@@ -3,12 +3,14 @@
 pub mod agents;
 pub mod app_settings;
 pub mod attachments;
+pub mod background;
 pub mod commands;
 pub mod context;
 pub mod db;
 pub mod desktop;
 pub mod env_path;
 pub mod error;
+pub mod events;
 pub mod i18n;
 pub mod memory;
 pub mod notifications;
@@ -18,12 +20,14 @@ pub mod state;
 pub mod usage_import;
 pub mod util;
 
+use std::sync::Arc;
 use std::time::Instant;
 
 use tauri::{Manager, RunEvent};
 use tracing_subscriber::EnvFilter;
 
-use crate::state::AppState;
+use crate::events::{EventSink, TauriSink};
+use crate::state::{AppPaths, AppState, Shared};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -51,7 +55,9 @@ pub fn run() {
             // CLIs installed since the session started (or in the installers' folders) are found right away.
             env_path::probe_login_shell();
             env_path::refresh_path();
-            let state = AppState::init(app.handle(), started)?;
+            let paths = AppPaths::resolve()?;
+            let events: Arc<dyn EventSink> = Arc::new(TauriSink(app.handle().clone()));
+            let state: Shared = Arc::new(AppState::open(paths, events, started)?);
             tracing::info!(
                 setup_ms = state.setup_ms,
                 db_open_us = state.db_open_us,
@@ -82,15 +88,10 @@ pub fn run() {
                 }
             }
             i18n::set(settings.language.unwrap_or(i18n::Language::En));
-            app.manage(state);
+            app.manage(Arc::clone(&state));
             // Tray, global shortcut, start with Windows; shows the main window unless started in the background.
             desktop::setup(app.handle(), &settings);
-            commands::memory::spawn_memory_watcher(app.handle());
-            commands::settings::spawn_idle_reaper(app.handle());
-            commands::pricing::spawn_price_refresh(app.handle());
-            commands::pricing::spawn_agy_quota_refresh(app.handle());
-            usage_import::spawn_periodic(app.handle());
-            remote::spawn_start(app.handle());
+            background::start(&state);
             Ok(())
         })
         .on_window_event(desktop::on_window_event)
@@ -176,7 +177,7 @@ pub fn run() {
     app.run(|handle, event| {
         if let RunEvent::Exit = event {
             // Never leave orphan agent processes behind.
-            if let Some(state) = handle.try_state::<AppState>() {
+            if let Some(state) = handle.try_state::<Shared>() {
                 state.agents.shutdown_all();
                 // Tell the connected devices we are leaving (bounded: never hold the exit).
                 let remote = state.remote.clone();

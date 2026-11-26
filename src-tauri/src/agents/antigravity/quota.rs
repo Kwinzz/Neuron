@@ -7,17 +7,18 @@
 
 use std::path::Path;
 use std::process::Stdio;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::time::Duration;
 
 use serde_json::Value;
-use tauri::{AppHandle, Emitter};
 
 use crate::agents::RateLimitWindow;
 use crate::agents::events::AgentKind;
 use crate::agents::process::{command, spawn_error};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
+use crate::events::{self, EventSink};
 use crate::util::now_ms;
 
 /// Emitted when an agent's subscription windows were refreshed outside a chat turn.
@@ -238,7 +239,7 @@ static REFRESHING: AtomicBool = AtomicBool::new(false);
 static LAST_REFRESH: AtomicI64 = AtomicI64::new(0);
 
 /// Save `/quota` windows and tell the UI.
-pub async fn store(db: &Db, app: &AppHandle, windows: Vec<RateLimitWindow>) {
+pub async fn store(db: &Db, events: &dyn EventSink, windows: Vec<RateLimitWindow>) {
     if windows.is_empty() {
         return;
     }
@@ -246,22 +247,19 @@ pub async fn store(db: &Db, app: &AppHandle, windows: Vec<RateLimitWindow>) {
     let saved =
         db.call(move |c| crate::db::providers::store_live_windows(c, AgentKind::Antigravity, &windows, now_ms())).await;
     match saved {
-        Ok(()) => {
-            let _ = app.emit(QUOTAS_CHANGED_EVENT, ());
-            crate::remote::hub::forward(QUOTAS_CHANGED_EVENT, &());
-        }
+        Ok(()) => events::emit(events, QUOTAS_CHANGED_EVENT, &()),
         Err(err) => tracing::warn!(%err, "agy quota not saved"),
     }
 }
 
 /// Background refresh (after an Antigravity turn, and periodically). Silent when agy is missing or logged out.
-pub async fn refresh(db: Db, app: AppHandle) {
+pub async fn refresh(db: Db, events: Arc<dyn EventSink>) {
     if now_ms() - LAST_REFRESH.load(Ordering::Relaxed) < MIN_REFRESH_MS || REFRESHING.swap(true, Ordering::AcqRel) {
         return;
     }
     let cwd = std::env::temp_dir();
     match run("quota", &cwd).await {
-        Ok(result) => store(&db, &app, windows(&result)).await,
+        Ok(result) => store(&db, events.as_ref(), windows(&result)).await,
         Err(err) => tracing::debug!(%err, "agy quota unavailable"),
     }
     REFRESHING.store(false, Ordering::Release);

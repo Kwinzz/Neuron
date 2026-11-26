@@ -11,17 +11,18 @@
 
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::Value;
-use tauri::{AppHandle, Emitter, Manager};
 
 use crate::agents::RateLimitWindow;
 use crate::agents::antigravity::quota::parse_rfc3339;
 use crate::agents::events::{AgentKind, TokenUsage};
-use crate::state::AppState;
+use crate::events;
+use crate::state::{AppState, Shared};
 
 /// Emitted after an import added usage (the dashboard reloads).
 pub const USAGE_CHANGED_EVENT: &str = "usage://changed";
@@ -336,13 +337,12 @@ fn store(
 }
 
 /// One import pass over every log file. Returns the number of usage rows added.
-async fn import_once(app: &AppHandle) -> usize {
+async fn import_once(state: &Shared) -> usize {
     // Screenshots / manual tests on an isolated `NEURON_DATA_DIR`: keep the real CLI logs out.
     if std::env::var_os("NEURON_NO_CLI_LOGS").is_some() {
         return 0;
     }
-    let Some(state) = app.try_state::<AppState>() else { return 0 };
-    let Ok(home) = app.path().home_dir() else { return 0 };
+    let Some(home) = dirs::home_dir() else { return 0 };
     let files = tokio::task::spawn_blocking(move || log_files(&home)).await.unwrap_or_default();
     let mut added = 0;
     let mut codex_limits: Option<Limits> = None;
@@ -365,14 +365,14 @@ async fn import_once(app: &AppHandle) -> usize {
         }
     }
     if let Some((at, windows)) = codex_limits {
-        store_codex_limits(&state, app, at, windows).await;
+        store_codex_limits(state, at, windows).await;
     }
     added
 }
 
 /// Codex limits read in its logs replace the stored ones when they are more recent (a Codex session run in a
 /// terminal moves the dashboard's bars too).
-async fn store_codex_limits(state: &AppState, app: &AppHandle, at: i64, windows: Vec<RateLimitWindow>) {
+async fn store_codex_limits(state: &AppState, at: i64, windows: Vec<RateLimitWindow>) {
     let saved = state
         .db
         .call(move |c| {
@@ -384,39 +384,35 @@ async fn store_codex_limits(state: &AppState, app: &AppHandle, at: i64, windows:
         })
         .await;
     match saved {
-        Ok(true) => {
-            let _ = app.emit(crate::agents::antigravity::quota::QUOTAS_CHANGED_EVENT, ());
-            crate::remote::hub::forward(crate::agents::antigravity::quota::QUOTAS_CHANGED_EVENT, &());
-        }
+        Ok(true) => events::emit(state.events.as_ref(), crate::agents::antigravity::quota::QUOTAS_CHANGED_EVENT, &()),
         Ok(false) => {}
         Err(err) => tracing::warn!(%err, "codex limits not saved"),
     }
 }
 
 /// Runs an import pass unless one is already running; the dashboard is told when usage was added.
-pub fn trigger(app: &AppHandle) {
+pub fn trigger(state: &Shared) {
     if RUNNING.swap(true, Ordering::AcqRel) {
         return;
     }
-    let app = app.clone();
+    let state = Arc::clone(state);
     tauri::async_runtime::spawn(async move {
-        let added = import_once(&app).await;
+        let added = import_once(&state).await;
         RUNNING.store(false, Ordering::Release);
         if added > 0 {
             tracing::info!(added, "usage imported from CLI logs");
-            let _ = app.emit(USAGE_CHANGED_EVENT, ());
-            crate::remote::hub::forward(USAGE_CHANGED_EVENT, &());
+            events::emit(state.events.as_ref(), USAGE_CHANGED_EVENT, &());
         }
     });
 }
 
 /// First import shortly after startup, then every 10 minutes (turns run from Neuron trigger one too).
-pub fn spawn_periodic(app: &AppHandle) {
-    let app = app.clone();
+pub fn spawn_periodic(state: &Shared) {
+    let state = Arc::clone(state);
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_secs(3)).await;
         loop {
-            trigger(&app);
+            trigger(&state);
             tokio::time::sleep(PERIOD).await;
         }
     });

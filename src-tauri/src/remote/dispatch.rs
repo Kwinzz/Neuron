@@ -6,12 +6,11 @@
 
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use tauri::{AppHandle, Manager};
 
 use crate::commands::{dashboard, memory, projects, threads};
 use crate::db::remote::AccessLevel;
 use crate::error::{AppError, AppResult};
-use crate::state::AppState;
+use crate::state::{AppState, Shared};
 
 const BYPASS: &str = "bypassPermissions";
 
@@ -80,11 +79,10 @@ fn json<T: serde::Serialize>(value: T) -> AppResult<Value> {
 
 /// A file of a chat (attachment, image its agent made) for a paired device to display.
 async fn read_attachment(
-    app: &AppHandle,
+    state: &AppState,
     thread_id: String,
     path: String,
 ) -> AppResult<crate::attachments::SharedFile> {
-    let state = app.state::<AppState>();
     let root = crate::attachments::root(&state.paths.data_dir);
     let id = thread_id.clone();
     let thread = state
@@ -97,7 +95,7 @@ async fn read_attachment(
 }
 
 /// Runs a remote call with the caller's level.
-pub async fn call(app: &AppHandle, level: AccessLevel, method: &str, args: Value) -> AppResult<Value> {
+pub async fn call(state: &Shared, level: AccessLevel, method: &str, args: Value) -> AppResult<Value> {
     let Some(needed) = required_level(method, &args) else {
         return Err(AppError::Invalid(crate::tr!(
             "« {method} » n'est pas disponible depuis un autre appareil",
@@ -113,30 +111,28 @@ pub async fn call(app: &AppHandle, level: AccessLevel, method: &str, args: Value
         )));
     }
     let a = &args;
-    let s = || app.state::<AppState>();
-    let app = app.clone();
     match method {
-        "dashboard_snapshot" => json(dashboard::dashboard_snapshot(s(), arg(a, "range")?).await?),
-        "usage_report" => json(dashboard::usage_report(s(), arg(a, "range")?).await?),
-        "refresh_quotas" => json(dashboard::refresh_quotas(app.clone(), s()).await?),
-        "update_provider" => json(dashboard::update_provider(s(), arg(a, "update")?).await?),
-        "list_projects" => json(dashboard::list_projects(s()).await?),
-        "list_threads" => json(dashboard::list_threads(s(), arg(a, "limit")?).await?),
-        "get_thread" => json(dashboard::get_thread(s(), arg(a, "id")?).await?),
+        "dashboard_snapshot" => json(dashboard::dashboard_snapshot_inner(state, arg(a, "range")?).await?),
+        "usage_report" => json(dashboard::usage_report_inner(state, arg(a, "range")?).await?),
+        "refresh_quotas" => json(dashboard::refresh_quotas_inner(state).await?),
+        "update_provider" => json(dashboard::update_provider_inner(state, arg(a, "update")?).await?),
+        "list_projects" => json(dashboard::list_projects_inner(state).await?),
+        "list_threads" => json(dashboard::list_threads_inner(state, arg(a, "limit")?).await?),
+        "get_thread" => json(dashboard::get_thread_inner(state, arg(a, "id")?).await?),
 
-        "create_thread" => json(threads::create_thread(app.clone(), s(), arg(a, "input")?).await?),
+        "create_thread" => json(threads::create_thread_inner(state, arg(a, "input")?).await?),
         "send_message" => json(
-            threads::send_message(app.clone(), s(), arg(a, "threadId")?, arg(a, "text")?, arg(a, "attachments")?)
-                .await?,
+            threads::send_message_inner(state, arg(a, "threadId")?, arg(a, "text")?, arg(a, "attachments")?).await?,
         ),
-        "list_slash_commands" => json(threads::list_slash_commands(s(), arg(a, "agent")?, arg(a, "cwd")?).await?),
+        "list_slash_commands" => {
+            json(threads::list_slash_commands_inner(state, arg(a, "agent")?, arg(a, "cwd")?).await?)
+        }
         "paste_attachment" => {
-            json(threads::paste_attachment(s(), arg(a, "name")?, arg(a, "mime")?, arg(a, "data")?).await?)
+            json(threads::paste_attachment_inner(state, arg(a, "name")?, arg(a, "mime")?, arg(a, "data")?).await?)
         }
         "respond_permission" => json(
-            threads::respond_permission(
-                app.clone(),
-                s(),
+            threads::respond_permission_inner(
+                state,
                 arg(a, "threadId")?,
                 arg(a, "requestId")?,
                 arg(a, "allow")?,
@@ -145,39 +141,39 @@ pub async fn call(app: &AppHandle, level: AccessLevel, method: &str, args: Value
             )
             .await?,
         ),
-        "stop_thread" => json(threads::stop_thread(app.clone(), s(), arg(a, "threadId")?).await?),
-        "get_thread_history" => json(threads::get_thread_history(s(), arg(a, "threadId")?).await?),
-        "rename_thread" => json(threads::rename_thread(s(), arg(a, "threadId")?, arg(a, "title")?).await?),
-        "delete_thread" => json(threads::delete_thread(s(), arg(a, "threadId")?).await?),
-        "running_threads" => json(threads::running_threads(s()).await?),
-        "prompt_history" => json(threads::prompt_history(s(), arg(a, "projectId")?).await?),
-        "default_cwd" => json(threads::default_cwd(s()).await?),
+        "stop_thread" => json(threads::stop_thread_inner(state, arg(a, "threadId")?).await?),
+        "get_thread_history" => json(threads::get_thread_history_inner(state, arg(a, "threadId")?).await?),
+        "rename_thread" => json(threads::rename_thread_inner(state, arg(a, "threadId")?, arg(a, "title")?).await?),
+        "delete_thread" => json(threads::delete_thread_inner(state, arg(a, "threadId")?).await?),
+        "running_threads" => json(threads::running_threads_inner(state).await?),
+        "prompt_history" => json(threads::prompt_history_inner(state, arg(a, "projectId")?).await?),
+        "default_cwd" => json(threads::default_cwd_inner(state).await?),
         "update_thread_settings" => {
-            json(threads::update_thread_settings(s(), arg(a, "threadId")?, arg(a, "settings")?).await?)
+            json(threads::update_thread_settings_inner(state, arg(a, "threadId")?, arg(a, "settings")?).await?)
         }
-        "create_project" => json(threads::create_project(s(), arg(a, "path")?, arg(a, "name")?).await?),
-        "delete_project" => json(threads::delete_project(s(), arg(a, "projectId")?).await?),
-        "list_models" => json(threads::list_models(s(), arg(a, "refresh")?).await?),
-        "agent_images" => json(threads::agent_images(app.clone(), s(), arg(a, "threadId")?, arg(a, "paths")?).await?),
+        "create_project" => json(threads::create_project_inner(state, arg(a, "path")?, arg(a, "name")?).await?),
+        "delete_project" => json(threads::delete_project_inner(state, arg(a, "projectId")?).await?),
+        "list_models" => json(threads::list_models_inner(state, arg(a, "refresh")?).await?),
+        "agent_images" => json(threads::agent_images_inner(state, arg(a, "threadId")?, arg(a, "paths")?).await?),
 
-        "read_attachment" => json(read_attachment(&app, arg(a, "threadId")?, arg(a, "path")?).await?),
+        "read_attachment" => json(read_attachment(state, arg(a, "threadId")?, arg(a, "path")?).await?),
 
         "agent_access" => json(crate::commands::access::agent_access(arg(a, "refresh")?).await?),
 
-        "project_context" => json(projects::project_context(s(), arg(a, "projectId")?).await?),
+        "project_context" => json(projects::project_context_inner(state, arg(a, "projectId")?).await?),
         "save_project_context" => {
-            json(projects::save_project_context(s(), arg(a, "projectId")?, arg(a, "content")?).await?)
+            json(projects::save_project_context_inner(state, arg(a, "projectId")?, arg(a, "content")?).await?)
         }
-        "project_overview" => json(projects::project_overview(s(), arg(a, "projectId")?).await?),
-        "thread_context" => json(projects::thread_context(s(), arg(a, "threadId")?).await?),
+        "project_overview" => json(projects::project_overview_inner(state, arg(a, "projectId")?).await?),
+        "thread_context" => json(projects::thread_context_inner(state, arg(a, "threadId")?).await?),
 
-        "list_memories" => json(memory::list_memories(s()).await?),
-        "create_memory" => json(memory::create_memory(s(), arg(a, "category")?, arg(a, "content")?).await?),
+        "list_memories" => json(memory::list_memories_inner(state).await?),
+        "create_memory" => json(memory::create_memory_inner(state, arg(a, "category")?, arg(a, "content")?).await?),
         "update_memory" => {
-            json(memory::update_memory(s(), arg(a, "id")?, arg(a, "category")?, arg(a, "content")?).await?)
+            json(memory::update_memory_inner(state, arg(a, "id")?, arg(a, "category")?, arg(a, "content")?).await?)
         }
-        "delete_memory" => json(memory::delete_memory(s(), arg(a, "id")?).await?),
-        "search_memories" => json(memory::search_memories(s(), arg(a, "query")?, arg(a, "limit")?).await?),
+        "delete_memory" => json(memory::delete_memory_inner(state, arg(a, "id")?).await?),
+        "search_memories" => json(memory::search_memories_inner(state, arg(a, "query")?, arg(a, "limit")?).await?),
 
         // Listed in `required_level` but not wired here: a programming error, never a remote one.
         other => Err(AppError::Other(format!("remote method not wired: {other}"))),

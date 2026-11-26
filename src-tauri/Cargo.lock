@@ -3322,6 +3322,7 @@ dependencies = [
  "base64 0.22.1",
  "blake3",
  "data-encoding",
+ "dirs 7.0.0",
  "futures-util",
  "ignore",
  "iroh",

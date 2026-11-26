@@ -3,7 +3,7 @@
 use base64::Engine;
 use serde::Serialize;
 use serde_json::{Value, json};
-use tauri::{AppHandle, State};
+use tauri::State;
 use ts_rs::TS;
 
 use crate::attachments::{self, Attachment, SharedFile};
@@ -13,7 +13,7 @@ use crate::remote::node::NearbyDevice;
 use crate::remote::pairing::PairingCode;
 use crate::remote::protocol::RpcRequest;
 use crate::remote::{self, RemoteSettings};
-use crate::state::AppState;
+use crate::state::{AppState, Shared};
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -53,13 +53,13 @@ async fn status(state: &AppState) -> AppResult<RemoteStatus> {
 }
 
 #[tauri::command]
-pub async fn remote_status(state: State<'_, AppState>) -> AppResult<RemoteStatus> {
+pub async fn remote_status(state: State<'_, Shared>) -> AppResult<RemoteStatus> {
     status(&state).await
 }
 
 /// Allow (or stop allowing) other devices to pair with and control this one.
 #[tauri::command]
-pub async fn remote_set_enabled(app: AppHandle, state: State<'_, AppState>, enabled: bool) -> AppResult<RemoteStatus> {
+pub async fn remote_set_enabled(state: State<'_, Shared>, enabled: bool) -> AppResult<RemoteStatus> {
     state
         .db
         .call(move |c| {
@@ -68,14 +68,14 @@ pub async fn remote_set_enabled(app: AppHandle, state: State<'_, AppState>, enab
             remote::save_settings(c, &settings)
         })
         .await?;
-    state.remote.sync(&app).await?;
+    state.remote.sync(&state).await?;
     status(&state).await
 }
 
 /// Reach (and be reached by) paired devices outside the local network, through public relays. Pairing itself
 /// stays local-only.
 #[tauri::command]
-pub async fn remote_set_internet(app: AppHandle, state: State<'_, AppState>, enabled: bool) -> AppResult<RemoteStatus> {
+pub async fn remote_set_internet(state: State<'_, Shared>, enabled: bool) -> AppResult<RemoteStatus> {
     state
         .db
         .call(move |c| {
@@ -84,16 +84,12 @@ pub async fn remote_set_internet(app: AppHandle, state: State<'_, AppState>, ena
             remote::save_settings(c, &settings)
         })
         .await?;
-    state.remote.sync(&app).await?;
+    state.remote.sync(&state).await?;
     status(&state).await
 }
 
 #[tauri::command]
-pub async fn remote_set_device_name(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    name: String,
-) -> AppResult<RemoteStatus> {
+pub async fn remote_set_device_name(state: State<'_, Shared>, name: String) -> AppResult<RemoteStatus> {
     let name = name.trim().to_string();
     if name.is_empty() {
         return Err(AppError::Invalid(crate::tr!("le nom est requis", "the name is required")));
@@ -106,18 +102,18 @@ pub async fn remote_set_device_name(
             remote::save_settings(c, &settings)
         })
         .await?;
-    state.remote.sync(&app).await?;
+    state.remote.sync(&state).await?;
     status(&state).await
 }
 
 /// Opens a pairing window on this device: the code to type on the other one (2 minutes, 3 attempts).
 #[tauri::command]
-pub async fn remote_start_pairing(app: AppHandle, state: State<'_, AppState>) -> AppResult<PairingCode> {
-    state.remote.ensure(&app).await?.open_pairing()
+pub async fn remote_start_pairing(state: State<'_, Shared>) -> AppResult<PairingCode> {
+    state.remote.ensure(&state).await?.open_pairing()
 }
 
 #[tauri::command]
-pub async fn remote_cancel_pairing(state: State<'_, AppState>) -> AppResult<()> {
+pub async fn remote_cancel_pairing(state: State<'_, Shared>) -> AppResult<()> {
     if let Some(node) = state.remote.node().await {
         node.cancel_pairing();
     }
@@ -126,19 +122,14 @@ pub async fn remote_cancel_pairing(state: State<'_, AppState>) -> AppResult<()> 
 
 /// Neuron instances that accept connections on the local network (starts listening if needed).
 #[tauri::command]
-pub async fn remote_nearby(app: AppHandle, state: State<'_, AppState>) -> AppResult<Vec<NearbyDevice>> {
-    Ok(state.remote.ensure(&app).await?.nearby())
+pub async fn remote_nearby(state: State<'_, Shared>) -> AppResult<Vec<NearbyDevice>> {
+    Ok(state.remote.ensure(&state).await?.nearby())
 }
 
 /// Pairs with a nearby device showing `code`; this device can then control it. Returns its name.
 #[tauri::command]
-pub async fn remote_pair(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    node_id: String,
-    code: String,
-) -> AppResult<String> {
-    let node = state.remote.ensure(&app).await?;
+pub async fn remote_pair(state: State<'_, Shared>, node_id: String, code: String) -> AppResult<String> {
+    let node = state.remote.ensure(&state).await?;
     let name = node.pair(&node_id, &code).await?;
     // Connect right away: its chats and events show up without waiting.
     if let Err(err) = node.connect_host(&node_id).await {
@@ -148,7 +139,7 @@ pub async fn remote_pair(
 }
 
 #[tauri::command]
-pub async fn remote_devices(state: State<'_, AppState>) -> AppResult<RemoteDevices> {
+pub async fn remote_devices(state: State<'_, Shared>) -> AppResult<RemoteDevices> {
     let (mut clients, mut hosts) = state.db.call(|c| Ok((store::list_clients(c)?, store::list_hosts(c)?))).await?;
     if let Some(node) = state.remote.node().await {
         let (live_clients, live_hosts) = (node.connected_clients(), node.connected_hosts());
@@ -165,13 +156,13 @@ pub async fn remote_devices(state: State<'_, AppState>) -> AppResult<RemoteDevic
 
 /// What a paired client may do on this device (applies to its next request).
 #[tauri::command]
-pub async fn remote_set_level(state: State<'_, AppState>, node_id: String, level: AccessLevel) -> AppResult<()> {
+pub async fn remote_set_level(state: State<'_, Shared>, node_id: String, level: AccessLevel) -> AppResult<()> {
     state.db.call(move |c| store::set_client_level(c, &node_id, level)).await
 }
 
 /// A paired client loses access right away (its connections are closed).
 #[tauri::command]
-pub async fn remote_revoke(state: State<'_, AppState>, node_id: String) -> AppResult<()> {
+pub async fn remote_revoke(state: State<'_, Shared>, node_id: String) -> AppResult<()> {
     let id = node_id.clone();
     state.db.call(move |c| store::delete_client(c, &id)).await?;
     if let Some(node) = state.remote.node().await {
@@ -182,36 +173,35 @@ pub async fn remote_revoke(state: State<'_, AppState>, node_id: String) -> AppRe
 
 /// This device stops controlling a host.
 #[tauri::command]
-pub async fn remote_forget(app: AppHandle, state: State<'_, AppState>, node_id: String) -> AppResult<()> {
+pub async fn remote_forget(state: State<'_, Shared>, node_id: String) -> AppResult<()> {
     let id = node_id.clone();
     state.db.call(move |c| store::delete_host(c, &id)).await?;
     if let Some(node) = state.remote.node().await {
         node.drop_host(&node_id);
     }
-    state.remote.sync(&app).await?;
+    state.remote.sync(&state).await?;
     Ok(())
 }
 
 /// The node, for a device this one controls (never dials an id that was not paired).
-async fn host_node(app: &AppHandle, state: &AppState, device: &str) -> AppResult<std::sync::Arc<remote::node::Node>> {
+async fn host_node(state: &Shared, device: &str) -> AppResult<std::sync::Arc<remote::node::Node>> {
     let probe = device.to_string();
     let paired = state.db.call(move |c| Ok(store::list_hosts(c)?.iter().any(|h| h.node_id == probe))).await?;
     if !paired {
         return Err(AppError::NotFound(crate::tr!("appareil non appairé", "device not paired")));
     }
-    state.remote.ensure(app).await
+    state.remote.ensure(state).await
 }
 
 /// A command run on a paired host (same name and arguments as the local `invoke`); its result as JSON.
 #[tauri::command]
 pub async fn remote_call(
-    app: AppHandle,
-    state: State<'_, AppState>,
+    state: State<'_, Shared>,
     device: String,
     method: String,
     args: Option<Value>,
 ) -> AppResult<Value> {
-    let node = host_node(&app, &state, &device).await?;
+    let node = host_node(&state, &device).await?;
     node.call(&device, RpcRequest { method, args: args.unwrap_or(Value::Null) }).await
 }
 
@@ -219,12 +209,11 @@ pub async fn remote_call(
 /// returns the host's copies, to send with the message.
 #[tauri::command]
 pub async fn remote_upload_attachments(
-    app: AppHandle,
-    state: State<'_, AppState>,
+    state: State<'_, Shared>,
     device: String,
     attachments: Vec<Attachment>,
 ) -> AppResult<Vec<Attachment>> {
-    let node = host_node(&app, &state, &device).await?;
+    let node = host_node(&state, &device).await?;
     let root = attachments::root(&state.paths.data_dir);
     let mut uploaded = Vec::new();
     for a in attachments::validate(&root, &attachments)? {
@@ -248,13 +237,12 @@ pub async fn remote_upload_attachments(
 /// chat displays them. A file the host refuses or can't send is left out.
 #[tauri::command]
 pub async fn remote_fetch_attachments(
-    app: AppHandle,
-    state: State<'_, AppState>,
+    state: State<'_, Shared>,
     device: String,
     thread_id: String,
     attachments: Vec<Attachment>,
 ) -> AppResult<Vec<Attachment>> {
-    let node = host_node(&app, &state, &device).await?;
+    let node = host_node(&state, &device).await?;
     // Inside the attachments folder: the webview may load it (asset protocol scope).
     let cache = attachments::root(&state.paths.data_dir).join("remote").join(device.get(..16).unwrap_or(&device));
     let mut local = Vec::new();

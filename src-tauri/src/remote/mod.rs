@@ -16,19 +16,19 @@ pub mod pairing;
 pub mod protocol;
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Weak};
 
 use iroh::SecretKey;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tauri::{AppHandle, Emitter, Manager};
 use ts_rs::TS;
 
 use crate::db::remote::{self as store, AccessLevel};
 use crate::error::{AppError, AppResult};
-use crate::state::AppState;
+use crate::events;
+use crate::state::{AppState, Shared};
 use crate::util::now_ms;
 use node::{Backend, BoxFut, Node, NodeConfig};
 use protocol::{RpcRequest, WireEvent};
@@ -130,8 +130,7 @@ impl Remote {
     }
 
     /// Starts, restarts or stops the endpoint to match the settings and paired devices.
-    pub async fn sync(&self, app: &AppHandle) -> AppResult<Option<Arc<Node>>> {
-        let state = app.state::<AppState>();
+    pub async fn sync(&self, state: &Shared) -> AppResult<Option<Arc<Node>>> {
         let (settings, hosts) = state.db.call(|c| Ok((load_settings(c)?, store::list_hosts(c)?.len()))).await?;
         let needed = settings.enabled || hosts > 0 || self.scanning.load(Ordering::Relaxed);
         let mut slot = self.node.lock().await;
@@ -157,7 +156,7 @@ impl Remote {
                 fixed_port: settings.enabled,
                 internet: settings.internet,
             };
-            let backend = Arc::new(AppBackend { app: app.clone() });
+            let backend = Arc::new(AppBackend { state: Arc::downgrade(state) });
             let node = Node::start(config, backend, hub::sender()).await?;
             tracing::info!(
                 id = %node.id().fmt_short(),
@@ -165,17 +164,17 @@ impl Remote {
                 port = ?node.port(),
                 "remote: endpoint started"
             );
-            spawn_reconnect(app, &node);
+            spawn_reconnect(state, &node);
             *slot = Some(node);
         }
-        let _ = app.emit_to("main", REMOTE_STATUS_CHANNEL, ());
+        events::emit_local(state.events.as_ref(), REMOTE_STATUS_CHANNEL, &());
         Ok(slot.clone())
     }
 
     /// The node, started if needed (looking for devices, pairing, calling a host).
-    pub async fn ensure(&self, app: &AppHandle) -> AppResult<Arc<Node>> {
+    pub async fn ensure(&self, state: &Shared) -> AppResult<Arc<Node>> {
         self.scanning.store(true, Ordering::Relaxed);
-        self.sync(app).await?.ok_or_else(|| AppError::Other("remote endpoint not started".into()))
+        self.sync(state).await?.ok_or_else(|| AppError::Other("remote endpoint not started".into()))
     }
 
     pub async fn shutdown(&self) {
@@ -189,13 +188,13 @@ impl Remote {
 const RECONNECT_EVERY: std::time::Duration = std::time::Duration::from_secs(30);
 
 /// Keeps the paired hosts connected: right away, then every [`RECONNECT_EVERY`] for those that are not.
-fn spawn_reconnect(app: &AppHandle, node: &Arc<Node>) {
-    let app = app.clone();
+fn spawn_reconnect(state: &Shared, node: &Arc<Node>) {
+    let weak_state = Arc::downgrade(state);
     let weak = Arc::downgrade(node);
     node.spawn(async move {
         loop {
             let Some(node) = weak.upgrade() else { break };
-            let Some(state) = app.try_state::<AppState>() else { break };
+            let Some(state) = weak_state.upgrade() else { break };
             let hosts = state.db.call(|c| store::list_hosts(c)).await.unwrap_or_default();
             let connected = node.connected_hosts();
             for host in hosts.into_iter().filter(|h| !connected.contains(&h.node_id)) {
@@ -204,85 +203,91 @@ fn spawn_reconnect(app: &AppHandle, node: &Arc<Node>) {
                 }
             }
             drop(node);
+            drop(state);
             tokio::time::sleep(RECONNECT_EVERY).await;
         }
     });
 }
 
 /// Starts the endpoint in the background when the feature is in use (never blocks the startup).
-pub fn spawn_start(app: &AppHandle) {
-    let app = app.clone();
+pub fn spawn_start(state: &Shared) {
+    let state = Arc::clone(state);
     tauri::async_runtime::spawn(async move {
-        let Some(state) = app.try_state::<AppState>() else { return };
-        if let Err(err) = state.remote.sync(&app).await {
+        if let Err(err) = state.remote.sync(&state).await {
             tracing::warn!(%err, "remote: endpoint not started");
         }
     });
 }
 
-/// [`Backend`] of the app: SQLite for the paired devices, the commands for the requests, Tauri events for the UI.
+/// [`Backend`] of the app: SQLite for the paired devices, the commands for the requests, EventSink for the UI.
 struct AppBackend {
-    app: AppHandle,
+    state: Weak<AppState>,
 }
 
 impl AppBackend {
-    fn db(&self) -> crate::db::Db {
-        self.app.state::<AppState>().db.clone()
+    fn state(&self) -> Option<Shared> {
+        self.state.upgrade()
     }
 }
 
 impl Backend for AppBackend {
     fn client_level(&self, client: String) -> BoxFut<Option<AccessLevel>> {
-        let db = self.db();
-        Box::pin(async move { db.call(move |c| store::client_level(c, &client)).await.ok().flatten() })
+        let state = self.state();
+        Box::pin(async move {
+            let state = state?;
+            state.db.call(move |c| store::client_level(c, &client)).await.ok().flatten()
+        })
     }
 
     fn call(&self, client: String, level: AccessLevel, request: RpcRequest) -> BoxFut<AppResult<Value>> {
-        let app = self.app.clone();
+        let state = self.state();
         Box::pin(async move {
+            let state = state.ok_or_else(|| AppError::Other("application shutting down".into()))?;
             tracing::info!(client = %client.get(..10).unwrap_or(&client), method = %request.method, "remote call");
-            dispatch::call(&app, level, &request.method, request.args).await
+            dispatch::call(&state, level, &request.method, request.args).await
         })
     }
 
     fn client_paired(&self, client: String, name: String) -> BoxFut<AppResult<()>> {
-        let db = self.db();
-        Box::pin(
-            async move { db.call(move |c| store::upsert_client(c, &client, &name, AccessLevel::Full, now_ms())).await },
-        )
+        let state = self.state();
+        Box::pin(async move {
+            let state = state.ok_or_else(|| AppError::Other("application shutting down".into()))?;
+            state.db.call(move |c| store::upsert_client(c, &client, &name, AccessLevel::Full, now_ms())).await
+        })
     }
 
     fn host_paired(&self, host: String, name: String) -> BoxFut<AppResult<()>> {
-        let db = self.db();
-        Box::pin(async move { db.call(move |c| store::upsert_host(c, &host, &name, now_ms())).await })
+        let state = self.state();
+        Box::pin(async move {
+            let state = state.ok_or_else(|| AppError::Other("application shutting down".into()))?;
+            state.db.call(move |c| store::upsert_host(c, &host, &name, now_ms())).await
+        })
     }
 
     fn client_seen(&self, client: String) {
-        let db = self.db();
+        let Some(state) = self.state() else { return };
         tauri::async_runtime::spawn(async move {
-            let _ = db.call(move |c| store::touch_client(c, &client, now_ms())).await;
+            let _ = state.db.call(move |c| store::touch_client(c, &client, now_ms())).await;
         });
     }
 
     fn host_seen(&self, host: String) {
-        let db = self.db();
+        let Some(state) = self.state() else { return };
         tauri::async_runtime::spawn(async move {
-            let _ = db.call(move |c| store::touch_host(c, &host, now_ms())).await;
+            let _ = state.db.call(move |c| store::touch_host(c, &host, now_ms())).await;
         });
     }
 
     fn host_event(&self, host: String, event: WireEvent) {
+        let Some(state) = self.state() else { return };
         let payload = RemoteEventPayload { device: host, channel: event.channel, payload: event.payload };
-        if let Err(err) = self.app.emit_to("main", REMOTE_EVENT_CHANNEL, payload) {
-            tracing::warn!(%err, "remote: host event not emitted");
-        }
+        events::emit_local(state.events.as_ref(), REMOTE_EVENT_CHANNEL, &payload);
     }
 
     /// A paired host showed up on the network: connect, so its chats and events appear right away.
     fn discovered(&self, id: String) {
-        let app = self.app.clone();
+        let Some(state) = self.state() else { return };
         tauri::async_runtime::spawn(async move {
-            let Some(state) = app.try_state::<AppState>() else { return };
             let probe = id.clone();
             let paired = state.db.call(move |c| Ok(store::list_hosts(c)?.iter().any(|h| h.node_id == probe))).await;
             if !paired.unwrap_or(false) {
@@ -297,6 +302,8 @@ impl Backend for AppBackend {
     }
 
     fn changed(&self) {
-        let _ = self.app.emit_to("main", REMOTE_STATUS_CHANNEL, ());
+        if let Some(state) = self.state() {
+            events::emit_local(state.events.as_ref(), REMOTE_STATUS_CHANNEL, &());
+        }
     }
 }

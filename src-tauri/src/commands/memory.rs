@@ -1,23 +1,24 @@
 //! Global memory: CRUD, search, file location, and the `memory.md` watcher.
 
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::State;
 
 use crate::agents::events::AgentKind;
 use crate::db::memories;
 use crate::error::AppError;
 use crate::error::AppResult;
+use crate::events;
 use crate::memory::import::{self, ImportedMemory, LocalMemorySource, MemoryImportOrigin};
 use crate::memory::{self, Memory, MemoryCategory, MemoryHit, MemoryInfo};
-use crate::state::AppState;
+use crate::state::{AppState, Shared};
 use crate::util::now_ms;
 
 /// Event emitted when the memory changed outside the frontend's own calls (file edit, agent via MCP).
 pub const MEMORY_CHANGED_EVENT: &str = "memory://changed";
 
-#[tauri::command]
-pub async fn list_memories(state: State<'_, AppState>) -> AppResult<Vec<Memory>> {
+pub(crate) async fn list_memories_inner(state: &AppState) -> AppResult<Vec<Memory>> {
     let file = state.paths.memory_file.clone();
     state
         .db
@@ -29,7 +30,15 @@ pub async fn list_memories(state: State<'_, AppState>) -> AppResult<Vec<Memory>>
 }
 
 #[tauri::command]
-pub async fn create_memory(state: State<'_, AppState>, category: MemoryCategory, content: String) -> AppResult<Memory> {
+pub async fn list_memories(state: State<'_, Shared>) -> AppResult<Vec<Memory>> {
+    list_memories_inner(&state).await
+}
+
+pub(crate) async fn create_memory_inner(
+    state: &AppState,
+    category: MemoryCategory,
+    content: String,
+) -> AppResult<Memory> {
     let file = state.paths.memory_file.clone();
     state
         .db
@@ -43,8 +52,12 @@ pub async fn create_memory(state: State<'_, AppState>, category: MemoryCategory,
 }
 
 #[tauri::command]
-pub async fn update_memory(
-    state: State<'_, AppState>,
+pub async fn create_memory(state: State<'_, Shared>, category: MemoryCategory, content: String) -> AppResult<Memory> {
+    create_memory_inner(&state, category, content).await
+}
+
+pub(crate) async fn update_memory_inner(
+    state: &AppState,
     id: String,
     category: MemoryCategory,
     content: String,
@@ -61,7 +74,16 @@ pub async fn update_memory(
 }
 
 #[tauri::command]
-pub async fn delete_memory(state: State<'_, AppState>, id: String) -> AppResult<()> {
+pub async fn update_memory(
+    state: State<'_, Shared>,
+    id: String,
+    category: MemoryCategory,
+    content: String,
+) -> AppResult<Memory> {
+    update_memory_inner(&state, id, category, content).await
+}
+
+pub(crate) async fn delete_memory_inner(state: &AppState, id: String) -> AppResult<()> {
     let file = state.paths.memory_file.clone();
     state
         .db
@@ -73,8 +95,12 @@ pub async fn delete_memory(state: State<'_, AppState>, id: String) -> AppResult<
 }
 
 #[tauri::command]
-pub async fn search_memories(
-    state: State<'_, AppState>,
+pub async fn delete_memory(state: State<'_, Shared>, id: String) -> AppResult<()> {
+    delete_memory_inner(&state, id).await
+}
+
+pub(crate) async fn search_memories_inner(
+    state: &AppState,
     query: String,
     limit: Option<u32>,
 ) -> AppResult<Vec<MemoryHit>> {
@@ -83,7 +109,12 @@ pub async fn search_memories(
 }
 
 #[tauri::command]
-pub async fn memory_info(state: State<'_, AppState>) -> AppResult<MemoryInfo> {
+pub async fn search_memories(state: State<'_, Shared>, query: String, limit: Option<u32>) -> AppResult<Vec<MemoryHit>> {
+    search_memories_inner(&state, query, limit).await
+}
+
+#[tauri::command]
+pub async fn memory_info(state: State<'_, Shared>) -> AppResult<MemoryInfo> {
     let launch = crate::util::neuron_exe().ok().map(|exe| {
         let paths =
             memory::MemoryPaths { db_path: state.paths.db_path.clone(), file_path: state.paths.memory_file.clone() };
@@ -98,7 +129,7 @@ pub async fn memory_info(state: State<'_, AppState>) -> AppResult<MemoryInfo> {
 
 /// Open `memory.md` with the default editor.
 #[tauri::command]
-pub async fn open_memory_file(state: State<'_, AppState>) -> AppResult<()> {
+pub async fn open_memory_file(state: State<'_, Shared>) -> AppResult<()> {
     crate::util::open_with_system(&state.paths.memory_file)?;
     Ok(())
 }
@@ -108,10 +139,9 @@ fn modified(path: &std::path::Path) -> Option<SystemTime> {
 }
 
 /// Poll `memory.md` (cheap `stat` every 2 s): import outside edits and tell the frontend.
-pub fn spawn_memory_watcher(app: &AppHandle) {
-    let app = app.clone();
+pub fn spawn_memory_watcher(state: &Shared) {
+    let state = Arc::clone(state);
     tauri::async_runtime::spawn(async move {
-        let Some(state) = app.try_state::<AppState>() else { return };
         let file = state.paths.memory_file.clone();
         let db = state.db.clone();
         let mut last = modified(&file);
@@ -124,12 +154,7 @@ pub fn spawn_memory_watcher(app: &AppHandle) {
             last = now;
             let f = file.clone();
             match db.call(move |c| memory::import_if_changed(c, &f, now_ms())).await {
-                Ok(_) => {
-                    crate::remote::hub::forward(MEMORY_CHANGED_EVENT, &());
-                    if let Err(err) = app.emit(MEMORY_CHANGED_EVENT, ()) {
-                        tracing::warn!(%err, "emit memory change failed");
-                    }
-                }
+                Ok(_) => events::emit(state.events.as_ref(), MEMORY_CHANGED_EVENT, &()),
                 Err(err) => tracing::warn!(%err, "memory.md import failed"),
             }
         }
@@ -172,13 +197,13 @@ async fn agy_status(state: &AppState) -> AppResult<AgyMcpStatus> {
 }
 
 #[tauri::command]
-pub async fn antigravity_mcp_status(state: State<'_, AppState>) -> AppResult<AgyMcpStatus> {
+pub async fn antigravity_mcp_status(state: State<'_, Shared>) -> AppResult<AgyMcpStatus> {
     agy_status(&state).await
 }
 
 /// `agy mcp add neuron -- <neuron.exe> --mcp-memory …` (explicit user action from Paramètres → Agents & MCP).
 #[tauri::command]
-pub async fn connect_antigravity_mcp(state: State<'_, AppState>) -> AppResult<AgyMcpStatus> {
+pub async fn connect_antigravity_mcp(state: State<'_, Shared>) -> AppResult<AgyMcpStatus> {
     let launch = launch_for(&state, "antigravity")?;
     let exe = launch.command.display().to_string();
     let mut args: Vec<&str> = vec!["mcp", "add", memory::mcp::SERVER_NAME, "--", &exe];
@@ -191,7 +216,7 @@ pub async fn connect_antigravity_mcp(state: State<'_, AppState>) -> AppResult<Ag
 }
 
 #[tauri::command]
-pub async fn disconnect_antigravity_mcp(state: State<'_, AppState>) -> AppResult<AgyMcpStatus> {
+pub async fn disconnect_antigravity_mcp(state: State<'_, Shared>) -> AppResult<AgyMcpStatus> {
     crate::agents::catalog::run_cli("agy", &["mcp", "remove", memory::mcp::SERVER_NAME]).await;
     agy_status(&state).await
 }
@@ -201,8 +226,9 @@ const MAX_REFORMULATE_CHARS: usize = 20_000;
 
 /// Instruction files of the agent CLIs found on this computer (Claude Code, Codex, Gemini CLI).
 #[tauri::command]
-pub async fn memory_import_sources(app: AppHandle) -> AppResult<Vec<LocalMemorySource>> {
-    let home = app.path().home_dir()?;
+pub async fn memory_import_sources() -> AppResult<Vec<LocalMemorySource>> {
+    let home = dirs::home_dir()
+        .ok_or_else(|| AppError::Other(crate::tr!("dossier personnel introuvable", "home directory not found")))?;
     Ok(tokio::task::spawn_blocking(move || import::local_sources(&home)).await?)
 }
 
@@ -254,7 +280,7 @@ pub async fn reformulate_memory_import(agent: AgentKind, text: String) -> AppRes
 /// Returns how many were added.
 #[tauri::command]
 pub async fn import_memories(
-    state: State<'_, AppState>,
+    state: State<'_, Shared>,
     items: Vec<ImportedMemory>,
     origin: MemoryImportOrigin,
 ) -> AppResult<u32> {

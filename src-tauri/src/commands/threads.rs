@@ -10,7 +10,7 @@ use crate::db::chat::{self, ChatItem};
 use crate::db::threads::{self, NewThread, ThreadSummary};
 use crate::db::{projects, settings};
 use crate::error::{AppError, AppResult};
-use crate::state::AppState;
+use crate::state::{AppState, Shared};
 use crate::util::now_ms;
 
 const PERMISSION_MODES: &[&str] = &["manual", "acceptEdits", "auto", "plan", "bypassPermissions"];
@@ -35,19 +35,14 @@ pub struct NewThreadInput {
     pub attachments: Vec<crate::attachments::Attachment>,
 }
 
-#[tauri::command]
-pub async fn create_thread(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    input: NewThreadInput,
-) -> AppResult<ThreadSummary> {
+pub(crate) async fn create_thread_inner(state: &Shared, input: NewThreadInput) -> AppResult<ThreadSummary> {
     if !state.agents.supports(input.agent) {
         return Err(AppError::Invalid(crate::tr!(
             "cet agent arrive dans une prochaine phase",
             "this agent comes in a later phase"
         )));
     }
-    let cwd = resolve_cwd(&state, input.cwd.as_deref(), input.project_id.as_deref()).await?;
+    let cwd = resolve_cwd(state, input.cwd.as_deref(), input.project_id.as_deref()).await?;
     let mode = input.permission_mode.clone().unwrap_or_else(|| "manual".into());
     validate_settings(&mode, input.effort.as_deref())?;
 
@@ -121,34 +116,45 @@ pub async fn create_thread(
     if !prompt.trim().is_empty() || !input.attachments.is_empty() {
         let root = crate::attachments::root(&state.paths.data_dir);
         let attachments = crate::attachments::validate(&root, &input.attachments)?;
-        state.agents.send_prompt(&app, &state.db, &id, &prompt, attachments).await?;
+        state.agents.send_prompt(state, &id, &prompt, attachments).await?;
     }
     Ok(summary)
 }
 
 #[tauri::command]
-pub async fn send_message(
-    app: AppHandle,
-    state: State<'_, AppState>,
+pub async fn create_thread(state: State<'_, Shared>, input: NewThreadInput) -> AppResult<ThreadSummary> {
+    create_thread_inner(&state, input).await
+}
+
+pub(crate) async fn send_message_inner(
+    state: &Shared,
     thread_id: String,
     text: String,
     attachments: Option<Vec<crate::attachments::Attachment>>,
 ) -> AppResult<()> {
     let root = crate::attachments::root(&state.paths.data_dir);
     let attachments = crate::attachments::validate(&root, &attachments.unwrap_or_default())?;
-    state.agents.send_prompt(&app, &state.db, &thread_id, &text, attachments).await
+    state.agents.send_prompt(state, &thread_id, &text, attachments).await
 }
 
-/// Slash commands of a provider in a working directory (the « / » menu). Cached 15 min.
 #[tauri::command]
-pub async fn list_slash_commands(
-    state: State<'_, AppState>,
+pub async fn send_message(
+    state: State<'_, Shared>,
+    thread_id: String,
+    text: String,
+    attachments: Option<Vec<crate::attachments::Attachment>>,
+) -> AppResult<()> {
+    send_message_inner(&state, thread_id, text, attachments).await
+}
+
+pub(crate) async fn list_slash_commands_inner(
+    state: &AppState,
     agent: AgentKind,
     cwd: Option<String>,
 ) -> AppResult<Vec<crate::agents::slash::SlashCommand>> {
     let cwd = match cwd.filter(|c| !c.trim().is_empty()) {
         Some(c) => std::path::PathBuf::from(c),
-        None => std::path::PathBuf::from(default_cwd_inner(&state).await?),
+        None => std::path::PathBuf::from(default_cwd_inner(state).await?),
     };
     if !cwd.is_dir() {
         return Ok(Vec::new());
@@ -156,10 +162,20 @@ pub async fn list_slash_commands(
     Ok(crate::agents::slash::list(agent, &cwd).await)
 }
 
+/// Slash commands of a provider in a working directory (the « / » menu). Cached 15 min.
+#[tauri::command]
+pub async fn list_slash_commands(
+    state: State<'_, Shared>,
+    agent: AgentKind,
+    cwd: Option<String>,
+) -> AppResult<Vec<crate::agents::slash::SlashCommand>> {
+    list_slash_commands_inner(&state, agent, cwd).await
+}
+
 /// Copy files picked with the « + » button into Neuron's attachments folder.
 #[tauri::command]
 pub async fn import_attachments(
-    state: State<'_, AppState>,
+    state: State<'_, Shared>,
     paths: Vec<String>,
 ) -> AppResult<Vec<crate::attachments::Attachment>> {
     let root = crate::attachments::root(&state.paths.data_dir);
@@ -169,10 +185,8 @@ pub async fn import_attachments(
     .await?
 }
 
-/// Save an image pasted from the clipboard (base64).
-#[tauri::command]
-pub async fn paste_attachment(
-    state: State<'_, AppState>,
+pub(crate) async fn paste_attachment_inner(
+    state: &AppState,
     name: String,
     mime: String,
     data: String,
@@ -181,10 +195,19 @@ pub async fn paste_attachment(
     tokio::task::spawn_blocking(move || crate::attachments::save_base64(&root, &name, &mime, &data)).await?
 }
 
+/// Save an image pasted from the clipboard (base64).
 #[tauri::command]
-pub async fn respond_permission(
-    app: AppHandle,
-    state: State<'_, AppState>,
+pub async fn paste_attachment(
+    state: State<'_, Shared>,
+    name: String,
+    mime: String,
+    data: String,
+) -> AppResult<crate::attachments::Attachment> {
+    paste_attachment_inner(&state, name, mime, data).await
+}
+
+pub(crate) async fn respond_permission_inner(
+    state: &AppState,
     thread_id: String,
     request_id: String,
     allow: bool,
@@ -196,7 +219,7 @@ pub async fn respond_permission(
     }
     state.agents.respond_permission(&thread_id, &request_id, allow, mode, answers)?;
     crate::agents::registry::emit_event(
-        &app,
+        state.events.as_ref(),
         &thread_id,
         crate::agents::events::AgentEvent::PermissionResolved { request_id, allow },
     );
@@ -204,17 +227,36 @@ pub async fn respond_permission(
 }
 
 #[tauri::command]
-pub async fn stop_thread(app: AppHandle, state: State<'_, AppState>, thread_id: String) -> AppResult<()> {
-    state.agents.stop(&app, &state.db, &thread_id)
+pub async fn respond_permission(
+    state: State<'_, Shared>,
+    thread_id: String,
+    request_id: String,
+    allow: bool,
+    mode: Option<String>,
+    answers: Option<std::collections::HashMap<String, String>>,
+) -> AppResult<()> {
+    respond_permission_inner(&state, thread_id, request_id, allow, mode, answers).await
+}
+
+pub(crate) async fn stop_thread_inner(state: &AppState, thread_id: String) -> AppResult<()> {
+    state.agents.stop(&state.events, &state.db, &thread_id)
 }
 
 #[tauri::command]
-pub async fn get_thread_history(state: State<'_, AppState>, thread_id: String) -> AppResult<Vec<ChatItem>> {
+pub async fn stop_thread(state: State<'_, Shared>, thread_id: String) -> AppResult<()> {
+    stop_thread_inner(&state, thread_id).await
+}
+
+pub(crate) async fn get_thread_history_inner(state: &AppState, thread_id: String) -> AppResult<Vec<ChatItem>> {
     state.db.call(move |c| chat::history(c, &thread_id)).await
 }
 
 #[tauri::command]
-pub async fn rename_thread(state: State<'_, AppState>, thread_id: String, title: String) -> AppResult<()> {
+pub async fn get_thread_history(state: State<'_, Shared>, thread_id: String) -> AppResult<Vec<ChatItem>> {
+    get_thread_history_inner(&state, thread_id).await
+}
+
+pub(crate) async fn rename_thread_inner(state: &AppState, thread_id: String, title: String) -> AppResult<()> {
     let title = title.trim().to_string();
     if title.is_empty() {
         return Err(AppError::Invalid(crate::tr!("le titre est vide", "the title is empty")));
@@ -223,25 +265,42 @@ pub async fn rename_thread(state: State<'_, AppState>, thread_id: String, title:
 }
 
 #[tauri::command]
-pub async fn delete_thread(state: State<'_, AppState>, thread_id: String) -> AppResult<()> {
+pub async fn rename_thread(state: State<'_, Shared>, thread_id: String, title: String) -> AppResult<()> {
+    rename_thread_inner(&state, thread_id, title).await
+}
+
+pub(crate) async fn delete_thread_inner(state: &AppState, thread_id: String) -> AppResult<()> {
     state.agents.shutdown(&thread_id);
     state.db.call(move |c| threads::delete(c, &thread_id)).await
 }
 
-/// Ids of threads whose agent process is alive.
 #[tauri::command]
-pub async fn running_threads(state: State<'_, AppState>) -> AppResult<Vec<String>> {
+pub async fn delete_thread(state: State<'_, Shared>, thread_id: String) -> AppResult<()> {
+    delete_thread_inner(&state, thread_id).await
+}
+
+pub(crate) async fn running_threads_inner(state: &AppState) -> AppResult<Vec<String>> {
     Ok(state.agents.running_ids())
 }
 
+/// Ids of threads whose agent process is alive.
 #[tauri::command]
-pub async fn prompt_history(state: State<'_, AppState>, project_id: Option<String>) -> AppResult<Vec<String>> {
+pub async fn running_threads(state: State<'_, Shared>) -> AppResult<Vec<String>> {
+    running_threads_inner(&state).await
+}
+
+pub(crate) async fn prompt_history_inner(state: &AppState, project_id: Option<String>) -> AppResult<Vec<String>> {
     state.db.call(move |c| chat::prompt_history(c, project_id.as_deref(), 100)).await
+}
+
+#[tauri::command]
+pub async fn prompt_history(state: State<'_, Shared>, project_id: Option<String>) -> AppResult<Vec<String>> {
+    prompt_history_inner(&state, project_id).await
 }
 
 /// Default working directory for a new thread: last used, else the user's home.
 #[tauri::command]
-pub async fn default_cwd(state: State<'_, AppState>) -> AppResult<String> {
+pub async fn default_cwd(state: State<'_, Shared>) -> AppResult<String> {
     default_cwd_inner(&state).await
 }
 
@@ -286,7 +345,7 @@ async fn resolve_cwd(state: &AppState, cwd: Option<&str>, project_id: Option<&st
     Ok(dir)
 }
 
-async fn default_cwd_inner(state: &AppState) -> AppResult<String> {
+pub(crate) async fn default_cwd_inner(state: &AppState) -> AppResult<String> {
     let last = state.db.call(|c| settings::get(c, settings::LAST_CWD)).await?;
     if let Some(Value::String(dir)) = last {
         if std::path::Path::new(&dir).is_dir() {
@@ -305,11 +364,8 @@ pub struct ThreadSettingsInput {
     pub permission_mode: String,
 }
 
-/// Change a chat's model / reasoning effort / permissions. A running agent restarts (resuming the
-/// conversation) before the next message.
-#[tauri::command]
-pub async fn update_thread_settings(
-    state: State<'_, AppState>,
+pub(crate) async fn update_thread_settings_inner(
+    state: &AppState,
     thread_id: String,
     settings: ThreadSettingsInput,
 ) -> AppResult<ThreadSummary> {
@@ -338,10 +394,19 @@ pub async fn update_thread_settings(
     Ok(summary)
 }
 
-/// Register a local folder as a project (idempotent). Returns the refreshed project list.
+/// Change a chat's model / reasoning effort / permissions. A running agent restarts (resuming the
+/// conversation) before the next message.
 #[tauri::command]
-pub async fn create_project(
-    state: State<'_, AppState>,
+pub async fn update_thread_settings(
+    state: State<'_, Shared>,
+    thread_id: String,
+    settings: ThreadSettingsInput,
+) -> AppResult<ThreadSummary> {
+    update_thread_settings_inner(&state, thread_id, settings).await
+}
+
+pub(crate) async fn create_project_inner(
+    state: &AppState,
     path: String,
     name: Option<String>,
 ) -> AppResult<Vec<projects::ProjectSummary>> {
@@ -367,10 +432,18 @@ pub async fn create_project(
         .await
 }
 
-/// Forget a project (its chats are kept).
+/// Register a local folder as a project (idempotent). Returns the refreshed project list.
 #[tauri::command]
-pub async fn delete_project(
-    state: State<'_, AppState>,
+pub async fn create_project(
+    state: State<'_, Shared>,
+    path: String,
+    name: Option<String>,
+) -> AppResult<Vec<projects::ProjectSummary>> {
+    create_project_inner(&state, path, name).await
+}
+
+pub(crate) async fn delete_project_inner(
+    state: &AppState,
     project_id: String,
 ) -> AppResult<Vec<projects::ProjectSummary>> {
     state
@@ -382,10 +455,14 @@ pub async fn delete_project(
         .await
 }
 
-/// Models per provider (Claude Code, Codex, Antigravity), read from the installed CLIs.
+/// Forget a project (its chats are kept).
 #[tauri::command]
-pub async fn list_models(
-    state: State<'_, AppState>,
+pub async fn delete_project(state: State<'_, Shared>, project_id: String) -> AppResult<Vec<projects::ProjectSummary>> {
+    delete_project_inner(&state, project_id).await
+}
+
+pub(crate) async fn list_models_inner(
+    state: &AppState,
     refresh: Option<bool>,
 ) -> AppResult<Vec<crate::agents::catalog::ProviderCatalog>> {
     let mut list = crate::agents::catalog::catalog(refresh.unwrap_or(false)).await;
@@ -397,12 +474,17 @@ pub async fn list_models(
     Ok(list)
 }
 
-/// Images an agent mentioned in a message (paths found in its text by the chat), made viewable: existing image
-/// files only, relative paths resolved against the chat's folder, each one opened to the asset protocol.
+/// Models per provider (Claude Code, Codex, Antigravity), read from the installed CLIs.
 #[tauri::command]
-pub async fn agent_images(
-    app: AppHandle,
-    state: State<'_, AppState>,
+pub async fn list_models(
+    state: State<'_, Shared>,
+    refresh: Option<bool>,
+) -> AppResult<Vec<crate::agents::catalog::ProviderCatalog>> {
+    list_models_inner(&state, refresh).await
+}
+
+pub(crate) async fn agent_images_inner(
+    state: &AppState,
     thread_id: String,
     paths: Vec<String>,
 ) -> AppResult<Vec<crate::attachments::Attachment>> {
@@ -420,6 +502,19 @@ pub async fn agent_images(
             .collect::<Vec<_>>()
     })
     .await?;
+    Ok(images)
+}
+
+/// Images an agent mentioned in a message (paths found in its text by the chat), made viewable: existing image
+/// files only, relative paths resolved against the chat's folder, each one opened to the asset protocol.
+#[tauri::command]
+pub async fn agent_images(
+    app: AppHandle,
+    state: State<'_, Shared>,
+    thread_id: String,
+    paths: Vec<String>,
+) -> AppResult<Vec<crate::attachments::Attachment>> {
+    let images = agent_images_inner(&state, thread_id, paths).await?;
     let scope = tauri::Manager::asset_protocol_scope(&app);
     for image in &images {
         if let Err(err) = scope.allow_file(&image.path) {
