@@ -1,6 +1,6 @@
 import { memo, useMemo } from "react";
 import { cn } from "cn";
-import { ArrowUpRight, GitFork, Square } from "lucide-react";
+import { ArrowUpRight, ChevronDown, GitFork, Square } from "lucide-react";
 import { AgentLogo } from "@/components/ui/AgentLogo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,8 @@ import { useChat } from "@/stores/chat";
 import { type Attention, useLive } from "@/stores/live";
 import { useUi } from "@/stores/ui";
 import { DockTerminal } from "./DockTerminal";
+import { orderedSubagents } from "./subagentMeta";
+import { SubagentTerminal } from "./SubagentTerminal";
 
 const ATTENTION_LABEL: Record<Attention, { text: MessageKey; className: string }> = {
   done: { text: "shell.attentionDone", className: "border-ok/40 text-ok" },
@@ -31,14 +33,10 @@ export const DockCard = memo(function DockCard({ id }: { id: string }) {
   const attention = useLive((s) => s.attention[id]);
   const focused = useUi((s) => s.focusedThreadId === id);
   const subs = useActivity((s) => s.subagents[id] ?? EMPTY_SUBAGENTS);
+  const expanded = useUi((s) => s.dockExpanded[id] ?? false);
 
-  const runningSubagents = useMemo(() => {
-    let count = 0;
-    for (const sub of Object.values(subs)) {
-      if (sub.status === "running") count++;
-    }
-    return count;
-  }, [subs]);
+  const subList = useMemo(() => orderedSubagents(subs), [subs]);
+  const runningSubagents = useMemo(() => subList.filter((sub) => sub.status === "running").length, [subList]);
 
   if (!thread) return null;
 
@@ -95,11 +93,34 @@ export const DockCard = memo(function DockCard({ id }: { id: string }) {
             {t(attn.text)}
           </Badge>
         )}
-        {runningSubagents > 0 && (
-          <Badge variant="secondary" className="shrink-0 gap-1 px-1.5 text-[10px] tabular-nums animate-in fade-in-0 duration-150">
-            <GitFork className="size-3" aria-hidden />
-            {t("shell.subagentCount", { n: runningSubagents })}
-          </Badge>
+        {subList.length > 0 && (
+          <button
+            type="button"
+            aria-expanded={expanded}
+            title={expanded ? t("shell.subagentsToggleHide") : t("shell.subagentsToggleShow")}
+            onClick={(e) => {
+              e.stopPropagation();
+              useUi.getState().setDockExpanded(id, !expanded);
+            }}
+            onKeyDown={(e) => e.stopPropagation()}
+            className={cn(
+              "flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] tabular-nums transition-colors duration-150 animate-in fade-in-0",
+              "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring hover:bg-accent",
+              runningSubagents > 0 ? "border-live/40 text-foreground" : "text-muted-foreground",
+              expanded && "bg-accent",
+            )}
+          >
+            {runningSubagents > 0 ? (
+              <span className="size-1.5 rounded-full bg-live animate-pulse" aria-hidden />
+            ) : (
+              <GitFork className="size-3" aria-hidden />
+            )}
+            {t("shell.subagentCount", { n: subList.length })}
+            <ChevronDown
+              className={cn("size-3 transition-transform duration-150", expanded && "rotate-180")}
+              aria-hidden
+            />
+          </button>
         )}
         <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
           <Button
@@ -167,6 +188,14 @@ export const DockCard = memo(function DockCard({ id }: { id: string }) {
         status={thread.status}
         detail={thread.status === "error" && thread.errorMessage ? thread.errorMessage : thread.detail}
       />
+
+      {expanded && subList.length > 0 && (
+        <div className="flex min-w-0 flex-col gap-1.5 animate-in fade-in-0 slide-in-from-top-1 duration-150">
+          {subList.map((sub) => (
+            <SubagentTerminal key={sub.id} threadId={id} sub={sub} />
+          ))}
+        </div>
+      )}
     </div>
   );
 });

@@ -55,6 +55,8 @@ interface UiState {
   focusedThreadId: string | null;
   /** Project filter selected for the dock (null = all). */
   selectedProjectId: string | null;
+  /** Dock cards showing their sub-agents' terminals (this session only). */
+  dockExpanded: Record<string, boolean>;
 
   navigate: (view: View) => void;
   setPaletteOpen: (open: boolean) => void;
@@ -71,6 +73,7 @@ interface UiState {
   /** Open an existing chat (null = back to Accueil). */
   focusThread: (id: string | null) => void;
   selectProject: (id: string | null) => void;
+  setDockExpanded: (threadId: string, expanded: boolean) => void;
 }
 
 export const useUi = create<UiState>((set, get) => ({
@@ -80,6 +83,7 @@ export const useUi = create<UiState>((set, get) => ({
   dockOpen: readDockPref(),
   focusedThreadId: null,
   selectedProjectId: null,
+  dockExpanded: {},
 
   navigate: (view) => set({ view, paletteOpen: false, focusedThreadId: view.kind === "thread" ? view.id : null }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
@@ -95,4 +99,5 @@ export const useUi = create<UiState>((set, get) => ({
   openProject: (id, tab) => get().navigate(tab ? { kind: "project", id, tab } : { kind: "project", id }),
   focusThread: (id) => get().navigate(id ? { kind: "thread", id } : { kind: "home" }),
   selectProject: (selectedProjectId) => set({ selectedProjectId }),
+  setDockExpanded: (threadId, expanded) => set({ dockExpanded: { ...get().dockExpanded, [threadId]: expanded } }),
 }));

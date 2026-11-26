@@ -4,8 +4,9 @@ import { ArrowDown } from "lucide-react";
 import type { ThreadStatus } from "@/bindings/ThreadStatus";
 import { t } from "@/i18n";
 import { describeStatus } from "@/lib/status";
-import { EMPTY_LINES, EMPTY_SUBAGENTS, type SubagentInfo, type TermLine, useActivity } from "@/stores/activity";
+import { EMPTY_LINES, EMPTY_SUBAGENTS, type SubagentInfo, useActivity } from "@/stores/activity";
 import { SubagentLane } from "./SubagentLane";
+import { orderedSubagents } from "./subagentMeta";
 import { TermLineView } from "./TermLineView";
 
 interface DockTerminalProps {
@@ -28,27 +29,25 @@ export const DockTerminal = memo(function DockTerminal({ id, title, active, stat
   const scrollRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
 
-  const { main, bySub, orphanSubs, resultIds } = useMemo(() => {
-    const mainLines: TermLine[] = [];
-    const grouped = new Map<string, TermLine[]>();
-    const mainIds = new Set<string>();
+  const { main, attached, orphanSubs, resultIds } = useMemo(() => {
+    // A Claude sub-agent's own calls are in its terminal (expanded card), not in the chat's.
+    const mainLines = lines.filter((line) => line.parentId === null || !(line.parentId in subs));
+    const mainIds = new Set(mainLines.map((l) => l.id));
 
-    for (const line of lines) {
-      if (line.parentId !== null && line.parentId in subs) {
-        const list = grouped.get(line.parentId);
-        if (list) list.push(line);
-        else grouped.set(line.parentId, [line]);
+    // Each sub-agent is mentioned under the line that launched it (process-tree ones: the shell call running when
+    // they appeared), or at the top when that line is gone.
+    const byLine = new Map<string, SubagentInfo[]>();
+    const orphans: SubagentInfo[] = [];
+    for (const sub of orderedSubagents(subs)) {
+      const anchor = sub.source === "process" ? sub.parentId : sub.id;
+      if (anchor !== null && mainIds.has(anchor)) {
+        const list = byLine.get(anchor);
+        if (list) list.push(sub);
+        else byLine.set(anchor, [sub]);
       } else {
-        mainLines.push(line);
-        mainIds.add(line.id);
+        orphans.push(sub);
       }
     }
-
-    const orphans: SubagentInfo[] = [];
-    for (const sub of Object.values(subs)) {
-      if (!mainIds.has(sub.id)) orphans.push(sub);
-    }
-    orphans.sort((a, b) => a.startedAt - b.startedAt);
 
     const lastFinishedTools = new Set<string>();
     for (let i = mainLines.length - 1; i >= 0 && lastFinishedTools.size < 2; i--) {
@@ -58,7 +57,7 @@ export const DockTerminal = memo(function DockTerminal({ id, title, active, stat
       }
     }
 
-    return { main: mainLines, bySub: grouped, orphanSubs: orphans, resultIds: lastFinishedTools };
+    return { main: mainLines, attached: byLine, orphanSubs: orphans, resultIds: lastFinishedTools };
   }, [lines, subs]);
 
   const scrollable = active || expanded;
@@ -114,19 +113,16 @@ export const DockTerminal = memo(function DockTerminal({ id, title, active, stat
           ) : (
             <div className="flex min-w-0 flex-col">
               {visibleOrphans.map((sub) => (
-                <SubagentLane key={sub.id} sub={sub} lines={bySub.get(sub.id) ?? EMPTY_LINES} />
+                <SubagentLane key={sub.id} threadId={id} sub={sub} />
               ))}
-              {visibleMain.map((line) => {
-                const launchedSub = subs[line.id];
-                return (
-                  <Fragment key={line.id}>
-                    <TermLineView line={line} showResult={resultIds.has(line.id)} />
-                    {launchedSub && (
-                      <SubagentLane sub={launchedSub} lines={bySub.get(launchedSub.id) ?? EMPTY_LINES} />
-                    )}
-                  </Fragment>
-                );
-              })}
+              {visibleMain.map((line) => (
+                <Fragment key={line.id}>
+                  <TermLineView line={line} showResult={resultIds.has(line.id)} />
+                  {attached.get(line.id)?.map((sub) => (
+                    <SubagentLane key={sub.id} threadId={id} sub={sub} />
+                  ))}
+                </Fragment>
+              ))}
             </div>
           )}
         </div>

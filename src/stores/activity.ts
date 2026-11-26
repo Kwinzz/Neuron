@@ -5,6 +5,7 @@
  */
 import { create } from "zustand";
 import type { AgentEventEnvelope } from "@/bindings/AgentEventEnvelope";
+import type { SubagentSource } from "@/bindings/SubagentSource";
 import type { SubagentStatus } from "@/bindings/SubagentStatus";
 import { nextFrame } from "@/lib/frame";
 
@@ -27,7 +28,7 @@ export interface TermLine {
 }
 
 export interface SubagentInfo {
-  /** Tool call that launched the sub-agent. */
+  /** Tool call that launched the sub-agent (`proc:<pid>` when only the process tree showed it). */
   id: string;
   description: string;
   type: string | null;
@@ -37,6 +38,17 @@ export interface SubagentInfo {
   lastTool: string | null;
   startedAt: number;
   endedAt: number | null;
+  /** `task`: the CLI's own sub-agent (its tool calls are lines with `parentId`); `command` / `process`: another
+   *  agent CLI the chat's agent started. */
+  source: SubagentSource;
+  /** Agent CLI (`claude`, `codex`, `antigravity`, `gemini`…), for `command` / `process`. */
+  agent: string | null;
+  command: string | null;
+  pid: number | null;
+  /** Last lines it printed (once its command returned). */
+  output: string | null;
+  /** Line of the chat it is shown under (process-tree sub-agents: the shell call running when it appeared). */
+  parentId: string | null;
 }
 
 interface ActivityState {
@@ -83,6 +95,18 @@ function describeInput(name: string, input: unknown): string {
     if (pick) return `${name} ${oneLine(pick)}`;
   }
   return name;
+}
+
+/** Tools that run a shell command (every agent). */
+const SHELL_TOOLS = new Set(["bash", "powershell", "shell", "exec", "run_command", "execute_command", "run_shell_command"]);
+
+/** Most recent shell call still running: where an agent found among the processes was most likely started. */
+function runningShellLine(lines: TermLine[]): string | null {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const l = lines[i];
+    if (l && l.kind === "tool" && l.state === "running" && l.tool && SHELL_TOOLS.has(l.tool.toLowerCase())) return l.id;
+  }
+  return null;
 }
 
 let counter = 0;
@@ -180,6 +204,12 @@ export const useActivity = create<ActivityState>((set, get) => {
               lastTool: null,
               startedAt: ts,
               endedAt: null,
+              source: "task",
+              agent: null,
+              command: null,
+              pid: null,
+              output: null,
+              parentId: null,
             });
           }
           return;
@@ -201,9 +231,11 @@ export const useActivity = create<ActivityState>((set, get) => {
         }
         case "SubagentUpdate": {
           const prev = get().subagents[threadId]?.[event.toolCallId];
+          // Older hosts send no source: a Claude Task.
+          const source = prev?.source ?? event.source ?? "task";
           setSubagent(threadId, {
             id: event.toolCallId,
-            description: prev?.description ?? oneLine(event.description ?? "Sous-agent"),
+            description: prev?.description ?? oneLine(event.description ?? event.command ?? event.agent ?? "Sous-agent"),
             type: event.subagentType ?? prev?.type ?? null,
             status: event.status,
             toolUses: event.toolUses ?? prev?.toolUses ?? null,
@@ -211,6 +243,15 @@ export const useActivity = create<ActivityState>((set, get) => {
             lastTool: event.lastTool ?? prev?.lastTool ?? null,
             startedAt: prev?.startedAt ?? ts,
             endedAt: event.status === "running" ? null : ts,
+            source,
+            agent: prev?.agent ?? event.agent ?? null,
+            command: prev?.command ?? event.command ?? null,
+            pid: event.pid ?? prev?.pid ?? null,
+            output: event.output ?? prev?.output ?? null,
+            parentId:
+              prev?.parentId ??
+              event.parentToolCallId ??
+              (source === "process" ? runningShellLine(get().lines[threadId] ?? EMPTY_LINES) : null),
           });
           return;
         }
