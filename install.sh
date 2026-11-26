@@ -13,6 +13,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/Kwinzz/Neuron.git"
+# NEURON_BRANCH=<branch>: build another branch; later updates stay on it (remembered in the sources' git config).
 BRANCH="${NEURON_BRANCH:-main}"
 SRC_DIR="${NEURON_SRC_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/neuron-src}"
 NODE_MIN_MAJOR=20
@@ -219,14 +220,19 @@ ensure_node() {
 fetch_sources() {
   step "$(m "Sources de Neuron" "Neuron sources")"
   if [ -d "$SRC_DIR/.git" ]; then
-    info "$(m "Mise à jour de $SRC_DIR" "Updating $SRC_DIR")"
-    git -C "$SRC_DIR" fetch --depth 1 origin "$BRANCH"
+    if [ -z "${NEURON_BRANCH:-}" ]; then
+      BRANCH="$(git -C "$SRC_DIR" config --get neuron.branch || echo "$BRANCH")"
+    fi
+    info "$(m "Mise à jour de $SRC_DIR (branche $BRANCH)" "Updating $SRC_DIR (branch $BRANCH)")"
+    # Explicit refspec: a --depth 1 clone only tracks the branch it was cloned from.
+    git -C "$SRC_DIR" fetch --depth 1 origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
     git -C "$SRC_DIR" reset --hard "origin/$BRANCH"
     git -C "$SRC_DIR" clean -fdq -e node_modules -e src-tauri/target -e packaging/arch/src -e packaging/arch/pkg
   else
     mkdir -p "$(dirname "$SRC_DIR")"
     git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$SRC_DIR"
   fi
+  git -C "$SRC_DIR" config neuron.branch "$BRANCH"
   LATEST="$(sed -n 's/^[[:space:]]*"version": "\(.*\)",/\1/p' "$SRC_DIR/src-tauri/tauri.conf.json" | head -n1)"
   ok "$(m "Version disponible : $LATEST" "Available version: $LATEST")"
 }

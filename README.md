@@ -23,6 +23,9 @@ Neuron contains no AI of its own: it runs the CLIs installed on your computer, w
   and per project.
 - **AI providers**: install and sign in to each CLI in one click; the chat tells you when an agent isn't signed in.
 - **Quick prompt** from any app (global shortcut), end-of-turn notifications, system tray, launch at login.
+- **Other devices**: drive the agents of another computer or of a [server without a screen](#run-neuron-on-a-server-no-screen)
+  from your Neuron, paired with a 6-digit code (local network, or the internet if you allow it).
+- **`neuron` command line**: status, pairing, background service, updates (`neuron help`).
 - **English and French** interface.
 
 ---
@@ -84,7 +87,9 @@ curl -fsSL https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh | bas
 ```
 
 (`--yes` answers yes to the questions; deleting your data is never automatic.)
-The built sources stay in `~/.local/share/neuron-src` so updates are faster.
+The built sources stay in `~/.local/share/neuron-src` so updates are faster. To build another branch of this
+repository, put `NEURON_BRANCH=<branch>` before `bash` (`... | NEURON_BRANCH=<branch> bash`): later updates stay on
+that branch.
 
 > Debian 12 and Ubuntu 24.04 ship Node.js 18, too old for the build: install Node 20.19+ first (for example from
 > [NodeSource](https://github.com/nodesource/distributions)).
@@ -217,8 +222,10 @@ the system's); change it any time in **Settings → General → Language**.
 | Database | `%APPDATA%\dev.neuron.app\` | `~/.local/share/dev.neuron.app/` |
 | Memory | `%USERPROFILE%\.neuron\memory.md` | `~/.neuron/memory.md` |
 
-Neuron makes a single network call of its own: the public model price list (at most once a day), to estimate costs.
-Everything else stays on your computer; only the agents you run talk to their provider, as in your terminal.
+Neuron's own network calls: the public model price list (at most once a day, to estimate costs) and the check for
+a new version on GitHub (every 12 hours, can be turned off in **Settings → Updates**). If you turn on other devices,
+Neuron also talks to the devices you paired (directly, or through public relays when « outside the local network » is
+on). Everything else stays on your computer; only the agents you run talk to their provider, as in your terminal.
 
 ## Development
 
