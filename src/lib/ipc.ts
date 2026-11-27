@@ -4,6 +4,7 @@
  */
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
@@ -27,6 +28,7 @@ import type { MemoryImportOrigin } from "@/bindings/MemoryImportOrigin";
 import type { MemoryCategory } from "@/bindings/MemoryCategory";
 import type { MemoryHit } from "@/bindings/MemoryHit";
 import type { MemoryInfo } from "@/bindings/MemoryInfo";
+import type { MessageHit } from "@/bindings/MessageHit";
 import type { ProjectContextFile } from "@/bindings/ProjectContextFile";
 import type { ProjectOverview } from "@/bindings/ProjectOverview";
 import type { NewThreadInput } from "@/bindings/NewThreadInput";
@@ -286,6 +288,41 @@ export const ipc = {
   renameThread: (threadId: string, title: string) =>
     call<void>(deviceOfThread(threadId), "rename_thread", { threadId, title }),
   deleteThread: (threadId: string) => call<void>(deviceOfThread(threadId), "delete_thread", { threadId }),
+  restoreThread: (threadId: string) => call<ThreadSummary>(deviceOfThread(threadId), "restore_thread", { threadId }),
+  setThreadPinned: (threadId: string, pinned: boolean) =>
+    call<ThreadSummary>(deviceOfThread(threadId), "set_thread_pinned", { threadId, pinned }),
+  setThreadArchived: (threadId: string, archived: boolean) =>
+    call<ThreadSummary>(deviceOfThread(threadId), "set_thread_archived", { threadId, archived }),
+  moveThread: (threadId: string, projectId: string | null) =>
+    call<ThreadSummary>(deviceOfThread(threadId), "move_thread", { threadId, projectId }),
+  /** Full-text search across chat messages of this device and every connected device. */
+  searchMessages: async (query: string, limit?: number): Promise<MessageHit[]> => {
+    if (!query.trim()) return [];
+    const hosts = connectedHosts();
+    if (hosts.length === 0) return invoke<MessageHit[]>("search_messages", { query, limit });
+    const [local, ...remotes] = await Promise.all([
+      invoke<MessageHit[]>("search_messages", { query, limit }),
+      ...hosts.map(async (device): Promise<MessageHit[]> => {
+        try {
+          const hits = await withTimeout(
+            call<MessageHit[]>(device, "search_messages", { query, limit }),
+            REMOTE_LIST_TIMEOUT_MS,
+          );
+          for (const hit of hits) {
+            rememberThread(device, hit.threadId);
+            if (hit.projectId) rememberProject(device, hit.projectId);
+          }
+          return hits;
+        } catch {
+          return [];
+        }
+      }),
+    ]);
+    const remote = remotes.flat();
+    if (remote.length === 0) return local;
+    const merged = [...local, ...remote].sort((a, b) => b.ts - a.ts);
+    return limit === undefined ? merged : merged.slice(0, limit);
+  },
   /** Running chats of every connected device. */
   runningThreads: async (): Promise<string[]> => {
     const [local, remote] = await Promise.all([invoke<string[]>("running_threads"), fromHosts(lastRunning, "running_threads")]);
@@ -313,6 +350,8 @@ export const ipc = {
   /** Sub-folders of `path` (home folder when null) on this device or on `device`. */
   listDirectory: (path: string | null, device: string | null = null) =>
     call<DirListing>(device, "list_directory", { path }),
+  renameProject: (projectId: string, name: string) =>
+    call<ProjectSummary>(deviceOfProject(projectId), "rename_project", { projectId, name }),
   deleteProject: (projectId: string) => call<ProjectSummary[]>(deviceOfProject(projectId), "delete_project", { projectId }),
   // Project context (.neuron/context.md) & injected context
   projectContext: (projectId: string) =>
@@ -427,7 +466,28 @@ export const events = {
   /** The quick prompt asks for the « Nouveau chat » screen (payload = project id or null). */
   onNewChatRequested: (handler: (projectId: string | null) => void): Promise<UnlistenFn> =>
     listen<string | null>("quick://new-chat", (e) => handler(e.payload)),
+  /** Native OS file drag & drop over the current webview (`paths` is populated on `enter` and `drop`). */
+  onFileDrop: (handler: (e: FileDropEvent) => void): Promise<UnlistenFn> => {
+    if (!isTauri()) return Promise.resolve(() => undefined);
+    return getCurrentWebview().onDragDropEvent(({ payload }) => {
+      switch (payload.type) {
+        case "enter":
+        case "drop":
+          handler({ kind: payload.type, paths: payload.paths });
+          break;
+        case "over":
+        case "leave":
+          handler({ kind: payload.type, paths: [] });
+          break;
+      }
+    });
+  },
 } as const;
+
+export type FileDropEvent = {
+  kind: "enter" | "over" | "leave" | "drop";
+  paths: string[];
+};
 
 /** Other devices: this one's access settings, pairing, paired devices. */
 export const remote = {

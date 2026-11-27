@@ -5,7 +5,10 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::agents::events::{AgentKind, ThreadStatus};
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
+
+/// Soft-deleted threads stay restorable for this long before background purge removes them.
+pub const DELETE_RETENTION_MS: i64 = 30_000;
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -24,6 +27,10 @@ pub struct ThreadSummary {
     pub updated_at: i64,
     #[ts(type = "number | null")]
     pub ended_at: Option<i64>,
+    #[ts(type = "number | null")]
+    pub pinned_at: Option<i64>,
+    #[ts(type = "number | null")]
+    pub archived_at: Option<i64>,
     /// input + output tokens consumed by this thread.
     #[ts(type = "number")]
     pub tokens: i64,
@@ -38,7 +45,7 @@ pub struct ThreadSummary {
 }
 
 const SELECT: &str = "SELECT t.id, t.project_id, p.name, t.agent, t.model, t.title, t.status,
-            t.created_at, t.updated_at, t.ended_at,
+            t.created_at, t.updated_at, t.ended_at, t.pinned_at, t.archived_at,
             COALESCE(u.tokens, 0), COALESCE(u.cost, 0.0), t.cwd, t.permission_mode, t.effort, t.context IS NOT NULL
      FROM threads t
      LEFT JOIN projects p ON p.id = t.project_id
@@ -57,12 +64,14 @@ fn from_row(row: &Row<'_>) -> rusqlite::Result<ThreadSummary> {
         created_at: row.get(7)?,
         updated_at: row.get(8)?,
         ended_at: row.get(9)?,
-        tokens: row.get(10)?,
-        cost_usd: row.get(11)?,
-        cwd: row.get(12)?,
-        permission_mode: row.get(13)?,
-        effort: row.get(14)?,
-        has_context: row.get(15)?,
+        pinned_at: row.get(10)?,
+        archived_at: row.get(11)?,
+        tokens: row.get(12)?,
+        cost_usd: row.get(13)?,
+        cwd: row.get(14)?,
+        permission_mode: row.get(15)?,
+        effort: row.get(16)?,
+        has_context: row.get(17)?,
     })
 }
 
@@ -119,7 +128,8 @@ pub fn create(conn: &Connection, t: &NewThread<'_>) -> AppResult<()> {
 
 pub fn runtime(conn: &Connection, id: &str) -> AppResult<Option<ThreadRuntime>> {
     let mut stmt = conn.prepare_cached(
-        "SELECT id, agent, project_id, model, cwd, permission_mode, session_ref, title, effort, context FROM threads WHERE id = ?1",
+        "SELECT id, agent, project_id, model, cwd, permission_mode, session_ref, title, effort, context
+         FROM threads WHERE id = ?1 AND deleted_at IS NULL",
     )?;
     Ok(stmt
         .query_row([id], |r| {
@@ -142,7 +152,9 @@ pub fn runtime(conn: &Connection, id: &str) -> AppResult<Option<ThreadRuntime>> 
 /// The context injected into a chat, if any.
 pub fn context(conn: &Connection, id: &str) -> AppResult<Option<crate::context::ContextBundle>> {
     let row: Option<(Option<String>, Option<String>)> = conn
-        .query_row("SELECT context, context_sources FROM threads WHERE id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?)))
+        .query_row("SELECT context, context_sources FROM threads WHERE id = ?1 AND deleted_at IS NULL", [id], |r| {
+            Ok((r.get(0)?, r.get(1)?))
+        })
         .optional()?;
     Ok(row.and_then(|(markdown, sources)| {
         Some(crate::context::ContextBundle {
@@ -160,7 +172,7 @@ pub fn user_message_count(conn: &Connection, id: &str) -> AppResult<i64> {
 pub fn set_status(conn: &Connection, id: &str, status: ThreadStatus, now: i64) -> AppResult<()> {
     let ended = (!status.is_active()).then_some(now);
     conn.execute(
-        "UPDATE threads SET status = ?2, updated_at = ?3, ended_at = ?4 WHERE id = ?1",
+        "UPDATE threads SET status = ?2, updated_at = ?3, ended_at = ?4 WHERE id = ?1 AND deleted_at IS NULL",
         rusqlite::params![id, status, now, ended],
     )?;
     Ok(())
@@ -168,21 +180,27 @@ pub fn set_status(conn: &Connection, id: &str, status: ThreadStatus, now: i64) -
 
 pub fn set_session(conn: &Connection, id: &str, session_ref: &str, model: Option<&str>) -> AppResult<()> {
     conn.execute(
-        "UPDATE threads SET session_ref = ?2, model = COALESCE(model, ?3) WHERE id = ?1",
+        "UPDATE threads SET session_ref = ?2, model = COALESCE(model, ?3) WHERE id = ?1 AND deleted_at IS NULL",
         rusqlite::params![id, session_ref, model],
     )?;
     Ok(())
 }
 
 pub fn set_title_if_empty(conn: &Connection, id: &str, title: &str) -> AppResult<()> {
-    conn.execute("UPDATE threads SET title = ?2 WHERE id = ?1 AND title = ''", rusqlite::params![id, title])?;
+    conn.execute(
+        "UPDATE threads SET title = ?2 WHERE id = ?1 AND title = '' AND deleted_at IS NULL",
+        rusqlite::params![id, title],
+    )?;
     Ok(())
 }
 
 /// Change model / effort / permission mode (applied when the session (re)starts).
 /// Mode switched by the agent itself (no restart).
 pub fn set_permission_mode(conn: &Connection, id: &str, mode: &str) -> AppResult<()> {
-    conn.execute("UPDATE threads SET permission_mode = ?2 WHERE id = ?1", rusqlite::params![id, mode])?;
+    conn.execute(
+        "UPDATE threads SET permission_mode = ?2 WHERE id = ?1 AND deleted_at IS NULL",
+        rusqlite::params![id, mode],
+    )?;
     Ok(())
 }
 
@@ -194,29 +212,113 @@ pub fn update_settings(
     permission_mode: &str,
 ) -> AppResult<()> {
     let n = conn.execute(
-        "UPDATE threads SET model = ?2, effort = ?3, permission_mode = ?4 WHERE id = ?1",
+        "UPDATE threads SET model = ?2, effort = ?3, permission_mode = ?4 WHERE id = ?1 AND deleted_at IS NULL",
         rusqlite::params![id, model, effort, permission_mode],
     )?;
     if n == 0 {
-        return Err(crate::error::AppError::NotFound(format!("chat {id}")));
+        return Err(AppError::NotFound(format!("chat {id}")));
     }
     Ok(())
 }
 
 pub fn rename(conn: &Connection, id: &str, title: &str) -> AppResult<()> {
-    conn.execute("UPDATE threads SET title = ?2 WHERE id = ?1", rusqlite::params![id, title])?;
+    conn.execute("UPDATE threads SET title = ?2 WHERE id = ?1 AND deleted_at IS NULL", rusqlite::params![id, title])?;
     Ok(())
 }
 
+pub fn set_pinned(conn: &Connection, id: &str, pinned_at: Option<i64>) -> AppResult<()> {
+    let n = conn.execute(
+        "UPDATE threads SET pinned_at = ?2 WHERE id = ?1 AND deleted_at IS NULL",
+        rusqlite::params![id, pinned_at],
+    )?;
+    if n == 0 {
+        return Err(AppError::NotFound(format!("chat {id}")));
+    }
+    Ok(())
+}
+
+pub fn set_archived(conn: &Connection, id: &str, archived_at: Option<i64>) -> AppResult<()> {
+    let n = conn.execute(
+        "UPDATE threads SET archived_at = ?2 WHERE id = ?1 AND deleted_at IS NULL",
+        rusqlite::params![id, archived_at],
+    )?;
+    if n == 0 {
+        return Err(AppError::NotFound(format!("chat {id}")));
+    }
+    Ok(())
+}
+
+/// Reassign a thread to another project (or detach it when `project_id` is `None`).
+/// Only `threads.project_id` changes; the frozen context and working directory stay as they are.
+pub fn move_to_project(conn: &Connection, id: &str, project_id: Option<&str>) -> AppResult<()> {
+    if let Some(pid) = project_id {
+        let exists = conn.query_row("SELECT 1 FROM projects WHERE id = ?1", [pid], |_| Ok(())).optional()?.is_some();
+        if !exists {
+            return Err(AppError::NotFound(crate::tr!("projet {pid}", "project {pid}")));
+        }
+    }
+    let n = conn.execute(
+        "UPDATE threads SET project_id = ?2 WHERE id = ?1 AND deleted_at IS NULL",
+        rusqlite::params![id, project_id],
+    )?;
+    if n == 0 {
+        return Err(AppError::NotFound(format!("chat {id}")));
+    }
+    Ok(())
+}
+
+/// Mark a thread as deleted (hidden from all queries; restorable until [`purge_deleted`] removes it).
+/// Any active status is cancelled and dangling running tools are closed since its agent has been shut down.
+pub fn soft_delete(conn: &Connection, id: &str, now: i64) -> AppResult<()> {
+    crate::db::chat::close_dangling_tools(conn, id, now)?;
+    let sql = format!(
+        "UPDATE threads
+         SET deleted_at = ?2,
+             status = CASE WHEN status IN ({active}) THEN 'cancelled' ELSE status END,
+             ended_at = CASE WHEN status IN ({active}) THEN COALESCE(ended_at, ?2) ELSE ended_at END
+         WHERE id = ?1 AND deleted_at IS NULL",
+        active = ThreadStatus::active_sql_list()
+    );
+    conn.execute(&sql, rusqlite::params![id, now])?;
+    Ok(())
+}
+
+/// Undo a soft deletion. Fails with [`AppError::NotFound`] if the thread was already purged.
+pub fn restore(conn: &Connection, id: &str) -> AppResult<()> {
+    let n = conn.execute("UPDATE threads SET deleted_at = NULL WHERE id = ?1", [id])?;
+    if n == 0 {
+        return Err(AppError::NotFound(crate::tr!(
+            "ce chat a déjà été définitivement supprimé",
+            "this chat has already been permanently deleted"
+        )));
+    }
+    Ok(())
+}
+
+/// Permanently remove a thread (cascades to messages / tool_calls; token_usage keeps rows with thread_id = NULL).
 pub fn delete(conn: &Connection, id: &str) -> AppResult<()> {
     conn.execute("DELETE FROM threads WHERE id = ?1", [id])?;
     Ok(())
 }
 
+/// Permanently delete every soft-deleted thread whose `deleted_at` is at or before `cutoff` (Unix ms).
+pub fn purge_deleted(conn: &Connection, cutoff: i64) -> AppResult<usize> {
+    let ids: Vec<String> = {
+        let mut stmt =
+            conn.prepare_cached("SELECT id FROM threads WHERE deleted_at IS NOT NULL AND deleted_at <= ?1")?;
+        let rows = stmt.query_map([cutoff], |r| r.get(0))?;
+        rows.collect::<Result<_, _>>()?
+    };
+    for id in &ids {
+        delete(conn, id)?;
+    }
+    Ok(ids.len())
+}
+
 /// At startup no agent process is alive: threads left "active" by a previous run become idle.
 pub fn reset_stale_active(conn: &Connection, now: i64) -> AppResult<usize> {
     let sql = format!(
-        "UPDATE threads SET status = 'idle', updated_at = ?1, ended_at = ?1 WHERE status IN ({})",
+        "UPDATE threads SET status = 'idle', updated_at = ?1, ended_at = ?1 WHERE deleted_at IS NULL AND status IN ({})",
         ThreadStatus::active_sql_list()
     );
     let n = conn.execute(&sql, [now])?;
@@ -229,20 +331,24 @@ pub fn reset_stale_active(conn: &Connection, now: i64) -> AppResult<usize> {
 }
 
 pub fn list_recent(conn: &Connection, limit: u32) -> AppResult<Vec<ThreadSummary>> {
-    let mut stmt = conn.prepare_cached(&format!("{SELECT} ORDER BY t.updated_at DESC LIMIT ?1"))?;
+    let mut stmt =
+        conn.prepare_cached(&format!("{SELECT} WHERE t.deleted_at IS NULL ORDER BY t.updated_at DESC LIMIT ?1"))?;
     let rows = stmt.query_map([limit], from_row)?;
     Ok(rows.collect::<Result<_, _>>()?)
 }
 
 pub fn list_active(conn: &Connection) -> AppResult<Vec<ThreadSummary>> {
-    let sql = format!("{SELECT} WHERE t.status IN ({}) ORDER BY t.updated_at DESC", ThreadStatus::active_sql_list());
+    let sql = format!(
+        "{SELECT} WHERE t.deleted_at IS NULL AND t.status IN ({}) ORDER BY t.updated_at DESC",
+        ThreadStatus::active_sql_list()
+    );
     let mut stmt = conn.prepare_cached(&sql)?;
     let rows = stmt.query_map([], from_row)?;
     Ok(rows.collect::<Result<_, _>>()?)
 }
 
 pub fn get(conn: &Connection, id: &str) -> AppResult<Option<ThreadSummary>> {
-    let mut stmt = conn.prepare_cached(&format!("{SELECT} WHERE t.id = ?1"))?;
+    let mut stmt = conn.prepare_cached(&format!("{SELECT} WHERE t.id = ?1 AND t.deleted_at IS NULL"))?;
     Ok(stmt.query_row([id], from_row).optional()?)
 }
 
@@ -300,6 +406,108 @@ mod tests {
             assert_eq!(count("SELECT COUNT(*) FROM tool_calls")?, 0);
             // The dashboard keeps what the chat cost.
             assert_eq!(count("SELECT COUNT(*) FROM token_usage WHERE thread_id IS NULL")?, 1);
+            Ok(())
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn pin_archive_and_move_preserve_context_and_cwd() {
+        let db = Db::open_in_memory().unwrap();
+        db.call(|conn| {
+            conn.execute_batch(
+                "INSERT INTO projects (id, name, path, created_at) VALUES
+                   ('p1', 'Alpha', '/alpha', 1),
+                   ('p2', 'Beta', '/beta', 2);
+                 INSERT INTO threads (id, project_id, agent, title, status, created_at, updated_at, cwd, context, context_sources)
+                   VALUES ('t1', 'p1', 'claude_code', 'Chat', 'done', 10, 20, '/alpha', '# frozen', '[]');",
+            )?;
+
+            // Pin & archive expose timestamps without hiding archived chats from list_recent.
+            set_pinned(conn, "t1", Some(100))?;
+            set_archived(conn, "t1", Some(200))?;
+            let t = get(conn, "t1")?.unwrap();
+            assert_eq!((t.pinned_at, t.archived_at), (Some(100), Some(200)));
+            assert_eq!(list_recent(conn, 10)?.len(), 1, "archived chats stay listed");
+
+            set_pinned(conn, "t1", None)?;
+            set_archived(conn, "t1", None)?;
+            let t = get(conn, "t1")?.unwrap();
+            assert_eq!((t.pinned_at, t.archived_at), (None, None));
+
+            // Move changes only project_id; cwd and frozen context stay untouched.
+            move_to_project(conn, "t1", Some("p2"))?;
+            let t = get(conn, "t1")?.unwrap();
+            assert_eq!(t.project_id.as_deref(), Some("p2"));
+            assert_eq!(t.project_name.as_deref(), Some("Beta"));
+            assert_eq!(t.cwd.as_deref(), Some("/alpha"));
+            assert_eq!(context(conn, "t1")?.map(|c| c.markdown).as_deref(), Some("# frozen"));
+
+            // Detaching from any project works too.
+            move_to_project(conn, "t1", None)?;
+            assert_eq!(get(conn, "t1")?.unwrap().project_id, None);
+            assert_eq!(get(conn, "t1")?.unwrap().cwd.as_deref(), Some("/alpha"));
+
+            // Missing project or missing thread returns NotFound.
+            assert!(matches!(move_to_project(conn, "t1", Some("missing")), Err(AppError::NotFound(_))));
+            assert!(matches!(set_pinned(conn, "missing", Some(1)), Err(AppError::NotFound(_))));
+            assert!(matches!(set_archived(conn, "missing", Some(1)), Err(AppError::NotFound(_))));
+            Ok(())
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn soft_delete_restore_and_purge_after_30s() {
+        let db = Db::open_in_memory().unwrap();
+        db.call(|conn| {
+            conn.execute_batch(
+                "INSERT INTO projects (id, name, path, created_at) VALUES ('p1', 'Neuron', '/n', 1);
+                 INSERT INTO threads (id, project_id, agent, title, status, created_at, updated_at) VALUES
+                   ('t1', 'p1', 'claude_code', 'Active chat', 'thinking', 10, 50),
+                   ('t2', 'p1', 'codex', 'Other chat', 'done', 10, 60);
+                 INSERT INTO messages (id, thread_id, seq, role, content, created_at)
+                   VALUES ('m1', 't1', 1, 'user', 'bonjour', 11);
+                 INSERT INTO tool_calls (id, thread_id, name, status, started_at)
+                   VALUES ('c1', 't1', 'Bash', 'running', 12);
+                 INSERT INTO token_usage (thread_id, agent, input_tokens, output_tokens, cost_usd, ts)
+                   VALUES ('t1', 'claude_code', 50, 10, 0.05, 13);",
+            )?;
+
+            // Soft delete hides the thread from lists, lookups, runtime, history and project counts.
+            soft_delete(conn, "t1", 1_000)?;
+            assert!(get(conn, "t1")?.is_none());
+            assert!(runtime(conn, "t1")?.is_none());
+            assert!(list_active(conn)?.is_empty());
+            assert_eq!(list_recent(conn, 10)?.iter().map(|t| t.id.as_str()).collect::<Vec<_>>(), ["t2"]);
+            assert!(crate::db::chat::history(conn, "t1")?.is_empty());
+            let proj = crate::db::projects::get(conn, "p1")?.unwrap();
+            assert_eq!((proj.thread_count, proj.active_count), (1, 0));
+
+            // Restore makes it visible again with its history, and active status was cleanly cancelled.
+            restore(conn, "t1")?;
+            let restored = get(conn, "t1")?.unwrap();
+            assert_eq!(restored.status, ThreadStatus::Cancelled);
+            assert_eq!(restored.updated_at, 50);
+            assert_eq!(crate::db::chat::history(conn, "t1")?.len(), 2);
+            let proj = crate::db::projects::get(conn, "p1")?.unwrap();
+            assert_eq!((proj.thread_count, proj.active_count), (2, 0));
+
+            // Soft delete again and test purge threshold (30 s).
+            soft_delete(conn, "t1", 10_000)?;
+            assert_eq!(purge_deleted(conn, 10_000 + DELETE_RETENTION_MS - 1 - DELETE_RETENTION_MS)?, 0);
+            assert_eq!(purge_deleted(conn, 9_999)?, 0, "deleted at 10_000 is newer than cutoff 9_999");
+            assert_eq!(purge_deleted(conn, 10_000)?, 1, "deleted at 10_000 is purged once 30 s elapsed");
+
+            // After purge, messages & tool_calls are gone, usage row kept with NULL thread_id, restore errors.
+            let count = |sql: &str| conn.query_row(sql, [], |r| r.get::<_, i64>(0));
+            assert_eq!(count("SELECT COUNT(*) FROM threads WHERE id = 't1'")?, 0);
+            assert_eq!(count("SELECT COUNT(*) FROM messages WHERE thread_id = 't1'")?, 0);
+            assert_eq!(count("SELECT COUNT(*) FROM tool_calls WHERE thread_id = 't1'")?, 0);
+            assert_eq!(count("SELECT COUNT(*) FROM token_usage WHERE thread_id IS NULL")?, 1);
+            assert!(matches!(restore(conn, "t1"), Err(AppError::NotFound(_))));
             Ok(())
         })
         .await

@@ -2,7 +2,7 @@
 import type { AgentKind } from "./AgentKind";
 import type { ThreadStatus } from "./ThreadStatus";
 
-export type ThreadSummary = { id: string, projectId: string | null, projectName: string | null, agent: AgentKind, model: string | null, title: string, status: ThreadStatus, createdAt: number, updatedAt: number, endedAt: number | null, 
+export type ThreadSummary = { id: string, projectId: string | null, projectName: string | null, agent: AgentKind, model: string | null, title: string, status: ThreadStatus, createdAt: number, updatedAt: number, endedAt: number | null, pinnedAt: number | null, archivedAt: number | null, 
 /**
  * input + output tokens consumed by this thread.
  */

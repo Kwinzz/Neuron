@@ -15,6 +15,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ("0007_cli_usage_logs", include_str!("../../migrations/0007_cli_usage_logs.sql")),
     ("0008_claude_turn_costs", include_str!("../../migrations/0008_claude_turn_costs.sql")),
     ("0009_remote_devices", include_str!("../../migrations/0009_remote_devices.sql")),
+    ("0010_thread_organization", include_str!("../../migrations/0010_thread_organization.sql")),
 ];
 
 /// Schema version after all embedded migrations are applied.
@@ -56,6 +57,7 @@ mod tests {
         "projects",
         "threads",
         "messages",
+        "messages_fts",
         "tool_calls",
         "token_usage",
         "providers",
@@ -154,6 +156,70 @@ mod tests {
             .query_row("SELECT json_extract(meta_json, '$.durationMs') FROM messages WHERE id = 't2'", [], |r| r.get(0))
             .unwrap();
         assert_eq!(duration, 5);
+    }
+
+    #[test]
+    fn messages_fts_stays_in_sync() {
+        let conn = fresh();
+        let search = |q: &str| -> i64 {
+            conn.query_row("SELECT COUNT(*) FROM messages_fts WHERE messages_fts MATCH ?1", [q], |r| r.get(0)).unwrap()
+        };
+
+        conn.execute(
+            "INSERT INTO threads (id, agent, title, status, created_at, updated_at) VALUES ('t1', 'claude_code', 'Test', 'idle', 1, 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO messages (id, thread_id, seq, role, content, created_at)
+             VALUES ('m1', 't1', 1, 'user', 'Préparer le déploiement', 1)",
+            [],
+        )
+        .unwrap();
+        assert_eq!(search("deploiement"), 1, "diacritics should be folded");
+
+        conn.execute("UPDATE messages SET content = 'Migration terminée' WHERE id = 'm1'", []).unwrap();
+        assert_eq!(search("deploiement"), 0);
+        assert_eq!(search("terminee"), 1);
+
+        // Cascade delete from threads must keep messages_fts in sync.
+        conn.execute("DELETE FROM threads WHERE id = 't1'", []).unwrap();
+        assert_eq!(search("terminee"), 0);
+        conn.execute("INSERT INTO messages_fts(messages_fts) VALUES('integrity-check')", []).unwrap();
+    }
+
+    #[test]
+    fn migrates_v9_to_v10_and_rebuilds_messages_fts() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+        for (_, sql) in &MIGRATIONS[..9] {
+            conn.execute_batch(sql).unwrap();
+        }
+        conn.pragma_update(None, "user_version", 9).unwrap();
+        conn.execute_batch(
+            "INSERT INTO threads (id, agent, title, status, created_at, updated_at)
+               VALUES ('t1', 'claude_code', 'Infra', 'done', 10, 20);
+             INSERT INTO messages (id, thread_id, seq, role, content, created_at) VALUES
+               ('m1', 't1', 1, 'user', 'Lancer le déploiement en préproduction', 11),
+               ('m2', 't1', 2, 'assistant', 'Déploiement réussi sans erreur.', 12),
+               ('m3', 't1', 3, 'thinking', 'vérification déploiement', 13);",
+        )
+        .unwrap();
+
+        assert_eq!(apply(&mut conn).unwrap(), LATEST_VERSION);
+        assert_eq!(LATEST_VERSION, 10);
+
+        let flags: (Option<i64>, Option<i64>, Option<i64>) = conn
+            .query_row("SELECT pinned_at, archived_at, deleted_at FROM threads WHERE id = 't1'", [], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+            })
+            .unwrap();
+        assert_eq!(flags, (None, None, None));
+
+        let hits = crate::db::chat::search_messages(&conn, "deploiement", 30).unwrap();
+        assert_eq!(hits.len(), 2, "only user + assistant messages are returned");
+        assert!(hits.iter().all(|h| h.snippet.contains('\u{2}') && h.snippet.contains('\u{3}')));
+        conn.execute("INSERT INTO messages_fts(messages_fts) VALUES('integrity-check')", []).unwrap();
     }
 
     #[test]

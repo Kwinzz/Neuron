@@ -85,6 +85,8 @@ export const useLive = create<LiveState>((set, get) => ({
                 cwd: s.cwd,
                 projectId: s.projectId,
                 projectName: s.projectName,
+                pinnedAt: s.pinnedAt,
+                archivedAt: s.archivedAt,
               }
             : fromSummary(s, prev);
         const kept = keepIfSame(prev, next);

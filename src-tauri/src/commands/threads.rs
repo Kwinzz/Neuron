@@ -1,12 +1,15 @@
 //! Thread lifecycle & chat commands.
 
+use std::sync::Arc;
+use std::time::Duration;
+
 use serde::Deserialize;
 use serde_json::Value;
 use tauri::{AppHandle, State};
 use ts_rs::TS;
 
 use crate::agents::events::AgentKind;
-use crate::db::chat::{self, ChatItem};
+use crate::db::chat::{self, ChatItem, MessageHit};
 use crate::db::threads::{self, NewThread, ThreadSummary};
 use crate::db::{projects, settings};
 use crate::error::{AppError, AppResult};
@@ -14,6 +17,8 @@ use crate::state::{AppState, Shared};
 use crate::util::now_ms;
 
 const PERMISSION_MODES: &[&str] = &["manual", "acceptEdits", "auto", "plan", "bypassPermissions"];
+const DEFAULT_SEARCH_LIMIT: u32 = 30;
+const MAX_SEARCH_LIMIT: u32 = 100;
 
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -271,12 +276,129 @@ pub async fn rename_thread(state: State<'_, Shared>, thread_id: String, title: S
 
 pub(crate) async fn delete_thread_inner(state: &AppState, thread_id: String) -> AppResult<()> {
     state.agents.shutdown(&thread_id);
-    state.db.call(move |c| threads::delete(c, &thread_id)).await
+    state.db.call(move |c| threads::soft_delete(c, &thread_id, now_ms())).await
 }
 
 #[tauri::command]
 pub async fn delete_thread(state: State<'_, Shared>, thread_id: String) -> AppResult<()> {
     delete_thread_inner(&state, thread_id).await
+}
+
+pub(crate) async fn restore_thread_inner(state: &AppState, thread_id: String) -> AppResult<ThreadSummary> {
+    state
+        .db
+        .call(move |c| {
+            threads::restore(c, &thread_id)?;
+            threads::get(c, &thread_id)?.ok_or_else(|| AppError::NotFound(format!("chat {thread_id}")))
+        })
+        .await
+}
+
+#[tauri::command]
+pub async fn restore_thread(state: State<'_, Shared>, thread_id: String) -> AppResult<ThreadSummary> {
+    restore_thread_inner(&state, thread_id).await
+}
+
+pub(crate) async fn set_thread_pinned_inner(
+    state: &AppState,
+    thread_id: String,
+    pinned: bool,
+) -> AppResult<ThreadSummary> {
+    state
+        .db
+        .call(move |c| {
+            threads::set_pinned(c, &thread_id, pinned.then(now_ms))?;
+            threads::get(c, &thread_id)?.ok_or_else(|| AppError::NotFound(format!("chat {thread_id}")))
+        })
+        .await
+}
+
+#[tauri::command]
+pub async fn set_thread_pinned(state: State<'_, Shared>, thread_id: String, pinned: bool) -> AppResult<ThreadSummary> {
+    set_thread_pinned_inner(&state, thread_id, pinned).await
+}
+
+pub(crate) async fn set_thread_archived_inner(
+    state: &AppState,
+    thread_id: String,
+    archived: bool,
+) -> AppResult<ThreadSummary> {
+    state
+        .db
+        .call(move |c| {
+            threads::set_archived(c, &thread_id, archived.then(now_ms))?;
+            threads::get(c, &thread_id)?.ok_or_else(|| AppError::NotFound(format!("chat {thread_id}")))
+        })
+        .await
+}
+
+#[tauri::command]
+pub async fn set_thread_archived(
+    state: State<'_, Shared>,
+    thread_id: String,
+    archived: bool,
+) -> AppResult<ThreadSummary> {
+    set_thread_archived_inner(&state, thread_id, archived).await
+}
+
+pub(crate) async fn move_thread_inner(
+    state: &AppState,
+    thread_id: String,
+    project_id: Option<String>,
+) -> AppResult<ThreadSummary> {
+    state
+        .db
+        .call(move |c| {
+            threads::move_to_project(c, &thread_id, project_id.as_deref())?;
+            threads::get(c, &thread_id)?.ok_or_else(|| AppError::NotFound(format!("chat {thread_id}")))
+        })
+        .await
+}
+
+/// Move a chat to another project (or detach it when `project_id` is `None`).
+/// Only `threads.project_id` changes; the frozen context and working directory stay as they are.
+#[tauri::command]
+pub async fn move_thread(
+    state: State<'_, Shared>,
+    thread_id: String,
+    project_id: Option<String>,
+) -> AppResult<ThreadSummary> {
+    move_thread_inner(&state, thread_id, project_id).await
+}
+
+pub(crate) async fn search_messages_inner(
+    state: &AppState,
+    query: String,
+    limit: Option<u32>,
+) -> AppResult<Vec<MessageHit>> {
+    let limit = limit.unwrap_or(DEFAULT_SEARCH_LIMIT).min(MAX_SEARCH_LIMIT);
+    state.db.call(move |c| chat::search_messages(c, &query, limit)).await
+}
+
+/// Full-text search across user and assistant messages (accent-insensitive, excludes deleted chats).
+#[tauri::command]
+pub async fn search_messages(
+    state: State<'_, Shared>,
+    query: String,
+    limit: Option<u32>,
+) -> AppResult<Vec<MessageHit>> {
+    search_messages_inner(&state, query, limit).await
+}
+
+/// Permanently remove soft-deleted chats past the 30 s undo window (at startup, then every 30 s).
+pub fn spawn_deleted_purge(state: &Shared) {
+    let state = Arc::clone(state);
+    tauri::async_runtime::spawn(async move {
+        loop {
+            let cutoff = now_ms().saturating_sub(threads::DELETE_RETENTION_MS);
+            match state.db.call(move |c| threads::purge_deleted(c, cutoff)).await {
+                Ok(n) if n > 0 => tracing::info!(purged = n, "purged deleted threads"),
+                Ok(_) => {}
+                Err(err) => tracing::warn!(%err, "deleted thread purge failed"),
+            }
+            tokio::time::sleep(Duration::from_secs(30)).await;
+        }
+    });
 }
 
 pub(crate) async fn running_threads_inner(state: &AppState) -> AppResult<Vec<String>> {
@@ -522,4 +644,63 @@ pub async fn agent_images(
         }
     }
     Ok(images)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::events::HeadlessSink;
+    use crate::state::{AppPaths, AppState};
+
+    fn temp_state() -> (std::path::PathBuf, Shared) {
+        let dir = std::env::temp_dir().join(format!("neuron-cmd-threads-{}", uuid::Uuid::new_v4().simple()));
+        let paths = AppPaths {
+            data_dir: dir.clone(),
+            db_path: dir.join("neuron.db"),
+            neuron_home: dir.join(".neuron"),
+            memory_file: dir.join(".neuron").join("memory.md"),
+        };
+        let state = AppState::open(paths, Arc::new(HeadlessSink), std::time::Instant::now()).unwrap();
+        (dir, Arc::new(state))
+    }
+
+    #[tokio::test]
+    async fn deleted_thread_rejects_send_message_and_can_be_restored() {
+        let (dir, state) = temp_state();
+        state
+            .db
+            .call(|c| {
+                c.execute(
+                    "INSERT INTO threads (id, agent, title, status, created_at, updated_at, cwd)
+                     VALUES ('t1', 'claude_code', 'Hello', 'done', 1, 1, '.')",
+                    [],
+                )?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        delete_thread_inner(&state, "t1".into()).await.unwrap();
+
+        let err = send_message_inner(&state, "t1".into(), "ping".into(), None).await.unwrap_err();
+        assert!(matches!(err, AppError::NotFound(_)), "expected NotFound, got {err:?}");
+        let msg_count: i64 = state
+            .db
+            .call(|c| Ok(c.query_row("SELECT COUNT(*) FROM messages WHERE thread_id = 't1'", [], |r| r.get(0))?))
+            .await
+            .unwrap();
+        assert_eq!(msg_count, 0, "rejected message must not be persisted");
+
+        let restored = restore_thread_inner(&state, "t1".into()).await.unwrap();
+        assert_eq!(restored.id, "t1");
+        assert_eq!(restored.pinned_at, None);
+        assert_eq!(restored.archived_at, None);
+
+        let pinned = set_thread_pinned_inner(&state, "t1".into(), true).await.unwrap();
+        assert!(pinned.pinned_at.is_some());
+        let archived = set_thread_archived_inner(&state, "t1".into(), true).await.unwrap();
+        assert!(archived.archived_at.is_some());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

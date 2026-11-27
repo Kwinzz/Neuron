@@ -269,6 +269,31 @@ pub async fn create_project_folder(
     create_project_folder_inner(&state, parent, name).await
 }
 
+pub(crate) async fn rename_project_inner(
+    state: &AppState,
+    project_id: String,
+    name: String,
+) -> AppResult<projects::ProjectSummary> {
+    state
+        .db
+        .call(move |c| {
+            projects::rename(c, &project_id, &name)?;
+            projects::get(c, &project_id)?
+                .ok_or_else(|| AppError::NotFound(crate::tr!("projet {project_id}", "project {project_id}")))
+        })
+        .await
+}
+
+/// Rename a project (trimmed, non-empty, max 120 chars).
+#[tauri::command]
+pub async fn rename_project(
+    state: State<'_, Shared>,
+    project_id: String,
+    name: String,
+) -> AppResult<projects::ProjectSummary> {
+    rename_project_inner(&state, project_id, name).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

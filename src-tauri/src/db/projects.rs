@@ -5,7 +5,9 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::agents::events::ThreadStatus;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
+
+pub const MAX_NAME_CHARS: usize = 120;
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +29,7 @@ pub fn list(conn: &Connection) -> AppResult<Vec<ProjectSummary>> {
         "SELECT p.id, p.name, p.path, p.created_at, p.last_opened_at,
                 COUNT(t.id),
                 COUNT(CASE WHEN t.status IN ({}) THEN 1 END)
-         FROM projects p LEFT JOIN threads t ON t.project_id = p.id
+         FROM projects p LEFT JOIN threads t ON t.project_id = p.id AND t.deleted_at IS NULL
          GROUP BY p.id
          ORDER BY COALESCE(p.last_opened_at, p.created_at) DESC",
         ThreadStatus::active_sql_list()
@@ -76,6 +78,25 @@ pub fn touch(conn: &Connection, id: &str, now: i64) -> AppResult<()> {
     Ok(())
 }
 
+/// Rename a project (trimmed, non-empty, max 120 chars).
+pub fn rename(conn: &Connection, id: &str, name: &str) -> AppResult<()> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err(AppError::Invalid(crate::tr!("le nom du projet est vide", "the project name is empty")));
+    }
+    if name.chars().count() > MAX_NAME_CHARS {
+        return Err(AppError::Invalid(crate::tr!(
+            "nom trop long (120 caractères au plus)",
+            "name too long (120 characters at most)"
+        )));
+    }
+    let n = conn.execute("UPDATE projects SET name = ?2 WHERE id = ?1", params![id, name])?;
+    if n == 0 {
+        return Err(AppError::NotFound(crate::tr!("projet {id}", "project {id}")));
+    }
+    Ok(())
+}
+
 /// Forget a project (its chats are kept, detached from it).
 pub fn delete(conn: &Connection, id: &str) -> AppResult<()> {
     conn.execute("DELETE FROM projects WHERE id = ?1", [id])?;
@@ -104,6 +125,35 @@ mod tests {
             assert!(list(c)?.is_empty());
             let project: Option<String> = c.query_row("SELECT project_id FROM threads WHERE id = 't'", [], |r| r.get(0))?;
             assert_eq!(project, None);
+            Ok(())
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn rename_validates_and_list_excludes_deleted_threads() {
+        let db = Db::open_in_memory().unwrap();
+        db.call(|c| {
+            let p = create(c, "Old", "C:/code/old", 1)?;
+            rename(c, &p, "  Nouveau nom  ")?;
+            assert_eq!(get(c, &p)?.unwrap().name, "Nouveau nom");
+
+            assert!(matches!(rename(c, &p, "   "), Err(AppError::Invalid(_))));
+            let exact = "é".repeat(MAX_NAME_CHARS);
+            rename(c, &p, &exact)?;
+            assert_eq!(get(c, &p)?.unwrap().name, exact);
+            let too_long = "é".repeat(MAX_NAME_CHARS + 1);
+            assert!(matches!(rename(c, &p, &too_long), Err(AppError::Invalid(_))));
+            assert!(matches!(rename(c, "missing", "Valid"), Err(AppError::NotFound(_))));
+
+            c.execute_batch(&format!(
+                "INSERT INTO threads (id, project_id, agent, title, status, created_at, updated_at, deleted_at) VALUES
+                   ('t1', '{p}', 'claude_code', 'Live', 'thinking', 1, 1, NULL),
+                   ('t2', '{p}', 'claude_code', 'Deleted', 'thinking', 1, 1, 999);"
+            ))?;
+            let summary = get(c, &p)?.unwrap();
+            assert_eq!((summary.thread_count, summary.active_count), (1, 1));
             Ok(())
         })
         .await

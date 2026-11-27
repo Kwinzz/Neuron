@@ -6,8 +6,28 @@ use serde::Serialize;
 use serde_json::Value;
 use ts_rs::TS;
 
-use crate::agents::events::TokenUsage;
+use crate::agents::events::{AgentKind, TokenUsage};
 use crate::error::AppResult;
+
+/// One full-text search match inside a chat message (`messages_fts`).
+///
+/// Matched terms in [`Self::snippet`] are wrapped between `\u{2}` (start) and `\u{3}` (end) so the UI can
+/// highlight them cleanly without colliding with Markdown or code; truncation uses `…`.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct MessageHit {
+    pub thread_id: String,
+    pub thread_title: String,
+    pub project_id: Option<String>,
+    pub agent: AgentKind,
+    pub message_id: String,
+    pub role: String,
+    /// Excerpt around the match; matched terms are wrapped between `\u{2}` and `\u{3}` (`…` for truncation).
+    pub snippet: String,
+    #[ts(type = "number")]
+    pub ts: i64,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "snake_case")]
@@ -189,6 +209,13 @@ pub fn close_dangling_tools(conn: &Connection, thread_id: &str, ts: i64) -> AppR
 }
 
 pub fn history(conn: &Connection, thread_id: &str) -> AppResult<Vec<ChatItem>> {
+    let alive = conn
+        .query_row("SELECT 1 FROM threads WHERE id = ?1 AND deleted_at IS NULL", [thread_id], |_| Ok(()))
+        .optional()?
+        .is_some();
+    if !alive {
+        return Ok(Vec::new());
+    }
     let mut stmt = conn.prepare_cached(
         "SELECT seq, 'm' AS src, id, role, content, meta_json, created_at, NULL, NULL, NULL, NULL
            FROM messages WHERE thread_id = ?1
@@ -308,6 +335,60 @@ pub fn message_exists(conn: &Connection, id: &str) -> AppResult<bool> {
     Ok(conn.query_row("SELECT 1 FROM messages WHERE id = ?1", [id], |_| Ok(())).optional()?.is_some())
 }
 
+/// Safely build an FTS5 MATCH query from user input:
+/// splits on whitespace, skips tokens without any alphanumeric char, escapes quotes, and turns each
+/// word into a quoted prefix term `"word"*` (implicit AND). Empty / whitespace input → `None`.
+fn fts_query(text: &str) -> Option<String> {
+    let terms: Vec<String> = text
+        .split_whitespace()
+        .filter(|w| w.chars().any(char::is_alphanumeric))
+        .take(16)
+        .map(|w| {
+            let escaped = w.replace('\0', "").replace('"', "\"\"");
+            format!("\"{escaped}\"*")
+        })
+        .collect();
+    (!terms.is_empty()).then(|| terms.join(" "))
+}
+
+/// Full-text search across user & assistant messages, excluding soft-deleted threads.
+/// Ordered by FTS5 rank (`bm25`) then recency (`created_at DESC`), capped at 100 hits.
+pub fn search_messages(conn: &Connection, query: &str, limit: u32) -> AppResult<Vec<MessageHit>> {
+    if limit == 0 {
+        return Ok(Vec::new());
+    }
+    let Some(fts) = fts_query(query) else {
+        return Ok(Vec::new());
+    };
+    let limit = i64::from(limit.min(100));
+    let mut stmt = conn.prepare_cached(
+        "SELECT t.id, t.title, t.project_id, t.agent, m.id, m.role,
+                snippet(messages_fts, 0, char(2), char(3), '…', 24),
+                m.created_at
+         FROM messages_fts
+         JOIN messages m ON m.rowid = messages_fts.rowid
+         JOIN threads t ON t.id = m.thread_id
+         WHERE messages_fts MATCH ?1
+           AND m.role IN ('user', 'assistant')
+           AND t.deleted_at IS NULL
+         ORDER BY bm25(messages_fts), m.created_at DESC
+         LIMIT ?2",
+    )?;
+    let rows = stmt.query_map(params![fts, limit], |r| {
+        Ok(MessageHit {
+            thread_id: r.get(0)?,
+            thread_title: r.get(1)?,
+            project_id: r.get(2)?,
+            agent: r.get(3)?,
+            message_id: r.get(4)?,
+            role: r.get(5)?,
+            snippet: r.get(6)?,
+            ts: r.get(7)?,
+        })
+    })?;
+    Ok(rows.collect::<Result<_, _>>()?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -367,6 +448,65 @@ mod tests {
             record_prompt(c, None, "b", 2)?;
             record_prompt(c, None, "a", 3)?;
             assert_eq!(prompt_history(c, None, 10)?, ["a", "b"]);
+            Ok(())
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn search_messages_accents_safety_and_deleted_exclusion() {
+        let db = Db::open_in_memory().unwrap();
+        db.call(|c| {
+            c.execute_batch(
+                "INSERT INTO projects (id, name, path, created_at) VALUES ('p1', 'App', '/app', 1);
+                 INSERT INTO threads (id, project_id, agent, title, status, created_at, updated_at) VALUES
+                   ('t1', 'p1', 'claude_code', 'Release', 'done', 1, 10),
+                   ('t2', NULL, 'codex', 'Deleted chat', 'done', 1, 20);",
+            )?;
+            insert_message(c, "m1", "t1", "user", "Prépare le déploiement en prod", None, 100)?;
+            insert_message(c, "m2", "t1", "assistant", "Le déploiement et le redéploiement sont prêts.", None, 200)?;
+            insert_message(c, "m3", "t1", "thinking", "réflexion interne déploiement", None, 250)?;
+            insert_message(c, "m4", "t1", "error", "erreur déploiement", None, 260)?;
+            insert_message(c, "m5", "t2", "user", "Autre déploiement sur un chat supprimé", None, 300)?;
+
+            // Empty / whitespace / punctuation-only queries return empty vec without error.
+            assert!(search_messages(c, "", 30)?.is_empty());
+            assert!(search_messages(c, "   \t\n ", 30)?.is_empty());
+            assert!(search_messages(c, "\"\"\" --- ???", 30)?.is_empty());
+            assert!(search_messages(c, "deploiement", 0)?.is_empty());
+
+            // Accent-insensitive + prefix + role filtering (excludes thinking & error).
+            let hits = search_messages(c, "deploi", 30)?;
+            assert_eq!(hits.len(), 3);
+            assert!(hits.iter().all(|h| matches!(h.role.as_str(), "user" | "assistant")));
+            assert!(hits.iter().all(|h| h.snippet.contains('\u{2}') && h.snippet.contains('\u{3}')));
+
+            // Multi-word AND + quote escaping / FTS operator words never fail.
+            let exact = search_messages(c, "\"deploiement\" prod", 30)?;
+            assert_eq!(exact.len(), 1);
+            assert_eq!(exact[0].message_id, "m1");
+            assert_eq!(exact[0].thread_id, "t1");
+            assert_eq!(exact[0].thread_title, "Release");
+            assert_eq!(exact[0].project_id.as_deref(), Some("p1"));
+            assert_eq!(exact[0].agent, AgentKind::ClaudeCode);
+            assert_eq!(exact[0].ts, 100);
+            assert!(search_messages(c, "NOT OR NEAR \"foo\" (bar)", 30)?.is_empty());
+
+            // Soft-deleting t2 excludes its messages from search; restoring brings them back.
+            crate::db::threads::soft_delete(c, "t2", 1_000)?;
+            let hits = search_messages(c, "deploiement", 30)?;
+            assert_eq!(hits.len(), 2);
+            assert!(hits.iter().all(|h| h.thread_id == "t1"));
+
+            crate::db::threads::restore(c, "t2")?;
+            assert_eq!(search_messages(c, "deploiement", 30)?.len(), 3);
+
+            // Purging t2 removes it permanently and keeps FTS index intact.
+            crate::db::threads::soft_delete(c, "t2", 1_000)?;
+            assert_eq!(crate::db::threads::purge_deleted(c, 1_000)?, 1);
+            assert_eq!(search_messages(c, "deploiement", 30)?.len(), 2);
+            c.execute("INSERT INTO messages_fts(messages_fts) VALUES('integrity-check')", [])?;
             Ok(())
         })
         .await

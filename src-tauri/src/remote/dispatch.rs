@@ -39,6 +39,7 @@ pub fn required_level(method: &str, args: &Value) -> Option<AccessLevel> {
         | "thread_context"
         | "list_memories"
         | "search_memories"
+        | "search_messages"
         | "read_attachment" => Read,
         "create_thread" => {
             // A folder of the remote device's choosing (not one of its projects) = run an agent anywhere.
@@ -59,11 +60,20 @@ pub fn required_level(method: &str, args: &Value) -> Option<AccessLevel> {
                 Chat
             }
         }
-        "send_message" | "paste_attachment" | "stop_thread" | "rename_thread" | "save_project_context" => Chat,
+        "send_message"
+        | "paste_attachment"
+        | "stop_thread"
+        | "rename_thread"
+        | "restore_thread"
+        | "set_thread_pinned"
+        | "set_thread_archived"
+        | "save_project_context" => Chat,
         // Browsing folders shows the host's disk: same level as creating a project there.
         "delete_thread"
+        | "move_thread"
         | "create_project"
         | "create_project_folder"
+        | "rename_project"
         | "list_directory"
         | "delete_project"
         | "create_memory"
@@ -153,6 +163,15 @@ pub async fn call(state: &Shared, level: AccessLevel, method: &str, args: Value)
         "get_thread_history" => json(threads::get_thread_history_inner(state, arg(a, "threadId")?).await?),
         "rename_thread" => json(threads::rename_thread_inner(state, arg(a, "threadId")?, arg(a, "title")?).await?),
         "delete_thread" => json(threads::delete_thread_inner(state, arg(a, "threadId")?).await?),
+        "restore_thread" => json(threads::restore_thread_inner(state, arg(a, "threadId")?).await?),
+        "set_thread_pinned" => {
+            json(threads::set_thread_pinned_inner(state, arg(a, "threadId")?, arg(a, "pinned")?).await?)
+        }
+        "set_thread_archived" => {
+            json(threads::set_thread_archived_inner(state, arg(a, "threadId")?, arg(a, "archived")?).await?)
+        }
+        "move_thread" => json(threads::move_thread_inner(state, arg(a, "threadId")?, arg(a, "projectId")?).await?),
+        "search_messages" => json(threads::search_messages_inner(state, arg(a, "query")?, arg(a, "limit")?).await?),
         "running_threads" => json(threads::running_threads_inner(state).await?),
         "prompt_history" => json(threads::prompt_history_inner(state, arg(a, "projectId")?).await?),
         "default_cwd" => json(threads::default_cwd_inner(state).await?),
@@ -165,6 +184,7 @@ pub async fn call(state: &Shared, level: AccessLevel, method: &str, args: Value)
         "create_project_folder" => {
             json(projects::create_project_folder_inner(state, arg(a, "parent")?, arg(a, "name")?).await?)
         }
+        "rename_project" => json(projects::rename_project_inner(state, arg(a, "projectId")?, arg(a, "name")?).await?),
         "list_models" => json(threads::list_models_inner(state, arg(a, "refresh")?).await?),
         "agent_images" => json(threads::agent_images_inner(state, arg(a, "threadId")?, arg(a, "paths")?).await?),
 
@@ -201,8 +221,14 @@ mod tests {
     #[test]
     fn levels() {
         assert_eq!(required_level("list_threads", &json!({})), Some(Read));
+        assert_eq!(required_level("search_messages", &json!({"query": "rust"})), Some(Read));
         assert_eq!(required_level("send_message", &json!({"threadId": "t"})), Some(Chat));
+        assert_eq!(required_level("set_thread_pinned", &json!({"threadId": "t", "pinned": true})), Some(Chat));
+        assert_eq!(required_level("set_thread_archived", &json!({"threadId": "t", "archived": true})), Some(Chat));
+        assert_eq!(required_level("restore_thread", &json!({"threadId": "t"})), Some(Chat));
         assert_eq!(required_level("delete_thread", &json!({})), Some(Full));
+        assert_eq!(required_level("move_thread", &json!({"threadId": "t", "projectId": "p"})), Some(Full));
+        assert_eq!(required_level("rename_project", &json!({"projectId": "p", "name": "New"})), Some(Full));
         // Deny by default, and local-only commands are never reachable.
         for method in ["open_folder", "update_app_settings", "install_agent", "open_memory_file", "nope", "remote_call"]
         {
