@@ -24,6 +24,9 @@ pub struct ClaudeParser {
     streamed_messages: HashSet<String>,
     /// Tool calls already announced (assistant events can repeat content).
     started_tools: HashSet<String>,
+    /// Tasks that are not sub-agents, by tool call id: the CLI also reports a long Bash command as a task
+    /// (`task_type: local_bash`), its progress and end without the type.
+    other_tasks: HashSet<String>,
     /// Text of `<synthetic>` messages (written by the CLI, not the model), held until the `result` says whether
     /// it was a local command's output (`local_command`) or an ordinary notice. `(item id, text)`.
     synthetic: Vec<(String, String)>,
@@ -103,6 +106,16 @@ impl ClaudeParser {
     /// Sub-agent lifecycle (`task_started` / `task_progress` / `task_notification`).
     fn on_task(&mut self, subtype: &str, v: &Value) -> Vec<AdapterEvent> {
         let Some(tool_call_id) = s(v, "tool_use_id") else { return Vec::new() };
+        if s(v, "task_type").is_some_and(|t| !t.ends_with("_agent")) {
+            self.other_tasks.insert(tool_call_id);
+            return Vec::new();
+        }
+        if self.other_tasks.contains(&tool_call_id) {
+            if subtype == "task_notification" {
+                self.other_tasks.remove(&tool_call_id);
+            }
+            return Vec::new();
+        }
         let status = match (subtype, v.get("status").and_then(Value::as_str)) {
             ("task_notification", Some("completed")) => SubagentStatus::Completed,
             ("task_notification", _) => SubagentStatus::Failed,
@@ -413,6 +426,18 @@ mod tests {
         events.extend(p.feed(r#"{"type":"result","subtype":"success","is_error":false,"result":"","usage":{}}"#));
         assert!(matches!(&events[1], AdapterEvent::BlockCompleted { text, .. } if text == "No response requested."));
         assert!(matches!(events.last(), Some(AdapterEvent::TurnComplete { .. })));
+    }
+
+    #[test]
+    fn long_bash_commands_are_not_subagents() {
+        // What the CLI sends for a foreground Bash command of a few seconds.
+        let bash = r#"{"type":"system","subtype":"task_started","task_id":"bek7z4x06","tool_use_id":"toolu_b","description":"Probe sleep","is_backgrounded":false,"task_type":"local_bash"}
+{"type":"system","subtype":"task_progress","task_id":"bek7z4x06","tool_use_id":"toolu_b","description":"Probe sleep"}
+{"type":"system","subtype":"task_notification","task_id":"bek7z4x06","tool_use_id":"toolu_b","status":"completed","output_file":"","summary":"Probe sleep"}"#;
+        let mut parser = ClaudeParser::new();
+        let events: Vec<AdapterEvent> = bash.lines().flat_map(|l| parser.feed(l)).collect();
+        assert!(!events.iter().any(|e| matches!(e, AdapterEvent::Subagent { .. })), "{events:?}");
+        assert!(parser.other_tasks.is_empty());
     }
 
     #[test]
