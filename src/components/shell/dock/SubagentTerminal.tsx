@@ -90,7 +90,16 @@ export const SubagentTerminal = memo(function SubagentTerminal({ threadId, sub }
       >
         {sub.source === "task" ? (
           taskLines.length === 0 ? (
-            <div className="truncate">{sub.lastTool ?? t("shell.subStarting")}</div>
+            outputLines.length > 0 ? (
+              // What it was asked (Antigravity: its calls are not streamed).
+              outputLines.map((line, i) => (
+                <div key={i} className="truncate" title={line}>
+                  {line}
+                </div>
+              ))
+            ) : (
+              <div className="truncate">{sub.lastTool ?? t("shell.subStarting")}</div>
+            )
           ) : (
             taskLines.map((line) => <TermLineView key={line.id} line={line} showResult={false} />)
           )

@@ -130,6 +130,9 @@ impl ClaudeParser {
             tool_uses: usage.and_then(|u| u.get("tool_uses")).and_then(Value::as_u64),
             tokens: usage.and_then(|u| u.get("total_tokens")).and_then(Value::as_u64),
             last_tool: s(v, "last_tool_name"),
+            agent: None,
+            parent_id: None,
+            output: None,
         }]
     }
 

@@ -31,7 +31,8 @@ durationMs: number | null, } | { "kind": "ThreadStatusChanged", status: ThreadSt
  */
 issue: AccessIssue | null, } | { "kind": "SubagentUpdate", toolCallId: string, description: string | null, subagentType: string | null, status: SubagentStatus, toolUses: number | null, tokens: number | null, lastTool: string | null, source: SubagentSource, 
 /**
- * Agent CLI (`claude`, `codex`, `antigravity`, `gemini`…), for sources other than `task`.
+ * Agent CLI (`claude`, `codex`, `antigravity`, `gemini`…), for sources other than `task`; for a `task`, the
+ * agent whose own sub-agent it is when not Claude (`antigravity`).
  */
 agent: string | null, 
 /**
@@ -43,6 +44,7 @@ command: string | null, pid: number | null,
  */
 output: string | null, 
 /**
- * Tool call of the chat during which it appeared (process-tree sub-agents).
+ * Tool call of the chat during which it appeared (process-tree sub-agents), or that launched it (Antigravity:
+ * several sub-agents per call).
  */
 parentToolCallId: string | null, };

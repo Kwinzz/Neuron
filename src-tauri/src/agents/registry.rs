@@ -1008,6 +1008,9 @@ impl AgentRegistry {
                     tool_uses,
                     tokens,
                     last_tool,
+                    agent,
+                    parent_id,
+                    output,
                 } => {
                     emit(
                         sink,
@@ -1021,11 +1024,11 @@ impl AgentRegistry {
                             tokens,
                             last_tool,
                             source: SubagentSource::Task,
-                            agent: None,
+                            agent,
                             command: None,
                             pid: None,
-                            output: None,
-                            parent_tool_call_id: None,
+                            output,
+                            parent_tool_call_id: parent_id,
                         },
                     );
                 }

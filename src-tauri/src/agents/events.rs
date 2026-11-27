@@ -217,7 +217,8 @@ pub enum AgentEvent {
         last_tool: Option<String>,
         #[serde(default)]
         source: SubagentSource,
-        /// Agent CLI (`claude`, `codex`, `antigravity`, `gemini`…), for sources other than `task`.
+        /// Agent CLI (`claude`, `codex`, `antigravity`, `gemini`…), for sources other than `task`; for a `task`, the
+        /// agent whose own sub-agent it is when not Claude (`antigravity`).
         #[serde(default)]
         agent: Option<String>,
         /// Command line that started it.
@@ -228,7 +229,8 @@ pub enum AgentEvent {
         /// Last lines it printed (when its command returned).
         #[serde(default)]
         output: Option<String>,
-        /// Tool call of the chat during which it appeared (process-tree sub-agents).
+        /// Tool call of the chat during which it appeared (process-tree sub-agents), or that launched it (Antigravity:
+        /// several sub-agents per call).
         #[serde(default)]
         parent_tool_call_id: Option<String>,
     },

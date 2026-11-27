@@ -162,6 +162,12 @@ pub enum AdapterEvent {
         tool_uses: Option<u64>,
         tokens: Option<u64>,
         last_tool: Option<String>,
+        /// Agent whose own sub-agent it is, when not Claude (`antigravity`).
+        agent: Option<String>,
+        /// Call that launched it when its id is not that call's (several sub-agents per call).
+        parent_id: Option<String>,
+        /// What it was asked, shown in its terminal while it has no tool calls of its own.
+        output: Option<String>,
     },
     ToolCallResult {
         id: String,

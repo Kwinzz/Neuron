@@ -35,11 +35,11 @@ export const DockTerminal = memo(function DockTerminal({ id, title, active, stat
     const mainIds = new Set(mainLines.map((l) => l.id));
 
     // Each sub-agent is mentioned under the line that launched it (process-tree ones: the shell call running when
-    // they appeared), or at the top when that line is gone.
+    // they appeared; Antigravity's: their `invoke_subagent` call), or at the top when that line is gone.
     const byLine = new Map<string, SubagentInfo[]>();
     const orphans: SubagentInfo[] = [];
     for (const sub of orderedSubagents(subs)) {
-      const anchor = sub.source === "process" ? sub.parentId : sub.id;
+      const anchor = sub.source === "process" ? sub.parentId : (sub.parentId ?? sub.id);
       if (anchor !== null && mainIds.has(anchor)) {
         const list = byLine.get(anchor);
         if (list) list.push(sub);

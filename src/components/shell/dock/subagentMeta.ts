@@ -23,9 +23,12 @@ const CLIS: Record<string, CliMeta> = {
   copilot: { label: "Copilot CLI", vendor: "other" },
 };
 
-/** Who runs a sub-agent: a Claude Task (Claude's own sub-agent) or another agent CLI. */
+/** Who runs a sub-agent: an agent's own sub-agent (Claude Task, Antigravity) or another agent CLI. */
 export function subagentMeta(sub: SubagentInfo): CliMeta {
   if (sub.source === "task") {
+    // No agent: Claude's (older hosts never send it).
+    const owner = sub.agent ? CLIS[sub.agent] : undefined;
+    if (owner) return { label: sub.type ?? owner.label, vendor: owner.vendor };
     return { label: sub.type ?? t("shell.subagentClaude"), vendor: "anthropic" };
   }
   const known = sub.agent ? CLIS[sub.agent] : undefined;
