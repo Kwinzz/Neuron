@@ -82,6 +82,9 @@ const project: Translation<typeof fr> = {
   colStatus: "Status",
   colUpdated: "Updated",
   // ProjectHeader
+  rename: "Rename",
+  projectName: "Project name",
+  renameFailed: "Couldn't rename project",
   changedWord: () => "changed",
   noRepo: "No git repository",
   chatWord: (v) => (Number(v.n) === 1 ? "chat" : "chats"),

@@ -1,8 +1,18 @@
 import { IS_LINUX } from "@/lib/platform";
-import { type KeyboardEvent, memo, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, memo, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "cn";
 import { ContextIndicator } from "@/components/context/ContextIndicator";
-import { FolderKanban, FolderOpen, MoreHorizontal, Pencil, Square, Trash2 } from "lucide-react";
+import {
+  Folder,
+  FolderInput,
+  FolderKanban,
+  FolderMinus,
+  FolderOpen,
+  MoreHorizontal,
+  Pencil,
+  Square,
+  Trash2,
+} from "lucide-react";
 import { AgentLogo } from "@/components/ui/AgentLogo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +21,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuPortal,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -25,9 +39,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { AGENTS } from "@/lib/agents";
-import { deviceOfThread } from "@/lib/deviceRouting";
+import { RENAME_CHAT_EVENT, moveChatToProject, renameChat } from "@/lib/chatActions";
+import { deviceOfProject, deviceOfThread } from "@/lib/deviceRouting";
 import { HeaderUsage } from "./HeaderUsage";
-import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { openFolder } from "@/lib/openFolder";
 import { describeStatus, STATUS, TONE_TEXT } from "@/lib/status";
 import { useChat } from "@/stores/chat";
@@ -35,7 +49,7 @@ import { useChatDeletion } from "@/stores/chatDeletion";
 import { useLive } from "@/stores/live";
 import { effortLabel } from "@/lib/models";
 import { findModel, useDeviceProviders } from "@/stores/models";
-import { toast } from "@/stores/toast";
+import { useNav } from "@/stores/nav";
 import { useUi } from "@/stores/ui";
 import { t } from "@/i18n";
 
@@ -54,13 +68,28 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
   const live = useLive((s) => s.threads[threadId]);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
-  const [pending, setPending] = useState<{ threadId: string; title: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   /** Set once the current edit session is committed or cancelled (blur after Enter/Esc must be a no-op). */
   const settledRef = useRef(false);
+  const titleRef = useRef(live?.title ?? "");
+  titleRef.current = live?.title ?? "";
+  const hasLiveRef = useRef(Boolean(live));
+  hasLiveRef.current = Boolean(live);
 
   useEffect(() => {
     setEditing(false);
+  }, [threadId]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      if (!hasLiveRef.current) return;
+      if ((e as CustomEvent<string>).detail !== threadId) return;
+      settledRef.current = false;
+      setDraft(titleRef.current);
+      setEditing(true);
+    };
+    window.addEventListener(RENAME_CHAT_EVENT, handler);
+    return () => window.removeEventListener(RENAME_CHAT_EVENT, handler);
   }, [threadId]);
 
   useEffect(() => {
@@ -85,8 +114,7 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
     );
   }
 
-  const activePending = pending && pending.threadId === threadId && pending.title !== live.title ? pending.title : null;
-  const displayTitle = activePending ?? live.title;
+  const displayTitle = live.title;
   const statusMeta = STATUS[live.status];
   const agentMeta = AGENTS[live.agent];
   const device = deviceOfThread(threadId);
@@ -103,18 +131,7 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
     const trimmed = draft.trim();
     setEditing(false);
     if (!trimmed || trimmed === displayTitle) return;
-
-    setPending({ threadId, title: trimmed });
-    try {
-      await ipc.renameThread(threadId, trimmed);
-    } catch (err) {
-      setPending((cur) => (cur?.threadId === threadId && cur.title === trimmed ? null : cur));
-      toast({
-        tone: "danger",
-        title: t("chat.renameFailed"),
-        description: ipcErrorMessage(err),
-      });
-    }
+    await renameChat(threadId, trimmed);
   };
 
   const onInputKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -206,11 +223,16 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
               </Button>
             </DropdownMenuTrigger>
             {/* No focus back to the trigger on close: it would blur the rename field right away (= commit). */}
-            <DropdownMenuContent align="end" className="w-48" onCloseAutoFocus={(e) => e.preventDefault()}>
+            <DropdownMenuContent align="end" className="w-52" onCloseAutoFocus={(e) => e.preventDefault()}>
               <DropdownMenuItem onClick={startEdit}>
                 <Pencil />
                 {t("chat.rename")}
               </DropdownMenuItem>
+              <ThreadMoveSubmenu
+                threadId={threadId}
+                currentProjectId={live.projectId}
+                device={device ?? deviceOfProject(live.projectId)}
+              />
               {live.cwd && !device && (
                 <DropdownMenuItem onClick={() => live.cwd && void openFolder(live.cwd)}>
                   <FolderOpen />
@@ -235,6 +257,60 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
     </header>
   );
 });
+
+function ThreadMoveSubmenu({
+  threadId,
+  currentProjectId,
+  device,
+}: {
+  threadId: string;
+  currentProjectId: string | null;
+  device: string | null;
+}) {
+  const projects = useNav((s) => s.projects);
+  const sameDeviceProjects = useMemo(
+    () => projects.filter((p) => deviceOfProject(p.id) === device),
+    [projects, device],
+  );
+
+  return (
+    <DropdownMenuSub>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuSubTrigger>
+            <FolderInput />
+            <span>{t("chat.moveToProject")}</span>
+          </DropdownMenuSubTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs">
+          {t("chat.moveKeepContext")}
+        </TooltipContent>
+      </Tooltip>
+      <DropdownMenuPortal>
+        <DropdownMenuSubContent className="max-h-72 w-52 overflow-y-auto">
+          {sameDeviceProjects.map((project) => (
+            <DropdownMenuItem
+              key={project.id}
+              disabled={currentProjectId === project.id}
+              onSelect={() => void moveChatToProject(threadId, project.id)}
+            >
+              <Folder />
+              <span className="truncate">{project.name}</span>
+            </DropdownMenuItem>
+          ))}
+          {sameDeviceProjects.length > 0 && <DropdownMenuSeparator />}
+          <DropdownMenuItem
+            disabled={currentProjectId === null}
+            onSelect={() => void moveChatToProject(threadId, null)}
+          >
+            <FolderMinus />
+            <span>{t("chat.noProject")}</span>
+          </DropdownMenuItem>
+        </DropdownMenuSubContent>
+      </DropdownMenuPortal>
+    </DropdownMenuSub>
+  );
+}
 
 /** "Claude Code · Claude Opus 5.5 · Élevé · [PC] · 📁 neuron" */
 const HeaderMeta = memo(function HeaderMeta({

@@ -23,6 +23,7 @@ function shortcut(id: string, combo: string, key: MessageKey, group: Shortcut["g
 
 export const SHORTCUTS: readonly Shortcut[] = [
   shortcut("palette", "mod+k", "shell.scPalette", "navigation"),
+  shortcut("filter-sidebar", "mod+shift+f", "shell.scFilterSidebar", "navigation"),
   shortcut("new-chat", "mod+n", "shell.navNewChat", "navigation"),
   shortcut("home", "mod+shift+h", "shell.navHome", "navigation"),
   shortcut("memory", "mod+shift+m", "shell.navMemory", "navigation"),
@@ -40,7 +41,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
   shortcut("md-strike", "mod+shift+x", "shell.scStrike", "chat"),
   shortcut("history", "arrowup", "shell.scHistory", "chat"),
   shortcut("plan-mode", "shift+tab", "shell.scPlanMode", "chat"),
-  shortcut("stop", "escape", "shell.scStop", "chat"),
+  shortcut("stop", "escape2", "shell.scStop", "chat"),
 ];
 
 const GROUP_LABEL: Record<Shortcut["group"], MessageKey> = {
@@ -67,6 +68,8 @@ function keyLabel(k: string): string | undefined {
       return t("shell.keyEnter");
     case "escape":
       return t("shell.keyEscape");
+    case "escape2":
+      return `${t("shell.keyEscape")} ×2`;
     case "tab":
       return "Tab";
     case "arrowup":

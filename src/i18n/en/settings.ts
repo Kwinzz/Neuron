@@ -11,13 +11,13 @@ const settings: Translation<typeof fr> = {
   // SettingsNav
   navLabel: "Settings sections",
   navGeneral: "General",
-  navBackground: "Background & shortcut",
+  navBackground: "Background & shortcuts",
   navAgents: "Agents & MCP",
+  navCosts: "Costs",
   navDevices: "Devices",
   navNotifications: "Notifications",
   navContext: "Injected context",
   navGeneric: "Generic CLIs",
-  navShortcuts: "Shortcuts",
   navUpdates: "Updates",
 
   // SettingsSkeleton

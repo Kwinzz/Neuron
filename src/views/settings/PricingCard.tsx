@@ -37,13 +37,13 @@ export function PricingCard() {
   };
 
   return (
-    <Card className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
+    <Card size="sm" className="min-w-0 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm font-medium">
-          <CircleDollarSign className="size-4 text-muted-foreground" />
-          {t("settings.pricingTitle")}
+        <CardTitle className="flex items-center gap-2">
+          <CircleDollarSign className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <span>{t("settings.pricingTitle")}</span>
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-xs">
           {t("settings.pricingDescription")}
         </CardDescription>
       </CardHeader>

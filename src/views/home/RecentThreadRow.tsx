@@ -25,7 +25,6 @@ export const RecentThreadRow = memo(function RecentThreadRow({ thread }: RecentT
 
   const openThread = () => {
     useUi.getState().focusThread(th.id);
-    useUi.getState().setDockOpen(true);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTableRowElement>) => {

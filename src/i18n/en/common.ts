@@ -3,6 +3,7 @@ import type fr from "../fr/common";
 
 const common: Translation<typeof fr> = {
   cancel: "Cancel",
+  undo: "Undo",
   close: "Close",
   save: "Save",
   delete: "Delete",

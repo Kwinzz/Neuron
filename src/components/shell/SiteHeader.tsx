@@ -10,21 +10,36 @@ import { useNav } from "@/stores/nav";
 import { useUi, type View } from "@/stores/ui";
 import { WindowControls } from "./WindowControls";
 
-function useViewTitle(view: View): { section: string; title: string } {
+function useViewTitle(view: View): { section: string; title: string; projectId: string | null } {
   const chatTitle = useLive((s) => (view.kind === "thread" ? s.threads[view.id]?.title : undefined));
-  const projectName = useLive((s) => (view.kind === "thread" ? s.threads[view.id]?.projectName : undefined));
-  const draftProject = useNav((s) =>
-    view.kind === "draft" && view.projectId ? s.projects.find((p) => p.id === view.projectId)?.name : undefined,
+  const threadProjectId = useLive((s) => (view.kind === "thread" ? (s.threads[view.id]?.projectId ?? null) : null));
+  const threadProjectName = useLive((s) => (view.kind === "thread" ? s.threads[view.id]?.projectName : undefined));
+  const targetProjectId =
+    view.kind === "thread" ? threadProjectId : view.kind === "draft" ? view.projectId : null;
+  const navProjectName = useNav((s) =>
+    targetProjectId ? s.projects.find((p) => p.id === targetProjectId)?.name : undefined,
   );
   const pageProject = useNav((s) =>
     view.kind === "project" ? s.projects.find((p) => p.id === view.id)?.name : undefined,
   );
-  if (view.kind === "thread") return { section: projectName ?? t("shell.chats"), title: chatTitle || t("shell.chat") };
-  if (view.kind === "draft") return { section: draftProject ?? t("shell.chats"), title: t("shell.navNewChat") };
-  if (view.kind === "project") return { section: t("shell.projects"), title: pageProject ?? t("shell.project") };
-  if (view.kind === "memory") return { section: "Neuron", title: t("shell.navMemory") };
-  if (view.kind === "settings") return { section: "Neuron", title: t("shell.navSettings") };
-  return { section: "Neuron", title: t("shell.navHome") };
+  if (view.kind === "thread") {
+    return {
+      section: navProjectName ?? threadProjectName ?? t("shell.chats"),
+      title: chatTitle || t("shell.chat"),
+      projectId: targetProjectId,
+    };
+  }
+  if (view.kind === "draft") {
+    return {
+      section: navProjectName ?? t("shell.chats"),
+      title: t("shell.navNewChat"),
+      projectId: targetProjectId,
+    };
+  }
+  if (view.kind === "project") return { section: t("shell.projects"), title: pageProject ?? t("shell.project"), projectId: null };
+  if (view.kind === "memory") return { section: "Neuron", title: t("shell.navMemory"), projectId: null };
+  if (view.kind === "settings") return { section: "Neuron", title: t("shell.navSettings"), projectId: null };
+  return { section: "Neuron", title: t("shell.navHome"), projectId: null };
 }
 
 /**
@@ -34,7 +49,7 @@ function useViewTitle(view: View): { section: string; title: string } {
  */
 export function SiteHeader() {
   const view = useUi((s) => s.view);
-  const { section, title } = useViewTitle(view);
+  const { section, title, projectId } = useViewTitle(view);
   const dockOpen = useUi((s) => s.dockOpen);
   return (
     <header
@@ -45,7 +60,20 @@ export function SiteHeader() {
         <SidebarTrigger className="-ml-1" aria-label={t("shell.scSidebar")} title={t("shell.scSidebar")} />
         <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
         <nav data-tauri-drag-region aria-label={t("shell.breadcrumb")} className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
-          <span data-tauri-drag-region key={section} className="shrink-0 text-muted-foreground animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ease-snappy">{section}</span>
+          {projectId ? (
+            <button
+              type="button"
+              key={section}
+              onClick={() => useUi.getState().openProject(projectId, "context")}
+              title={t("chat.openProject")}
+              aria-label={t("shell.openProjectBreadcrumb", { name: section })}
+              className="max-w-60 shrink-0 cursor-pointer truncate rounded-sm text-muted-foreground transition-colors duration-150 outline-none hover:text-foreground focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 animate-in fade-in-0 slide-in-from-bottom-1 ease-snappy"
+            >
+              {section}
+            </button>
+          ) : (
+            <span data-tauri-drag-region key={section} className="shrink-0 text-muted-foreground animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ease-snappy">{section}</span>
+          )}
           <span data-tauri-drag-region className="text-muted-foreground">/</span>
           <h1 data-tauri-drag-region key={title} className="truncate font-medium animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ease-snappy">{title}</h1>
         </nav>

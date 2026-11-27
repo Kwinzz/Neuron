@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { AgentKind } from "@/bindings/AgentKind";
 
 /**
  * - home: Accueil (dashboard)
@@ -10,22 +11,31 @@ import { create } from "zustand";
  */
 export type View =
   | { kind: "home" }
-  | { kind: "draft"; projectId: string | null }
+  | { kind: "draft"; projectId: string | null; agent?: AgentKind }
   | { kind: "thread"; id: string }
   | { kind: "project"; id: string; tab?: "context" | "chats" }
   | { kind: "memory" }
-  | { kind: "settings"; section?: SettingsSection };
+  | { kind: "settings"; section?: SettingsSectionTarget };
 
 export type SettingsSection =
   | "general"
   | "background"
   | "agents"
+  | "costs"
   | "devices"
   | "notifications"
   | "context"
   | "generic"
-  | "shortcuts"
   | "updates";
+
+/** Includes legacy section ids (redirected by `resolveSettingsSection`) so existing callers keep working. */
+export type SettingsSectionTarget = SettingsSection | "shortcuts";
+
+export function resolveSettingsSection(section?: SettingsSectionTarget): SettingsSection {
+  if (!section) return "general";
+  if (section === "shortcuts") return "background";
+  return section;
+}
 
 const DOCK_KEY = "neuron.dockOpen";
 
@@ -61,13 +71,13 @@ interface UiState {
   navigate: (view: View) => void;
   setPaletteOpen: (open: boolean) => void;
   setShortcutsOpen: (open: boolean) => void;
-  /** Open Paramètres (optionally on a section). */
-  openSettings: (section?: SettingsSection) => void;
+  /** Open Paramètres (optionally on a section; legacy ids are redirected). */
+  openSettings: (section?: SettingsSectionTarget) => void;
   togglePalette: () => void;
   setDockOpen: (open: boolean) => void;
   toggleDock: () => void;
-  /** Open an empty chat (inside `projectId` when given). No dialog: the chat is created on send. */
-  startChat: (projectId?: string | null) => void;
+  /** Open an empty chat (inside `projectId` and/or with `agent` when given). No dialog: the chat is created on send. */
+  startChat: (projectId?: string | null, agent?: AgentKind) => void;
   /** Open a project page. */
   openProject: (id: string, tab?: "context" | "chats") => void;
   /** Open an existing chat (null = back to Accueil). */
@@ -88,14 +98,16 @@ export const useUi = create<UiState>((set, get) => ({
   navigate: (view) => set({ view, paletteOpen: false, focusedThreadId: view.kind === "thread" ? view.id : null }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen, paletteOpen: false }),
-  openSettings: (section) => get().navigate(section ? { kind: "settings", section } : { kind: "settings" }),
+  openSettings: (section) =>
+    get().navigate(section ? { kind: "settings", section: resolveSettingsSection(section) } : { kind: "settings" }),
   togglePalette: () => set({ paletteOpen: !get().paletteOpen }),
   setDockOpen: (dockOpen) => {
     writeDockPref(dockOpen);
     set({ dockOpen });
   },
   toggleDock: () => get().setDockOpen(!get().dockOpen),
-  startChat: (projectId = null) => get().navigate({ kind: "draft", projectId }),
+  startChat: (projectId = null, agent) =>
+    get().navigate(agent ? { kind: "draft", projectId, agent } : { kind: "draft", projectId }),
   openProject: (id, tab) => get().navigate(tab ? { kind: "project", id, tab } : { kind: "project", id }),
   focusThread: (id) => get().navigate(id ? { kind: "thread", id } : { kind: "home" }),
   selectProject: (selectedProjectId) => set({ selectedProjectId }),

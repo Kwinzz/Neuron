@@ -3,6 +3,7 @@ import type { Message } from "../index";
 /** Words shared by every screen. Owned by the lead: namespaces add their own keys elsewhere. */
 const common = {
   cancel: "Annuler",
+  undo: "Annuler",
   close: "Fermer",
   save: "Enregistrer",
   delete: "Supprimer",

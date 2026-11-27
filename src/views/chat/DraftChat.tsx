@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DraftContextPreview } from "@/components/context/DraftContextPreview";
+import type { AgentKind } from "@/bindings/AgentKind";
 import type { Attachment } from "@/bindings/Attachment";
 import { FolderGit2, FolderOpen, MessageSquarePlus } from "lucide-react";
 import { AgentAccessNotice } from "@/components/chat/AgentAccessNotice";
@@ -27,7 +28,8 @@ function folderName(path: string): string {
 }
 
 /** Empty chat: pick model / reasoning / permissions, type, and the chat is created on send. */
-export function DraftChat({ projectId }: { projectId: string | null }) {
+export function DraftChat({ projectId, agent }: { projectId: string | null; agent?: AgentKind }) {
+  const view = useUi((s) => s.view);
   const project = useNav((s) => (projectId ? s.projects.find((p) => p.id === projectId) : undefined));
   const projectDevice = deviceOfProject(projectId);
   const [pickedDevice, setPickedDevice] = useState<string | null>(null);
@@ -35,9 +37,20 @@ export function DraftChat({ projectId }: { projectId: string | null }) {
   const deviceName = useDevices((s) =>
     device ? s.devices?.hosts.find((h) => h.nodeId === device)?.name : undefined,
   );
-  const [settings, setSettings] = useState<ChatSettings>(readChatDefaults);
+  const [settings, setSettings] = useState<ChatSettings>(() => {
+    const defaults = readChatDefaults();
+    if (!agent || defaults.agent === agent) return defaults;
+    return { ...defaults, agent, model: null, effort: null };
+  });
   const [cwd, setCwd] = useState<string>("");
   const manualCwdRef = useRef(false);
+
+  // Sync the draft's agent when started with an explicit agent (e.g. from Ctrl+K) while DraftChat is already mounted.
+  useEffect(() => {
+    if (view.kind !== "draft" || !view.agent) return;
+    const target = view.agent;
+    setSettings((cur) => (cur.agent === target ? cur : { ...cur, agent: target, model: null, effort: null }));
+  }, [view]);
 
   // When switching to another device, fall back to its default model if the chosen one does not exist there.
   const deviceProviders = useDeviceProviders(device);

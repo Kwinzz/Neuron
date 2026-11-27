@@ -4,6 +4,7 @@ import type { ChatItem } from "@/bindings/ChatItem";
 import { Markdown } from "@/components/markdown/Markdown";
 import { useReveal } from "@/stores/reveal";
 import { AgentImages } from "./AgentImages";
+import { CopyMessageButton } from "./CopyMessageButton";
 import { stripAppDirectives } from "@/lib/appDirectives";
 import { stripSummaryLine } from "@/lib/turnSummary";
 import { useSmoothText } from "./useSmoothText";
@@ -37,8 +38,10 @@ export const AssistantText = memo(function AssistantText({
   }, [item.id, writing]);
   useEffect(() => () => useReveal.getState().set(item.id, false), [item.id]);
 
+  const copyable = visible.trimEnd();
+
   return (
-    <>
+    <div className="group/msg min-w-0">
       <Markdown
         highlight={!writing}
         streaming={writing}
@@ -60,6 +63,11 @@ export const AssistantText = memo(function AssistantText({
       </Markdown>
       {/* Images the agent produced or referenced, once its message is complete. */}
       {!writing && <AgentImages threadId={threadId} text={visible} />}
-    </>
+      {!writing && copyable.trim().length > 0 && (
+        <div className="mt-1 -mb-2 flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover/msg:opacity-100 group-focus-within/msg:opacity-100 has-data-[copied=true]:opacity-100">
+          <CopyMessageButton text={copyable} />
+        </div>
+      )}
+    </div>
   );
 });

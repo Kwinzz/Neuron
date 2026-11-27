@@ -8,10 +8,14 @@ import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { useActivity } from "@/stores/activity";
 import { useChat } from "@/stores/chat";
 import { useDashboard } from "@/stores/dashboard";
+import { useDrafts } from "@/stores/drafts";
 import { useLive } from "@/stores/live";
 import { useNav } from "@/stores/nav";
 import { toast } from "@/stores/toast";
 import { useUi } from "@/stores/ui";
+
+/** Soft-deleted chats are purged after 30 s on the backend; offer Undo for ~25 s to keep a safe margin. */
+const UNDO_DELETE_MS = 25_000;
 
 interface ChatDeletionState {
   /** Chat awaiting confirmation. */
@@ -49,9 +53,42 @@ export const useChatDeletion = create<ChatDeletionState>((set, get) => ({
     useLive.getState().remove(id);
     useChat.getState().forget(id);
     useActivity.getState().clear(id);
+    useDrafts.getState().clear(id);
     useNav.setState((s) => ({ chats: s.chats.filter((c) => c.id !== id) }));
     void useNav.getState().load();
     void useDashboard.getState().load();
-    toast({ tone: "ok", title: t("chat.chatDeleted") });
+
+    let restoring = false;
+    toast(
+      {
+        tone: "ok",
+        title: t("chat.chatDeleted"),
+        actionLabel: t("common.undo"),
+        onClick: () => {
+          if (restoring) return;
+          restoring = true;
+          void (async () => {
+            try {
+              const restored = await ipc.restoreThread(id);
+              useLive.getState().hydrate([restored]);
+              await useNav.getState().load();
+              void useDashboard.getState().load();
+              toast({
+                tone: "ok",
+                title: t("chat.chatRestored"),
+                onClick: () => useUi.getState().focusThread(restored.id),
+              });
+            } catch (err) {
+              toast({
+                tone: "danger",
+                title: t("chat.restoreChatFailed"),
+                description: ipcErrorMessage(err),
+              });
+            }
+          })();
+        },
+      },
+      UNDO_DELETE_MS,
+    );
   },
 }));

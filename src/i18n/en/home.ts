@@ -3,11 +3,23 @@ import type fr from "../fr/home";
 
 /** Namespace « home » — English (same keys as French). */
 const home: Translation<typeof fr> = {
-  // ActiveThreadsCard
-  activeTitle: "In progress",
-  activeCount: (v) => (Number(v.n) === 1 ? `${v.n} active chat` : `${v.n} active chats`),
-  activeEmptyTitle: "No agent running",
-  activeEmptyBody: "Start a chat to follow it here.",
+  // StartChatCard / HomeProjectPicker
+  startChatTitle: "Start a chat",
+  startChatFullView: "Full view",
+  startChatAria: "First chat message",
+  startChatPlaceholder: "What should the agent do? (Enter to start the chat)",
+  startChatPlaceholderInProject: "What should the agent do in {project}? (Enter to start)",
+  projectPickerAria: "Chat project",
+  searchProjectPlaceholder: "Search projects…",
+  noProjectMatch: "No project found.",
+  noProjectSearch: "no project none",
+  recentProjectsTitle: "Recent projects",
+  recentProjectsEmpty: "Add a folder to start chats with its context.",
+  recentProjectNewChat: "New chat in {name}",
+  recentProjectOpen: "Open project {name}",
+  // SetupAgentsCard
+  setupAgentsTitle: "Set up your agents",
+  setupAgentsDescription: "Install and sign in to the CLIs you want to run in Neuron.",
   // AgentTotals
   agentsShown: "Agents shown",
   showAgent: "Show {agent}",
@@ -39,10 +51,6 @@ const home: Translation<typeof fr> = {
   // DeltaBadge
   deltaNoPrevious: "No comparable previous period",
   deltaVsPrevious: "compared with the previous period",
-  // ProjectsCard
-  byProjectTitle: "By project",
-  byProjectEmpty: "No per-project data",
-  projectShareAria: "Share of project {name}",
   // QuotaBar / ResetCountdown
   resetIn: "resets in",
   resetInShort: "Resets in",

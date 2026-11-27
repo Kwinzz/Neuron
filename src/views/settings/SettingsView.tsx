@@ -5,7 +5,12 @@ import { Button } from "@/components/ui/button";
 import { ipcErrorMessage } from "@/lib/ipc";
 import { useSettings } from "@/stores/settings";
 import { toast } from "@/stores/toast";
-import { useUi, type SettingsSection } from "@/stores/ui";
+import {
+  resolveSettingsSection,
+  useUi,
+  type SettingsSection,
+  type SettingsSectionTarget,
+} from "@/stores/ui";
 import { AgentsSection } from "./AgentsSection";
 import { BackgroundSection } from "./BackgroundSection";
 import { ContextSection } from "./ContextSection";
@@ -16,12 +21,11 @@ import { GenericClisSection } from "./GenericClisSection";
 import { NotificationsSection } from "./NotificationsSection";
 import { SettingsNav } from "./SettingsNav";
 import { SettingsSkeleton } from "./SettingsSkeleton";
-import { ShortcutsSection } from "./ShortcutsSection";
 import { UpdatesSection } from "./UpdatesSection";
 import { t } from "@/i18n";
 
 interface SettingsViewProps {
-  section?: SettingsSection;
+  section?: SettingsSectionTarget;
 }
 
 export function SettingsView({ section }: SettingsViewProps) {
@@ -51,7 +55,7 @@ export function SettingsView({ section }: SettingsViewProps) {
     }
   }, [loadSettings]);
 
-  const active: SettingsSection = section ?? "general";
+  const active: SettingsSection = resolveSettingsSection(section);
 
   const handleSelectSection = useCallback((next: SettingsSection) => {
     useUi.getState().openSettings(next);
@@ -73,10 +77,10 @@ export function SettingsView({ section }: SettingsViewProps) {
           key={active}
           className="min-w-0 max-w-3xl animate-in fade-in-0 slide-in-from-bottom-1 duration-200"
         >
-          {active === "shortcuts" ? (
-            <ShortcutsSection />
-          ) : active === "agents" ? (
+          {active === "agents" ? (
             <AgentsSection />
+          ) : active === "costs" ? (
+            <PricingCard />
           ) : active === "devices" ? (
             <DevicesSection />
           ) : loadError !== null && settings === null ? (
@@ -95,7 +99,6 @@ export function SettingsView({ section }: SettingsViewProps) {
           ) : active === "general" ? (
             <div className="flex flex-col gap-4">
               <GeneralSection settings={settings} />
-              <PricingCard />
             </div>
           ) : active === "background" ? (
             <BackgroundSection settings={settings} />

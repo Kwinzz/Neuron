@@ -3,20 +3,23 @@ import { type CSSProperties, Suspense, lazy, useEffect, useLayoutEffect, useMemo
 import { cn } from "cn";
 import { DeleteChatDialog } from "@/components/chat/DeleteChatDialog";
 import { NewProjectDialog } from "@/components/projects/NewProjectDialog";
+import { RemoveProjectDialog } from "@/components/projects/RemoveProjectDialog";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { ShortcutsDialog } from "@/components/shortcuts/ShortcutsDialog";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import type { RemoteHost } from "@/bindings/RemoteHost";
 import { useAgentEventBridge } from "@/hooks/useAgentEventBridge";
 import { useHotkey } from "@/hooks/useHotkey";
 import { useRemoteDevices } from "@/hooks/useRemoteDevices";
 import { useUpdates } from "@/hooks/useUpdates";
 import { ipc } from "@/lib/ipc";
 import { useDashboard } from "@/stores/dashboard";
+import { useDevices } from "@/stores/devices";
 import { useLayout } from "@/stores/layout";
 import { useLive } from "@/stores/live";
-import { useNav } from "@/stores/nav";
+import { getSidebarChatIds, useNav } from "@/stores/nav";
 import { useUi } from "@/stores/ui";
 import { AppSidebar } from "./AppSidebar";
 import { LiveDock } from "./LiveDock";
@@ -48,15 +51,19 @@ function usePrefetchViews(): void {
   }, []);
 }
 
-/** Alt+↑ / Alt+↓: previous / next chat in the recent list. */
+const EMPTY_HOSTS: readonly RemoteHost[] = [];
+
+/** Alt+↑ / Alt+↓: previous / next chat in the sidebar display order (pinned first, folders as shown, archived excluded). */
 function stepChat(delta: 1 | -1): void {
-  const chats = useNav.getState().chats;
-  if (chats.length === 0) return;
+  const { projects, chats } = useNav.getState();
+  const hosts = useDevices.getState().devices?.hosts ?? EMPTY_HOSTS;
+  const ids = getSidebarChatIds(projects, chats, hosts);
+  if (ids.length === 0) return;
   const view = useUi.getState().view;
-  const index = view.kind === "thread" ? chats.findIndex((c) => c.id === view.id) : -1;
-  const next = index < 0 ? 0 : Math.min(chats.length - 1, Math.max(0, index + delta));
-  const target = chats[next];
-  if (target && (index < 0 || next !== index)) useUi.getState().focusThread(target.id);
+  const index = view.kind === "thread" ? ids.indexOf(view.id) : -1;
+  const next = index < 0 ? 0 : Math.min(ids.length - 1, Math.max(0, index + delta));
+  const target = ids[next];
+  if (target && (index < 0 || next !== index)) useUi.getState().focusThread(target);
 }
 
 /** Make sure the opened thread's summary is in the live store (title, agent, cwd…). */
@@ -139,7 +146,9 @@ export function AppShell() {
               >
                 <Suspense fallback={null}>
                   {view.kind === "home" && <MissionControl />}
-                  {view.kind === "draft" && <DraftChat key={`draft-${view.projectId ?? ""}`} projectId={view.projectId} />}
+                  {view.kind === "draft" && (
+                    <DraftChat key={`draft-${view.projectId ?? ""}`} projectId={view.projectId} agent={view.agent} />
+                  )}
                   {view.kind === "thread" && <ChatView key={view.id} threadId={view.id} />}
                   {view.kind === "project" && <ProjectView key={view.id} projectId={view.id} tab={view.tab} />}
                   {view.kind === "memory" && <MemoryView />}
@@ -154,6 +163,7 @@ export function AppShell() {
       <CommandPalette />
       <ShortcutsDialog />
       <DeleteChatDialog />
+      <RemoveProjectDialog />
       <NewProjectDialog />
       <Toaster theme="dark" position="bottom-right" richColors={false} />
     </TooltipProvider>

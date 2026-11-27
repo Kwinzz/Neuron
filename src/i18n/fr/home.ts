@@ -2,11 +2,23 @@ import type { Message } from "../index";
 
 /** Namespace « home » — French (source of truth). */
 const home = {
-  // ActiveThreadsCard
-  activeTitle: "En cours",
-  activeCount: (v) => (Number(v.n) <= 1 ? `${v.n} chat actif` : `${v.n} chats actifs`),
-  activeEmptyTitle: "Aucun agent en cours",
-  activeEmptyBody: "Lance un chat pour le suivre ici.",
+  // StartChatCard / HomeProjectPicker
+  startChatTitle: "Démarrer un chat",
+  startChatFullView: "Écran complet",
+  startChatAria: "Premier message du chat",
+  startChatPlaceholder: "Que doit faire l'agent ? (Entrée pour démarrer le chat)",
+  startChatPlaceholderInProject: "Que doit faire l'agent dans {project} ? (Entrée pour démarrer)",
+  projectPickerAria: "Projet du chat",
+  searchProjectPlaceholder: "Rechercher un projet…",
+  noProjectMatch: "Aucun projet trouvé.",
+  noProjectSearch: "aucun projet sans projet",
+  recentProjectsTitle: "Projets récents",
+  recentProjectsEmpty: "Ajoute un dossier pour lancer des chats avec son contexte.",
+  recentProjectNewChat: "Nouveau chat dans {name}",
+  recentProjectOpen: "Ouvrir le projet {name}",
+  // SetupAgentsCard
+  setupAgentsTitle: "Configure tes agents",
+  setupAgentsDescription: "Installe et connecte les CLI que tu veux piloter dans Neuron.",
   // AgentTotals
   agentsShown: "Agents affichés",
   showAgent: "Afficher {agent}",
@@ -38,10 +50,6 @@ const home = {
   // DeltaBadge
   deltaNoPrevious: "Pas de période précédente comparable",
   deltaVsPrevious: "par rapport à la période précédente",
-  // ProjectsCard
-  byProjectTitle: "Par projet",
-  byProjectEmpty: "Aucune donnée par projet",
-  projectShareAria: "Part du projet {name}",
   // QuotaBar / ResetCountdown
   resetIn: "reset dans",
   resetInShort: "Réinit. dans",

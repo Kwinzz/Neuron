@@ -62,15 +62,19 @@ const TimelineItem = memo(function TimelineItem({
   threadId,
   fresh,
   agent,
+  isLastUser,
+  canResend,
 }: {
   item: ChatItem;
   threadId: string;
   fresh: boolean;
   agent: AgentKind;
+  isLastUser: boolean;
+  canResend: boolean;
 }) {
   switch (item.kind) {
     case "user":
-      return <UserMessage item={item} />;
+      return <UserMessage item={item} threadId={threadId} isLastUser={isLastUser} />;
     case "text":
       return <AssistantText item={item} fresh={fresh} threadId={threadId} />;
     case "thinking":
@@ -86,7 +90,7 @@ const TimelineItem = memo(function TimelineItem({
         <PermissionCard item={item} threadId={threadId} />
       );
     case "error":
-      return <ErrorItem item={item} agent={agent} />;
+      return <ErrorItem item={item} agent={agent} threadId={threadId} canResend={canResend} />;
     case "command":
       return <CommandOutput item={item} />;
     case "turn":
@@ -120,11 +124,27 @@ export const Timeline = memo(function Timeline({
   if (initial.current === null) initial.current = new Set(items.map((i) => i.id));
   const seen = initial.current;
 
+  let lastUserId: string | null = null;
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (items[i]?.kind === "user") {
+      lastUserId = items[i]!.id;
+      break;
+    }
+  }
+  const hasUser = lastUserId !== null;
+
   return (
     <>
       {items.map((item) => (
         <div key={item.id} className={cn("min-w-0", !seen.has(item.id) && ENTER[item.kind])}>
-          <TimelineItem item={item} threadId={threadId} fresh={!seen.has(item.id)} agent={agent} />
+          <TimelineItem
+            item={item}
+            threadId={threadId}
+            fresh={!seen.has(item.id)}
+            agent={agent}
+            isLastUser={item.kind === "user" && item.id === lastUserId}
+            canResend={item.kind === "error" && hasUser}
+          />
         </div>
       ))}
     </>

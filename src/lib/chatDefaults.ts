@@ -1,3 +1,4 @@
+import type { AgentKind } from "@/bindings/AgentKind";
 import type { ChatSettings } from "@/lib/models";
 
 /** Settings of the last new chat (shared by the « Nouveau chat » screen and the quick prompt window). */
@@ -19,6 +20,15 @@ export function saveChatDefaults(next: ChatSettings): void {
   } catch {
     /* not persisted */
   }
+}
+
+/** Switch the default agent for new chats (clearing model & effort when the provider changes). */
+export function setDefaultAgent(agent: AgentKind): ChatSettings {
+  const current = readChatDefaults();
+  const next: ChatSettings =
+    current.agent === agent ? current : { ...current, agent, model: null, effort: null };
+  saveChatDefaults(next);
+  return next;
 }
 
 /** Agent + model last used from the quick prompt window (its own memory, independent of « Nouveau chat »). */

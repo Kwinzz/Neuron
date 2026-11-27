@@ -1,4 +1,4 @@
-import { type ComponentProps, type ReactNode, memo, useEffect, useMemo, useState } from "react";
+import { type ComponentProps, type KeyboardEvent, type ReactNode, memo, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "cn";
 import {
   Brain,
@@ -14,8 +14,10 @@ import {
   MessageSquare,
   Monitor,
   MoreHorizontal,
+  Pencil,
   Plus,
   Search,
+  SearchX,
   Trash2,
 } from "lucide-react";
 import type { ProjectSummary } from "@/bindings/ProjectSummary";
@@ -47,23 +49,22 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
-import { AgentLogo } from "@/components/ui/AgentLogo";
-import { StatusDot } from "@/components/ui/StatusDot";
-import { deviceOfProject, deviceOfThread } from "@/lib/deviceRouting";
-import { ipc, ipcErrorMessage } from "@/lib/ipc";
+import { useHotkey } from "@/hooks/useHotkey";
+import { renameProject } from "@/lib/projectActions";
 import { STATUS } from "@/lib/status";
-import { useDashboard } from "@/stores/dashboard";
 import { useDevices } from "@/stores/devices";
 import { useLive } from "@/stores/live";
 import { useNewProject } from "@/stores/newProject";
-import { type SidebarSection, useNav } from "@/stores/nav";
-import { useChatDeletion } from "@/stores/chatDeletion";
-import { toast } from "@/stores/toast";
+import { type SidebarSection, isSectionCollapsed, partitionSidebar, useNav } from "@/stores/nav";
+import { useProjectRemoval } from "@/stores/projectRemoval";
 import { useUi } from "@/stores/ui";
 import { useUpdate } from "@/stores/update";
 import neuronMark from "@/assets/neuron-mark.png";
 import { t } from "@/i18n";
+import { ChatRow } from "./ChatRow";
+import { SidebarFilter } from "./SidebarFilter";
 import { SidebarResizer } from "./SidebarResizer";
 
 /** Chats shown per project folder / in the loose "Chats" list before "Afficher plus". */
@@ -192,64 +193,85 @@ const EMPTY: ThreadSummary[] = [];
 const EMPTY_PROJECTS: ProjectSummary[] = [];
 const EMPTY_HOSTS: readonly RemoteHost[] = [];
 
-/** Projects and chats split between this device and each paired host. */
+/** Projects and chats split between this device, each paired host and archived chats, with fuzzy title filtering. */
 function SidebarSections() {
   const projects = useNav((s) => s.projects);
   const chats = useNav((s) => s.chats);
   const hosts = useDevices((s) => s.devices?.hosts) ?? EMPTY_HOSTS;
+  const [filter, setFilter] = useState("");
+  const filterRef = useRef<HTMLInputElement>(null);
+  const { open: sidebarOpen, setOpen: setSidebarOpen, isMobile, setOpenMobile } = useSidebar();
 
-  const partitioned = useMemo(() => {
-    const localProjects: ProjectSummary[] = [];
-    const projectsByDevice = new Map<string, ProjectSummary[]>();
-    for (const p of projects) {
-      const device = deviceOfProject(p.id);
-      if (device === null) {
-        localProjects.push(p);
-      } else {
-        const list = projectsByDevice.get(device);
-        if (list) list.push(p);
-        else projectsByDevice.set(device, [p]);
-      }
+  useHotkey("mod+shift+f", () => {
+    if (isMobile) {
+      setOpenMobile(true);
+    } else if (!sidebarOpen) {
+      setSidebarOpen(true);
     }
+    window.requestAnimationFrame(() => {
+      filterRef.current?.focus();
+      filterRef.current?.select();
+    });
+  });
 
-    const chatsByProject = new Map<string, ThreadSummary[]>();
-    const localLooseChats: ThreadSummary[] = [];
-    const looseChatsByDevice = new Map<string, ThreadSummary[]>();
-    const chatsByDevice = new Map<string, ThreadSummary[]>();
-    for (const c of chats) {
-      const device = deviceOfThread(c.id) ?? deviceOfProject(c.projectId);
-      if (device !== null) {
-        const all = chatsByDevice.get(device);
-        if (all) all.push(c);
-        else chatsByDevice.set(device, [c]);
-      }
-      if (c.projectId !== null) {
-        const list = chatsByProject.get(c.projectId);
-        if (list) list.push(c);
-        else chatsByProject.set(c.projectId, [c]);
-      } else if (device === null) {
-        localLooseChats.push(c);
-      } else {
-        const list = looseChatsByDevice.get(device);
-        if (list) list.push(c);
-        else looseChatsByDevice.set(device, [c]);
-      }
-    }
+  const trimmedFilter = filter.trim();
+  const filtering = trimmedFilter.length > 0;
+  const untitledLabel = t("common.untitledChat");
 
-    return { localProjects, projectsByDevice, chatsByProject, localLooseChats, looseChatsByDevice, chatsByDevice };
-  }, [projects, chats]);
+  const partitioned = useMemo(
+    () =>
+      partitionSidebar(
+        projects,
+        chats,
+        hosts,
+        filtering ? { query: trimmedFilter, untitledLabel } : undefined,
+      ),
+    [projects, chats, hosts, filtering, trimmedFilter, untitledLabel],
+  );
 
   return (
     <>
-      <ProjectsNav projects={partitioned.localProjects} byProject={partitioned.chatsByProject} />
-      <LooseChatsNav chats={partitioned.localLooseChats} />
-      <RemoteDevicesNav
-        hosts={hosts}
-        projectsByDevice={partitioned.projectsByDevice}
-        looseChatsByDevice={partitioned.looseChatsByDevice}
-        chatsByDevice={partitioned.chatsByDevice}
-        byProject={partitioned.chatsByProject}
-      />
+      <SidebarFilter value={filter} onChange={setFilter} inputRef={filterRef} />
+      {filtering && !partitioned.hasAnyMatch ? (
+        <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+          <div className="flex flex-col items-center gap-1.5 rounded-lg border border-dashed border-sidebar-border px-3 py-5 text-center">
+            <SearchX className="size-4 text-muted-foreground" aria-hidden />
+            <p className="text-xs text-muted-foreground wrap-anywhere">
+              {t("shell.filterNoMatch", { query: filter.trim() })}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setFilter("");
+                filterRef.current?.focus();
+              }}
+              className="mt-0.5 rounded-xs text-xs font-medium text-sidebar-foreground underline-offset-4 outline-hidden transition-colors duration-150 hover:underline focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+            >
+              {t("shell.filterClear")}
+            </button>
+          </div>
+        </SidebarGroup>
+      ) : (
+        <>
+          {(!filtering || partitioned.visibleLocalProjects.length > 0) && (
+            <ProjectsNav
+              projects={partitioned.visibleLocalProjects}
+              byProject={partitioned.chatsByProject}
+              filtering={filtering}
+            />
+          )}
+          <LooseChatsNav chats={partitioned.localLooseChats} filtering={filtering} />
+          <RemoteDevicesNav
+            hosts={partitioned.visibleHosts}
+            projectsByDevice={partitioned.visibleProjectsByDevice}
+            looseChatsByDevice={partitioned.looseChatsByDevice}
+            chatsByDevice={partitioned.chatsByDevice}
+            byProject={partitioned.chatsByProject}
+            filtering={filtering}
+          />
+          <ArchivedChatsNav chats={partitioned.archivedChats} filtering={filtering} />
+        </>
+      )}
     </>
   );
 }
@@ -264,6 +286,8 @@ function SectionGroup({
   section,
   label,
   activeCount,
+  count,
+  forceOpen = false,
   action,
   className,
   children,
@@ -271,13 +295,22 @@ function SectionGroup({
   section: SidebarSection;
   label: string;
   activeCount: number;
+  count?: number;
+  forceOpen?: boolean;
   action?: ReactNode;
   className?: string;
   children: ReactNode;
 }) {
-  const collapsed = useNav((s) => s.collapsedSections[section] ?? false);
+  const storedCollapsed = useNav((s) => isSectionCollapsed(s.collapsedSections, section));
+  const collapsed = forceOpen ? false : storedCollapsed;
   return (
-    <Collapsible asChild open={!collapsed} onOpenChange={() => useNav.getState().toggleSection(section)}>
+    <Collapsible
+      asChild
+      open={!collapsed}
+      onOpenChange={() => {
+        if (!forceOpen) useNav.getState().toggleSection(section);
+      }}
+    >
       <SidebarGroup className={className}>
         <SidebarGroupLabel asChild>
           <CollapsibleTrigger
@@ -288,15 +321,19 @@ function SectionGroup({
             title={collapsed ? t("shell.sectionShow", { name: label }) : t("shell.sectionHide", { name: label })}
           >
             <ChevronRight
-              className={cn("size-3! transition-transform duration-200", !collapsed && "rotate-90")}
+              className={cn("size-3! transition-transform duration-150", !collapsed && "rotate-90")}
               aria-hidden
             />
             <span>{label}</span>
-            {collapsed && activeCount > 0 && (
+            {collapsed && activeCount > 0 ? (
               <span className="ml-auto flex items-center gap-1 text-live tabular-nums animate-in fade-in-0 zoom-in-75 duration-200">
                 <span className="size-1.5 animate-pulse rounded-full bg-live" />
                 {activeCount}
               </span>
+            ) : (
+              count !== undefined && (
+                <span className="ml-auto text-[11px] text-muted-foreground/70 tabular-nums">{count}</span>
+              )
             )}
           </CollapsibleTrigger>
         </SidebarGroupLabel>
@@ -312,9 +349,11 @@ function SectionGroup({
 function ProjectsNav({
   projects,
   byProject,
+  filtering = false,
 }: {
   projects: ProjectSummary[];
   byProject: Map<string, ThreadSummary[]>;
+  filtering?: boolean;
 }) {
   const projectChats = useMemo(() => projects.flatMap((p) => byProject.get(p.id) ?? EMPTY), [projects, byProject]);
   const activeCount = useActiveCount(projectChats);
@@ -323,6 +362,7 @@ function ProjectsNav({
       section="projects"
       label={t("shell.projects")}
       activeCount={activeCount}
+      forceOpen={filtering}
       action={
         <SidebarGroupAction title={t("shell.addProjectTitle")} onClick={() => useNewProject.getState().show(null)}>
           <FolderPlus />
@@ -331,7 +371,7 @@ function ProjectsNav({
       }
     >
       <SidebarMenu>
-        {projects.length === 0 && (
+        {!filtering && projects.length === 0 && (
           <SidebarMenuItem>
             <SidebarMenuButton onClick={() => useNewProject.getState().show(null)} className="text-muted-foreground">
               <FolderPlus />
@@ -340,7 +380,7 @@ function ProjectsNav({
           </SidebarMenuItem>
         )}
         {projects.map((p) => (
-          <ProjectFolder key={p.id} project={p} chats={byProject.get(p.id) ?? EMPTY} />
+          <ProjectFolder key={p.id} project={p} chats={byProject.get(p.id) ?? EMPTY} filtering={filtering} />
         ))}
       </SidebarMenu>
     </SectionGroup>
@@ -351,112 +391,236 @@ const ProjectFolder = memo(function ProjectFolder({
   project,
   chats,
   nested = false,
+  filtering = false,
 }: {
   project: ProjectSummary;
   chats: ThreadSummary[];
   nested?: boolean;
+  filtering?: boolean;
 }) {
-  const open = useNav((s) => s.openProjects[project.id] ?? false);
+  const storedOpen = useNav((s) => s.openProjects[project.id] ?? false);
+  const open = filtering || storedOpen;
   const [showAll, setShowAll] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const settledRef = useRef(false);
+  const skipCloseFocusRef = useRef(false);
+  const restoreButtonFocusRef = useRef(false);
   const draftHere = useUi((s) => s.view.kind === "draft" && s.view.projectId === project.id);
   const pageHere = useUi((s) => s.view.kind === "project" && s.view.id === project.id);
   const activeCount = useLive((s) => chats.filter((c) => STATUS[s.threads[c.id]?.status ?? c.status].active).length);
-  const visible = showAll ? chats : chats.slice(0, PAGE);
+  const visible = filtering || showAll ? chats : chats.slice(0, PAGE);
 
-  const remove = async () => {
-    try {
-      await ipc.deleteProject(project.id);
-      await useNav.getState().load();
-      void useDashboard.getState().load();
-    } catch (err) {
-      toast({ tone: "danger", title: t("shell.projectRemoveFailed"), description: ipcErrorMessage(err) });
+  useEffect(() => {
+    if (editing) {
+      const input = inputRef.current;
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    } else if (restoreButtonFocusRef.current) {
+      restoreButtonFocusRef.current = false;
+      buttonRef.current?.focus();
+    }
+  }, [editing]);
+
+  const startEdit = (fromMenu = false) => {
+    if (fromMenu) skipCloseFocusRef.current = true;
+    settledRef.current = false;
+    restoreButtonFocusRef.current = false;
+    setDraft(project.name);
+    setEditing(true);
+  };
+
+  const commit = async (fromKeyboard = false) => {
+    if (settledRef.current) return;
+    settledRef.current = true;
+    if (fromKeyboard) restoreButtonFocusRef.current = true;
+    const trimmed = draft.trim();
+    setEditing(false);
+    if (!trimmed || trimmed === project.name) return;
+    await renameProject(project.id, trimmed);
+  };
+
+  const cancelEdit = (fromKeyboard = false) => {
+    if (settledRef.current) return;
+    settledRef.current = true;
+    if (fromKeyboard) restoreButtonFocusRef.current = true;
+    setEditing(false);
+  };
+
+  const onInputKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing) return;
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      void commit(true);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      cancelEdit(true);
+    }
+  };
+
+  const onButtonKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key === "F2" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      startEdit(false);
+    }
+  };
+
+  const onMenuCloseAutoFocus = (e: Event) => {
+    if (!skipCloseFocusRef.current) return;
+    e.preventDefault();
+    skipCloseFocusRef.current = false;
+    const input = inputRef.current;
+    if (input && document.activeElement !== input) {
+      input.focus();
+      input.select();
     }
   };
 
   return (
-    <Collapsible asChild open={open} onOpenChange={(o) => useNav.getState().setProjectOpen(project.id, o)}>
+    <Collapsible
+      asChild
+      open={open}
+      onOpenChange={(o) => {
+        if (!filtering && !editing) useNav.getState().setProjectOpen(project.id, o);
+      }}
+    >
       <SidebarMenuItem>
-        <CollapsibleTrigger asChild>
-          <SidebarMenuButton tooltip={project.path} className={nested ? "h-7" : undefined}>
-            <ChevronRight
-              className={`size-3.5! text-muted-foreground transition-transform duration-200 ${open ? "rotate-90" : ""}`}
-            />
-            {open ? <FolderOpen /> : <Folder />}
-            <span>{project.name}</span>
-            {activeCount > 0 && (
-              <span className="ml-auto flex items-center gap-1 text-xs text-live tabular-nums transition-opacity duration-150 group-hover/menu-item:opacity-0 animate-in fade-in-0 zoom-in-75 animation-duration-200">
-                <span className="size-1.5 animate-pulse rounded-full bg-live" />
-                {activeCount}
-              </span>
+        {editing ? (
+          <div
+            className={cn(
+              "flex w-full min-w-0 items-center gap-2 rounded-md bg-sidebar-accent px-2 group-data-[collapsible=icon]:hidden",
+              nested ? "h-7" : "h-8",
             )}
-          </SidebarMenuButton>
-        </CollapsibleTrigger>
+          >
+            <ChevronRight
+              className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform duration-150", open && "rotate-90")}
+              aria-hidden
+            />
+            {open ? <FolderOpen className="size-4 shrink-0" aria-hidden /> : <Folder className="size-4 shrink-0" aria-hidden />}
+            <input
+              ref={inputRef}
+              type="text"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={onInputKeyDown}
+              onBlur={() => void commit(false)}
+              onClick={(e) => e.stopPropagation()}
+              aria-label={t("project.projectName")}
+              className="h-6 min-w-0 flex-1 rounded-sm bg-background px-1.5 text-sm text-sidebar-foreground ring-1 ring-sidebar-ring outline-none"
+            />
+          </div>
+        ) : (
+          <>
+            <CollapsibleTrigger asChild>
+              <SidebarMenuButton
+                ref={buttonRef}
+                tooltip={project.path}
+                onKeyDown={onButtonKeyDown}
+                className={nested ? "h-7" : undefined}
+              >
+                <ChevronRight
+                  className={`size-3.5! text-muted-foreground transition-transform duration-150 ${open ? "rotate-90" : ""}`}
+                />
+                {open ? <FolderOpen /> : <Folder />}
+                <span>{project.name}</span>
+                {activeCount > 0 && (
+                  <span className="ml-auto flex items-center gap-1 text-xs text-live tabular-nums transition-opacity duration-150 group-hover/menu-item:opacity-0 animate-in fade-in-0 zoom-in-75 animation-duration-200">
+                    <span className="size-1.5 animate-pulse rounded-full bg-live" />
+                    {activeCount}
+                  </span>
+                )}
+              </SidebarMenuButton>
+            </CollapsibleTrigger>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <SidebarMenuAction showOnHover className={nested ? "top-1" : undefined}>
-              <MoreHorizontal />
-              <span className="sr-only">{t("shell.projectActions")}</span>
-            </SidebarMenuAction>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="right" align="start" className="w-52">
-            <DropdownMenuItem onClick={() => useUi.getState().startChat(project.id)}>
-              <Plus />
-              {t("shell.newChatHere")}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => useUi.getState().openProject(project.id, "context")}>
-              <FileText />
-              {t("shell.projectContext")}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                useUi.getState().selectProject(project.id);
-                useUi.getState().setDockOpen(true);
+            <DropdownMenu
+              onOpenChange={(menuOpen) => {
+                if (menuOpen) skipCloseFocusRef.current = false;
               }}
             >
-              <MessageSquare />
-              {t("shell.filterDock")}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onClick={() => void remove()}>
-              <Trash2 />
-              {t("shell.removeProject")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuAction showOnHover className={nested ? "top-1" : undefined}>
+                  <MoreHorizontal />
+                  <span className="sr-only">{t("shell.projectActions")}</span>
+                </SidebarMenuAction>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="right" align="start" className="w-52" onCloseAutoFocus={onMenuCloseAutoFocus}>
+                <DropdownMenuItem onSelect={() => useUi.getState().startChat(project.id)}>
+                  <Plus />
+                  {t("shell.newChatHere")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => useUi.getState().openProject(project.id, "context")}>
+                  <FileText />
+                  {t("shell.projectContext")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    useUi.getState().selectProject(project.id);
+                    useUi.getState().setDockOpen(true);
+                  }}
+                >
+                  <MessageSquare />
+                  {t("shell.filterDock")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => startEdit(true)}>
+                  <Pencil />
+                  {t("project.rename")}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onSelect={() => useProjectRemoval.getState().request(project.id)}
+                >
+                  <Trash2 />
+                  {t("shell.removeProject")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        )}
 
         <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
           <SidebarMenuSub className={nested ? "mr-0 pr-0" : undefined}>
-            <SidebarMenuSubItem>
-              <SidebarMenuSubButton
-                isActive={draftHere}
-                onClick={() => useUi.getState().startChat(project.id)}
-                className="text-muted-foreground"
-              >
-                <Plus />
-                <span>{t("shell.navNewChat")}</span>
-              </SidebarMenuSubButton>
-            </SidebarMenuSubItem>
-            <SidebarMenuSubItem>
-              <SidebarMenuSubButton
-                isActive={pageHere}
-                onClick={() => useUi.getState().openProject(project.id, "context")}
-                className="text-muted-foreground"
-              >
-                <FileText />
-                <span>{t("shell.contextAndProject")}</span>
-              </SidebarMenuSubButton>
-            </SidebarMenuSubItem>
+            {!filtering && (
+              <>
+                <SidebarMenuSubItem>
+                  <SidebarMenuSubButton
+                    isActive={draftHere}
+                    onClick={() => useUi.getState().startChat(project.id)}
+                    className="text-muted-foreground"
+                  >
+                    <Plus />
+                    <span>{t("shell.navNewChat")}</span>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+                <SidebarMenuSubItem>
+                  <SidebarMenuSubButton
+                    isActive={pageHere}
+                    onClick={() => useUi.getState().openProject(project.id, "context")}
+                    className="text-muted-foreground"
+                  >
+                    <FileText />
+                    <span>{t("shell.contextAndProject")}</span>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              </>
+            )}
             {visible.map((c, i) => (
-              <SidebarMenuSubItem
+              <ChatRow
                 key={c.id}
-                className="animate-in fade-in-0 slide-in-from-left-1 fill-mode-both duration-200"
-                style={{ animationDelay: `${Math.min(i, 10) * 25}ms` }}
-              >
-                <ChatLink chat={c} sub />
-              </SidebarMenuSubItem>
+                chat={c}
+                sub
+                className={filtering ? undefined : "animate-in fade-in-0 slide-in-from-left-1 fill-mode-both duration-150"}
+                style={filtering ? undefined : { animationDelay: `${Math.min(i, 10) * 25}ms` }}
+              />
             ))}
-            {chats.length > PAGE && (
+            {!filtering && chats.length > PAGE && (
               <SidebarMenuSubItem>
                 <SidebarMenuSubButton onClick={() => setShowAll((v) => !v)} className="text-xs text-muted-foreground">
                   <span>{showAll ? t("shell.showLess") : t("shell.showMore", { n: chats.length - PAGE })}</span>
@@ -470,29 +634,29 @@ const ProjectFolder = memo(function ProjectFolder({
   );
 });
 
-function LooseChatsNav({ chats }: { chats: ThreadSummary[] }) {
+function LooseChatsNav({ chats, filtering = false }: { chats: ThreadSummary[]; filtering?: boolean }) {
   const [showAll, setShowAll] = useState(false);
   const activeCount = useActiveCount(chats);
   if (chats.length === 0) return null;
-  const visible = showAll ? chats : chats.slice(0, PAGE);
+  const visible = filtering || showAll ? chats : chats.slice(0, PAGE);
   return (
     <SectionGroup
       section="chats"
       label={t("shell.chats")}
       activeCount={activeCount}
+      forceOpen={filtering}
       className="group-data-[collapsible=icon]:hidden"
     >
       <SidebarMenu>
         {visible.map((c, i) => (
-          <SidebarMenuItem
+          <ChatRow
             key={c.id}
-            className="animate-in fade-in-0 slide-in-from-left-1 fill-mode-both duration-200"
-            style={{ animationDelay: `${Math.min(i, 10) * 25}ms` }}
-          >
-            <ChatLink chat={c} />
-          </SidebarMenuItem>
+            chat={c}
+            className={filtering ? undefined : "animate-in fade-in-0 slide-in-from-left-1 fill-mode-both duration-150"}
+            style={filtering ? undefined : { animationDelay: `${Math.min(i, 10) * 25}ms` }}
+          />
         ))}
-        {chats.length > PAGE && (
+        {!filtering && chats.length > PAGE && (
           <SidebarMenuItem>
             <SidebarMenuButton onClick={() => setShowAll((v) => !v)} className="text-xs text-muted-foreground">
               <span>{showAll ? t("shell.showLess") : t("shell.showMore", { n: chats.length - PAGE })}</span>
@@ -510,18 +674,20 @@ function RemoteDevicesNav({
   looseChatsByDevice,
   chatsByDevice,
   byProject,
+  filtering = false,
 }: {
   hosts: readonly RemoteHost[];
   projectsByDevice: Map<string, ProjectSummary[]>;
   looseChatsByDevice: Map<string, ThreadSummary[]>;
   chatsByDevice: Map<string, ThreadSummary[]>;
   byProject: Map<string, ThreadSummary[]>;
+  filtering?: boolean;
 }) {
   const deviceChats = useMemo(() => [...chatsByDevice.values()].flat(), [chatsByDevice]);
   const activeCount = useActiveCount(deviceChats);
   if (hosts.length === 0) return null;
   return (
-    <SectionGroup section="devices" label={t("shell.devices")} activeCount={activeCount}>
+    <SectionGroup section="devices" label={t("shell.devices")} activeCount={activeCount} forceOpen={filtering}>
       <SidebarMenu>
         {hosts.map((host) => (
           <DeviceFolder
@@ -531,6 +697,7 @@ function RemoteDevicesNav({
             looseChats={looseChatsByDevice.get(host.nodeId) ?? EMPTY}
             allChats={chatsByDevice.get(host.nodeId) ?? EMPTY}
             byProject={byProject}
+            filtering={filtering}
           />
         ))}
       </SidebarMenu>
@@ -544,22 +711,30 @@ const DeviceFolder = memo(function DeviceFolder({
   looseChats,
   allChats,
   byProject,
+  filtering = false,
 }: {
   host: RemoteHost;
   projects: ProjectSummary[];
   looseChats: ThreadSummary[];
   allChats: ThreadSummary[];
   byProject: Map<string, ThreadSummary[]>;
+  filtering?: boolean;
 }) {
   const storedOpen = useNav((s) => s.openDevices[host.nodeId]);
-  const open = storedOpen ?? host.connected;
+  const open = filtering || (storedOpen ?? host.connected);
   const [showAll, setShowAll] = useState(false);
   const activeCount = useLive((s) => allChats.filter((c) => STATUS[s.threads[c.id]?.status ?? c.status].active).length);
-  const visibleLoose = showAll ? looseChats : looseChats.slice(0, PAGE);
+  const visibleLoose = filtering || showAll ? looseChats : looseChats.slice(0, PAGE);
   const statusLabel = host.connected ? t("shell.deviceOnline") : t("shell.deviceOffline");
 
   return (
-    <Collapsible asChild open={open} onOpenChange={(o) => useNav.getState().setDeviceOpen(host.nodeId, o)}>
+    <Collapsible
+      asChild
+      open={open}
+      onOpenChange={(o) => {
+        if (!filtering) useNav.getState().setDeviceOpen(host.nodeId, o);
+      }}
+    >
       <SidebarMenuItem>
         <CollapsibleTrigger asChild>
           <SidebarMenuButton
@@ -567,7 +742,7 @@ const DeviceFolder = memo(function DeviceFolder({
             className={!host.connected ? "text-muted-foreground" : undefined}
           >
             <ChevronRight
-              className={`size-3.5! text-muted-foreground transition-transform duration-200 ${open ? "rotate-90" : ""}`}
+              className={`size-3.5! text-muted-foreground transition-transform duration-150 ${open ? "rotate-90" : ""}`}
             />
             <Monitor />
             <span>{host.name}</span>
@@ -588,7 +763,7 @@ const DeviceFolder = memo(function DeviceFolder({
 
         <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
           <SidebarMenuSub className="mr-0 pr-0">
-            {host.connected && (
+            {!filtering && host.connected && (
               <SidebarMenuSubItem>
                 <SidebarMenuSubButton
                   onClick={() => useNewProject.getState().show(host.nodeId)}
@@ -600,7 +775,7 @@ const DeviceFolder = memo(function DeviceFolder({
               </SidebarMenuSubItem>
             )}
             {projects.map((p) => (
-              <ProjectFolder key={p.id} project={p} chats={byProject.get(p.id) ?? EMPTY} nested />
+              <ProjectFolder key={p.id} project={p} chats={byProject.get(p.id) ?? EMPTY} nested filtering={filtering} />
             ))}
             {projects.length > 0 && looseChats.length > 0 && (
               <li className="px-2 pt-1.5 pb-0.5 text-[11px] font-medium text-muted-foreground select-none">
@@ -608,22 +783,22 @@ const DeviceFolder = memo(function DeviceFolder({
               </li>
             )}
             {visibleLoose.map((c, i) => (
-              <SidebarMenuItem
+              <ChatRow
                 key={c.id}
-                className="animate-in fade-in-0 slide-in-from-left-1 fill-mode-both duration-200"
-                style={{ animationDelay: `${Math.min(i, 10) * 25}ms` }}
-              >
-                <ChatLink chat={c} compact />
-              </SidebarMenuItem>
+                chat={c}
+                compact
+                className={filtering ? undefined : "animate-in fade-in-0 slide-in-from-left-1 fill-mode-both duration-150"}
+                style={filtering ? undefined : { animationDelay: `${Math.min(i, 10) * 25}ms` }}
+              />
             ))}
-            {looseChats.length > PAGE && (
+            {!filtering && looseChats.length > PAGE && (
               <SidebarMenuSubItem>
                 <SidebarMenuSubButton onClick={() => setShowAll((v) => !v)} className="text-xs text-muted-foreground">
                   <span>{showAll ? t("shell.showLess") : t("shell.showMore", { n: looseChats.length - PAGE })}</span>
                 </SidebarMenuSubButton>
               </SidebarMenuSubItem>
             )}
-            {projects.length === 0 && looseChats.length === 0 && (
+            {!filtering && projects.length === 0 && looseChats.length === 0 && (
               <li className="px-2 py-1 text-xs text-muted-foreground">
                 {host.connected ? t("shell.deviceEmpty") : t("shell.deviceOffline")}
               </li>
@@ -635,91 +810,40 @@ const DeviceFolder = memo(function DeviceFolder({
   );
 });
 
-/** "…" menu of a chat row (shown on hover): delete, after confirmation (`DeleteChatDialog`). */
-function ChatActions({ chatId, sub, compact = false }: { chatId: string; sub: boolean; compact?: boolean }) {
-  const trigger = sub ? (
-    <button
-      type="button"
-      className="absolute top-1/2 right-1 flex size-5 -translate-y-1/2 items-center justify-center rounded-md text-sidebar-foreground opacity-0 outline-hidden group-focus-within/menu-sub-item:opacity-100 group-hover/menu-sub-item:opacity-100 hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring aria-expanded:opacity-100 [&>svg]:size-4"
-    >
-      <MoreHorizontal />
-      <span className="sr-only">{t("chat.chatActions")}</span>
-    </button>
-  ) : (
-    <SidebarMenuAction showOnHover className={compact ? "top-1" : undefined}>
-      <MoreHorizontal />
-      <span className="sr-only">{t("chat.chatActions")}</span>
-    </SidebarMenuAction>
-  );
+/** Collapsible « Archivés » section at the bottom of the sidebar (collapsed by default, persisted in nav store). */
+function ArchivedChatsNav({ chats, filtering = false }: { chats: ThreadSummary[]; filtering?: boolean }) {
+  const [showAll, setShowAll] = useState(false);
+  const activeCount = useActiveCount(chats);
+  if (chats.length === 0) return null;
+  const visible = filtering || showAll ? chats : chats.slice(0, PAGE);
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-      <DropdownMenuContent side="right" align="start" className="w-48">
-        <DropdownMenuItem variant="destructive" onClick={() => useChatDeletion.getState().request(chatId)}>
-          <Trash2 />
-          {t("chat.deleteChat")}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <SectionGroup
+      section="archived"
+      label={t("shell.archived")}
+      activeCount={activeCount}
+      count={chats.length}
+      forceOpen={filtering}
+      className="group-data-[collapsible=icon]:hidden"
+    >
+      <SidebarMenu>
+        {visible.map((c, i) => (
+          <ChatRow
+            key={c.id}
+            chat={c}
+            muted
+            className={filtering ? undefined : "animate-in fade-in-0 slide-in-from-left-1 fill-mode-both duration-150"}
+            style={filtering ? undefined : { animationDelay: `${Math.min(i, 10) * 25}ms` }}
+          />
+        ))}
+        {!filtering && chats.length > PAGE && (
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={() => setShowAll((v) => !v)} className="text-xs text-muted-foreground">
+              <span>{showAll ? t("shell.showLess") : t("shell.showMore", { n: chats.length - PAGE })}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        )}
+      </SidebarMenu>
+    </SectionGroup>
   );
 }
-
-/** A chat entry; title and status come from the live store when available. */
-const ChatLink = memo(function ChatLink({
-  chat,
-  sub = false,
-  compact = false,
-}: {
-  chat: ThreadSummary;
-  sub?: boolean;
-  compact?: boolean;
-}) {
-  const title = useLive((s) => s.threads[chat.id]?.title ?? chat.title);
-  const status = useLive((s) => s.threads[chat.id]?.status ?? chat.status);
-  const active = useUi((s) => s.view.kind === "thread" && s.view.id === chat.id);
-  const label = title || t("common.untitledChat");
-  const open = () => useUi.getState().focusThread(chat.id);
-  const working = STATUS[status].active;
-
-  if (sub) {
-    return (
-      <>
-        {/* On hover the "…" button takes the status dot's place, at the row's right edge. */}
-        <SidebarMenuSubButton
-          isActive={active}
-          onClick={open}
-          title={label}
-          className="group-focus-within/menu-sub-item:pr-7 group-hover/menu-sub-item:pr-7"
-        >
-          <span className="min-w-0 flex-1 truncate">{label}</span>
-          {working && (
-            <StatusDot
-              status={status}
-              className="shrink-0 animate-in fade-in-0 zoom-in-50 duration-200 group-focus-within/menu-sub-item:hidden group-hover/menu-sub-item:hidden"
-            />
-          )}
-        </SidebarMenuSubButton>
-        <ChatActions chatId={chat.id} sub />
-      </>
-    );
-  }
-  const buttonClass = [compact ? "h-7" : "", working ? "pr-7" : ""].filter(Boolean).join(" ") || undefined;
-  return (
-    <>
-      {/* The status dot sits over the row's right edge: keep the title clear of it. */}
-      <SidebarMenuButton isActive={active} onClick={open} tooltip={label} className={buttonClass}>
-        <AgentLogo agent={chat.agent} />
-        <span>{label}</span>
-      </SidebarMenuButton>
-      {working && (
-        <SidebarMenuBadge
-          className={`${compact ? "top-1 " : ""}group-focus-within/menu-item:opacity-0 group-hover/menu-item:opacity-0`}
-        >
-          <StatusDot status={status} className="animate-in fade-in-0 zoom-in-50 duration-200" />
-        </SidebarMenuBadge>
-      )}
-      <ChatActions chatId={chat.id} sub={false} compact={compact} />
-    </>
-  );
-});
 

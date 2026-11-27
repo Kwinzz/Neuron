@@ -11,15 +11,17 @@ export interface ToastInput {
   tone: ToastTone;
   title: string;
   description?: string;
-  /** Optional action (e.g. open the thread). */
+  /** Optional action (e.g. open the thread, undo a deletion). */
   onClick?: () => void;
+  /** Custom label for the action button (defaults to « Ouvrir »). */
+  actionLabel?: string;
 }
 
-export function toast({ tone, title, description, onClick }: ToastInput, ttlMs = 5000): void {
+export function toast({ tone, title, description, onClick, actionLabel }: ToastInput, ttlMs = 5000): void {
   const options = {
     description,
     duration: ttlMs,
-    ...(onClick ? { action: { label: t("common.open"), onClick } } : {}),
+    ...(onClick ? { action: { label: actionLabel ?? t("common.open"), onClick } } : {}),
   };
   switch (tone) {
     case "ok":

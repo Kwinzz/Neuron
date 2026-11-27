@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { XCircle } from "lucide-react";
 import { AgentAccessNotice } from "@/components/chat/AgentAccessNotice";
 import { AgentLogo } from "@/components/ui/AgentLogo";
@@ -23,6 +23,8 @@ import "./chat.css";
 import { t } from "@/i18n";
 
 const EMPTY_ITEMS: ChatItem[] = [];
+/** Window within which a second Escape press confirms stopping the running agent. */
+const STOP_CONFIRM_MS = 600;
 
 export function ChatView({ threadId }: { threadId: string }) {
   const thread = useChat((s) => s.threads[threadId]);
@@ -43,15 +45,61 @@ export function ChatView({ threadId }: { threadId: string }) {
     void useChat.getState().load(threadId);
   }, [threadId]);
 
-  // Échap stops the running agent — also from the composer, but never while a dialog/menu/popover is
-  // open (they own Échap) or from a single-line input (chat rename).
+  const [confirmStop, setConfirmStop] = useState(false);
+  const stopTimerRef = useRef<number | null>(null);
+  const stopArmedUntilRef = useRef(0);
+
+  const clearStopConfirm = useCallback(() => {
+    stopArmedUntilRef.current = 0;
+    if (stopTimerRef.current !== null) {
+      window.clearTimeout(stopTimerRef.current);
+      stopTimerRef.current = null;
+    }
+    setConfirmStop(false);
+  }, []);
+
+  useEffect(() => {
+    if (!active) clearStopConfirm();
+  }, [active, clearStopConfirm]);
+
+  useEffect(() => clearStopConfirm, [clearStopConfirm]);
+
+  // Double-Échap stops the running agent — never while typing in a non-empty composer, in a single-line input
+  // (chat rename), or while a dialog/menu/popover is open (they own Échap).
   useHotkey(
     "escape",
     (e) => {
+      if (e.repeat || e.isComposing) return;
       const target = e.target as HTMLElement | null;
       if (target?.tagName === "INPUT") return;
-      if (document.querySelector('[role="dialog"], [role="menu"], [role="listbox"], [data-radix-popper-content-wrapper]')) return;
-      void useChat.getState().stop(threadId);
+      if (
+        target instanceof HTMLTextAreaElement &&
+        target.hasAttribute("data-composer") &&
+        target.value.trim().length > 0
+      ) {
+        return;
+      }
+      if (
+        document.querySelector(
+          '[role="dialog"], [role="menu"], [role="listbox"], [data-radix-popper-content-wrapper]',
+        )
+      ) {
+        return;
+      }
+      const now = performance.now();
+      if (now <= stopArmedUntilRef.current) {
+        clearStopConfirm();
+        void useChat.getState().stop(threadId);
+        return;
+      }
+      stopArmedUntilRef.current = now + STOP_CONFIRM_MS;
+      setConfirmStop(true);
+      if (stopTimerRef.current !== null) window.clearTimeout(stopTimerRef.current);
+      stopTimerRef.current = window.setTimeout(() => {
+        stopTimerRef.current = null;
+        stopArmedUntilRef.current = 0;
+        setConfirmStop(false);
+      }, STOP_CONFIRM_MS);
     },
     { enabled: active, allowInInputs: true },
   );
@@ -142,6 +190,7 @@ export function ChatView({ threadId }: { threadId: string }) {
         showPill={showPill}
         onPillClick={handlePillClick}
         timelineGutter
+        stopConfirm={confirmStop}
       />
     </div>
   );

@@ -81,6 +81,9 @@ const project = {
   colStatus: "Statut",
   colUpdated: "Mis à jour",
   // ProjectHeader
+  rename: "Renommer",
+  projectName: "Nom du projet",
+  renameFailed: "Renommage impossible",
   changedWord: (v) => (Number(v.n) === 1 ? "modifié" : "modifiés"),
   noRepo: "Pas de dépôt git",
   chatWord: (v) => (Number(v.n) <= 1 ? "chat" : "chats"),

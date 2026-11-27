@@ -11,7 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { ArrowUp, Plus, Square } from "lucide-react";
+import { ArrowUp, Paperclip, Plus, Square } from "lucide-react";
 import { cn } from "cn";
 import type { AgentKind } from "@/bindings/AgentKind";
 import type { Attachment } from "@/bindings/Attachment";
@@ -22,6 +22,7 @@ import { AGENTS } from "@/lib/agents";
 import { deviceOfThread } from "@/lib/deviceRouting";
 import { fuzzyScore, normalize } from "@/lib/fuzzy";
 import { caretInOpenFence, continueBlock, type TextEdit, toggleWrap } from "@/lib/markdownInput";
+import { draftKey, onComposerFill, useDrafts } from "@/stores/drafts";
 import { useLive } from "@/stores/live";
 import { EMPTY_COMMANDS, slashKey, useSlash } from "@/stores/slash";
 import { AttachmentTray } from "@/components/attachments/AttachmentTray";
@@ -32,7 +33,7 @@ import {
   InputGroupTextarea,
 } from "@/components/ui/input-group";
 import { ThreadSettingsBar } from "@/components/chat/ThreadSettingsBar";
-import { ipc, ipcErrorMessage } from "@/lib/ipc";
+import { events, ipc, ipcErrorMessage } from "@/lib/ipc";
 import { toast } from "@/stores/toast";
 import { useChat } from "@/stores/chat";
 import { NewMessagesPill } from "./NewMessagesPill";
@@ -97,6 +98,8 @@ interface ComposerProps {
   slashDevice?: string | null;
   /** Same column as the timeline, whose left gutter (pl-10) holds the agent cursor. */
   timelineGutter?: boolean;
+  /** First Escape pressed while the agent runs: prompt a second press to stop. */
+  stopConfirm?: boolean;
 }
 
 /** Ctrl+<key> (⌘ on macOS) → Markdown marker wrapped around the selection. */
@@ -132,12 +135,18 @@ export const Composer = memo(function Composer({
   slashCwd,
   slashDevice,
   timelineGutter = false,
+  stopConfirm = false,
 }: ComposerProps) {
-  const [value, setValue] = useState("");
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const draftId = draftKey(threadId, projectId);
+  const [value, setValue] = useState(() => useDrafts.getState().drafts[draftId]?.text ?? "");
+  const [attachments, setAttachments] = useState<Attachment[]>(
+    () => useDrafts.getState().drafts[draftId]?.attachments ?? [],
+  );
   /** Files being copied/saved (skeleton tiles; sending waits for them). */
   const [importing, setImporting] = useState(0);
+  const [dragging, setDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const composerAreaRef = useRef<HTMLDivElement>(null);
 
   const device = slashDevice !== undefined ? slashDevice : threadId ? deviceOfThread(threadId) : null;
   const prevDeviceRef = useRef(device);
@@ -179,14 +188,50 @@ export const Composer = memo(function Composer({
   const historyProjectRef = useRef<string | null>(projectId);
   const historyIndexRef = useRef(-1);
   const draftRef = useRef("");
-  const pendingCaretEndRef = useRef(false);
+  const pendingCaretEndRef = useRef(value.length > 0);
   const fetchingHistoryRef = useRef(false);
+  const draftIdRef = useRef(draftId);
 
   if (historyProjectRef.current !== projectId) {
     historyProjectRef.current = projectId;
     historyRef.current = null;
     historyIndexRef.current = -1;
   }
+
+  useEffect(() => {
+    if (draftIdRef.current !== draftId) {
+      draftIdRef.current = draftId;
+      const saved = useDrafts.getState().drafts[draftId];
+      const nextText = saved?.text ?? "";
+      pendingCaretEndRef.current = nextText.length > 0;
+      setValue(nextText);
+      setAttachments(saved?.attachments ?? []);
+      return;
+    }
+    useDrafts.getState().set(draftId, { text: value, attachments });
+  }, [draftId, value, attachments]);
+
+  useEffect(
+    () =>
+      onComposerFill((targetKey, text) => {
+        if (targetKey !== draftId) return;
+        historyIndexRef.current = -1;
+        draftRef.current = "";
+        setSlashDismissedAt(null);
+        pendingCaretEndRef.current = true;
+        setValue(text);
+        const el = textareaRef.current;
+        if (el) {
+          el.focus();
+          if (el.value === text) {
+            pendingCaretEndRef.current = false;
+            const len = text.length;
+            el.setSelectionRange(len, len);
+          }
+        }
+      }),
+    [draftId],
+  );
 
   useEffect(() => {
     textareaRef.current?.focus();
@@ -211,10 +256,12 @@ export const Composer = memo(function Composer({
     const trimmed = value.trim();
     if (!canSend) return;
 
+    const targetKey = draftId;
     const previous = value;
     const sentAttachments = attachments;
     setValue("");
     setAttachments([]);
+    useDrafts.getState().clear(targetKey);
     historyIndexRef.current = -1;
     draftRef.current = "";
     onSent();
@@ -225,6 +272,10 @@ export const Composer = memo(function Composer({
         ? await useChat.getState().send(threadId, trimmed, sentAttachments)
         : false;
     if (!ok) {
+      const existing = useDrafts.getState().drafts[targetKey];
+      if (!existing || (existing.text === "" && existing.attachments.length === 0)) {
+        useDrafts.getState().set(targetKey, { text: previous, attachments: sentAttachments });
+      }
       setValue((current) => (current === "" ? previous : current));
       setAttachments((current) => (current.length === 0 ? sentAttachments : current));
       return;
@@ -236,7 +287,7 @@ export const Composer = memo(function Composer({
   };
 
   /** Run an import, showing `count` skeleton tiles meanwhile. */
-  const addAttachments = async (count: number, load: () => Promise<Attachment[]>) => {
+  const addAttachments = useCallback(async (count: number, load: () => Promise<Attachment[]>) => {
     setImporting((n) => n + count);
     try {
       const added = await load();
@@ -247,7 +298,50 @@ export const Composer = memo(function Composer({
       setImporting((n) => Math.max(0, n - count));
       textareaRef.current?.focus();
     }
-  };
+  }, []);
+
+  // Native OS file drag & drop over the webview: only the visible composer reacts (and never behind a dialog).
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | null = null;
+    const isVisible = () => {
+      const el = composerAreaRef.current;
+      if (!el || el.getClientRects().length === 0) return false;
+      if (document.querySelector('[role="dialog"]')) return false;
+      return true;
+    };
+    void events
+      .onFileDrop((e) => {
+        if (disposed) return;
+        if (e.kind === "leave") {
+          setDragging(false);
+          return;
+        }
+        if (!isVisible()) {
+          setDragging(false);
+          return;
+        }
+        if (e.kind === "enter" || e.kind === "over") {
+          setDragging(true);
+          return;
+        }
+        if (e.kind === "drop") {
+          setDragging(false);
+          if (e.paths.length > 0) {
+            void addAttachments(e.paths.length, () => ipc.importAttachments(e.paths));
+          }
+        }
+      })
+      .then((fn) => {
+        if (disposed) fn();
+        else unlisten = fn;
+      })
+      .catch(() => undefined);
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [addAttachments]);
 
   const pickFiles = async () => {
     let paths: string[];
@@ -419,7 +513,7 @@ export const Composer = memo(function Composer({
         className="pointer-events-none absolute inset-x-0 bottom-full h-6 bg-linear-to-t from-background to-transparent"
       />
       <div className={cn("mx-auto w-full max-w-3xl", timelineGutter && "pl-10")}>
-        <div className="relative">
+        <div ref={composerAreaRef} className="relative">
           {slashOpen && agent && (
             <div className="absolute inset-x-0 bottom-full z-20 mb-2">
               <SlashMenu
@@ -436,6 +530,17 @@ export const Composer = memo(function Composer({
           {showPill && (
             <div className="absolute -top-10 left-1/2 -translate-x-1/2">
               <NewMessagesPill onClick={onPillClick} />
+            </div>
+          )}
+          {stopConfirm && active && threadId && (
+            <div className="pointer-events-none absolute right-0 bottom-full z-20 mb-2">
+              <span
+                role="status"
+                aria-live="polite"
+                className="inline-flex items-center rounded-lg border bg-popover px-2.5 py-1 text-xs font-medium text-foreground shadow-sm animate-in fade-in-0 duration-150"
+              >
+                {t("chat.escAgainToStop")}
+              </span>
             </div>
           )}
           <InputGroup
@@ -480,7 +585,10 @@ export const Composer = memo(function Composer({
                   <InputGroupButton
                     variant="outline"
                     size="icon-sm"
-                    className="rounded-full animate-in fade-in-0 zoom-in-75 duration-150"
+                    className={cn(
+                      "rounded-full animate-in fade-in-0 zoom-in-75 duration-150",
+                      stopConfirm && "border-destructive/60 text-destructive",
+                    )}
                     aria-label={t("chat.stopAgent")}
                     title={t("chat.stop")}
                     onClick={() => threadId && void useChat.getState().stop(threadId)}
@@ -501,6 +609,16 @@ export const Composer = memo(function Composer({
               </div>
             </InputGroupAddon>
           </InputGroup>
+          {dragging && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-primary/50 bg-background/80 text-sm font-medium text-foreground transition-opacity duration-150"
+            >
+              <Paperclip className="size-4 shrink-0" aria-hidden />
+              <span>{t("chat.dropToAttach")}</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

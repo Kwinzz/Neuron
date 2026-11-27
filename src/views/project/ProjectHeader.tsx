@@ -1,16 +1,19 @@
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { cn } from "cn";
-import { FolderOpen, GitBranch, MessageSquare, Plus, RefreshCw } from "lucide-react";
+import { FolderOpen, GitBranch, MessageSquare, Pencil, Plus, RefreshCw } from "lucide-react";
 import type { ProjectOverview } from "@/bindings/ProjectOverview";
 import type { ProjectSummary } from "@/bindings/ProjectSummary";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DeviceBadge } from "@/components/ui/DeviceBadge";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { t } from "@/i18n";
 import { deviceOfProject } from "@/lib/deviceRouting";
 import { openFolder } from "@/lib/openFolder";
+import { renameProject } from "@/lib/projectActions";
 import { useUi } from "@/stores/ui";
 
 interface ProjectHeaderProps {
@@ -40,6 +43,50 @@ export function ProjectHeader({
   const git = overview?.git ?? null;
   const changedCount = git?.changed.length ?? 0;
 
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const settledRef = useRef(false);
+
+  useEffect(() => {
+    setEditing(false);
+  }, [projectId]);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+
+  const startEdit = () => {
+    if (!project) return;
+    settledRef.current = false;
+    setDraft(project.name);
+    setEditing(true);
+  };
+
+  const commit = async () => {
+    if (settledRef.current) return;
+    settledRef.current = true;
+    const trimmed = draft.trim();
+    setEditing(false);
+    if (!trimmed || trimmed === project?.name) return;
+    await renameProject(projectId, trimmed);
+  };
+
+  const onInputKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing) return;
+    if (e.key === "Enter") {
+      e.preventDefault();
+      void commit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      settledRef.current = true;
+      setEditing(false);
+    }
+  };
+
   return (
     <Card className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
       <CardContent className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -57,9 +104,37 @@ export function ProjectHeader({
             ) : (
               <>
                 <div className="flex min-w-0 items-center gap-2">
-                  <h1 className="truncate text-lg leading-tight font-semibold text-foreground">
-                    {name ?? t("shell.project")}
-                  </h1>
+                  {editing ? (
+                    <Input
+                      ref={inputRef}
+                      type="text"
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onKeyDown={onInputKeyDown}
+                      onBlur={() => void commit()}
+                      aria-label={t("project.projectName")}
+                      className="h-7 max-w-md rounded-md bg-transparent px-1.5 text-lg font-semibold md:text-lg dark:bg-transparent"
+                    />
+                  ) : project ? (
+                    <h1 className="min-w-0 truncate text-lg leading-tight font-semibold text-foreground">
+                      <button
+                        type="button"
+                        title={t("project.rename")}
+                        onClick={startEdit}
+                        className="group inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                      >
+                        <span className="truncate">{name ?? t("shell.project")}</span>
+                        <Pencil
+                          className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+                          aria-hidden
+                        />
+                      </button>
+                    </h1>
+                  ) : (
+                    <h1 className="truncate text-lg leading-tight font-semibold text-foreground">
+                      {name ?? t("shell.project")}
+                    </h1>
+                  )}
                   <DeviceBadge device={device} />
                 </div>
                 {path && (

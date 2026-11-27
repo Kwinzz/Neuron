@@ -2,6 +2,7 @@ import { IS_LINUX, IS_WINDOWS } from "@/lib/platform";
 import { useState, type KeyboardEvent } from "react";
 import { AppWindow, Keyboard, RotateCcw } from "lucide-react";
 import type { AppSettings } from "@/bindings/AppSettings";
+import { ShortcutsList } from "@/components/shortcuts/ShortcutsList";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -201,6 +202,19 @@ export function BackgroundSection({ settings }: { settings: AppSettings }) {
               </div>
             }
           />
+        </CardContent>
+      </Card>
+
+      <Card size="sm" className="min-w-0">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Keyboard className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            <span>{t("settings.shortcutsTitle")}</span>
+          </CardTitle>
+          <CardDescription className="text-xs">{t("settings.shortcutsDescription")}</CardDescription>
+        </CardHeader>
+        <CardContent className="min-w-0">
+          <ShortcutsList />
         </CardContent>
       </Card>
     </div>

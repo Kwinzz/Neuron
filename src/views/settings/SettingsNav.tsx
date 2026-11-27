@@ -2,8 +2,8 @@ import { cn } from "cn";
 import {
   AppWindow,
   Bell,
+  CircleDollarSign,
   Download,
-  Keyboard,
   Layers,
   MonitorSmartphone,
   Plug,
@@ -14,21 +14,21 @@ import {
 import { t, type MessageKey } from "@/i18n";
 import type { SettingsSection } from "@/stores/ui";
 
-interface SettingsNavItem {
+export interface SettingsNavItem {
   id: SettingsSection;
   label: MessageKey;
   icon: LucideIcon;
 }
 
-const NAV_ITEMS: readonly SettingsNavItem[] = [
+export const SETTINGS_SECTIONS: readonly SettingsNavItem[] = [
   { id: "general", label: "settings.navGeneral", icon: SlidersHorizontal },
   { id: "background", label: "settings.navBackground", icon: AppWindow },
   { id: "agents", label: "settings.navAgents", icon: Plug },
+  { id: "costs", label: "settings.navCosts", icon: CircleDollarSign },
   { id: "devices", label: "settings.navDevices", icon: MonitorSmartphone },
   { id: "notifications", label: "settings.navNotifications", icon: Bell },
   { id: "context", label: "settings.navContext", icon: Layers },
   { id: "generic", label: "settings.navGeneric", icon: SquareTerminal },
-  { id: "shortcuts", label: "settings.navShortcuts", icon: Keyboard },
   { id: "updates", label: "settings.navUpdates", icon: Download },
 ];
 
@@ -44,7 +44,7 @@ export function SettingsNav({ active, onSelect }: SettingsNavProps) {
       className="min-w-0 min-[900px]:sticky min-[900px]:top-4 min-[900px]:self-start"
     >
       <ul className="flex gap-1 overflow-x-auto pb-1 min-[900px]:flex-col min-[900px]:overflow-visible min-[900px]:pb-0">
-        {NAV_ITEMS.map((item) => {
+        {SETTINGS_SECTIONS.map((item) => {
           const Icon = item.icon;
           const isActive = item.id === active;
           return (

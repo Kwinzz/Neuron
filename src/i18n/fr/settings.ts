@@ -10,13 +10,13 @@ const settings = {
   // SettingsNav
   navLabel: "Sections des paramètres",
   navGeneral: "Général",
-  navBackground: "Arrière-plan & raccourci",
+  navBackground: "Arrière-plan & raccourcis",
   navAgents: "Agents & MCP",
+  navCosts: "Coûts",
   navDevices: "Appareils",
   navNotifications: "Notifications",
   navContext: "Contexte injecté",
   navGeneric: "CLI génériques",
-  navShortcuts: "Raccourcis",
   navUpdates: "Mises à jour",
 
   // SettingsSkeleton
