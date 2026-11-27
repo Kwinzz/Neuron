@@ -50,21 +50,39 @@ pub async fn update_install(app: tauri::AppHandle, state: State<'_, Shared>) -> 
         });
         Ok(())
     } else if cfg!(target_os = "linux") {
-        let cmd = update::linux_update_command();
-        let latest = &info.latest;
-        let script = crate::tr!(
-            "set -o pipefail; printf '\033[36m%s\033[0m\n\n' 'Mise à jour de Neuron vers {latest}'; \
-             if {cmd}; then printf '\n\033[32m%s\033[0m\n' 'Neuron est à jour : relance-le depuis le menu des applications.'; \
-             read -r -p 'Entrée pour fermer… ' _; exit 0; fi; \
-             printf '\n\033[31m%s\033[0m\n' 'Échec de la mise à jour.'; read -r -p 'Entrée pour fermer… ' _",
-            "set -o pipefail; printf '\033[36m%s\033[0m\n\n' 'Updating Neuron to {latest}'; \
-             if {cmd}; then printf '\n\033[32m%s\033[0m\n' 'Neuron is up to date: start it again from the applications menu.'; \
-             read -r -p 'Press Enter to close… ' _; exit 0; fi; \
-             printf '\n\033[31m%s\033[0m\n' 'Update failed.'; read -r -p 'Press Enter to close… ' _"
-        );
+        let script = update_script(&info.latest, &update::linux_update_command());
         crate::agents::access::open_terminal(&crate::tr!("Neuron — mise à jour", "Neuron — update"), &script)
     } else {
         crate::util::open_with_system(std::path::Path::new(&info.page_url))?;
         Ok(())
+    }
+}
+
+/// Bash run in a terminal window by [`update_install`] on Linux. Escapes are doubled (`\\033`, `\\n`): printf reads
+/// them; a Rust `\0` would put a NUL byte in the argument and the terminal could not be started.
+fn update_script(latest: &str, cmd: &str) -> String {
+    crate::tr!(
+        "set -o pipefail; printf '\\033[36m%s\\033[0m\\n\\n' 'Mise à jour de Neuron vers {latest}'; \
+         if {cmd}; then printf '\\n\\033[32m%s\\033[0m\\n' 'Neuron est à jour : relance-le depuis le menu des applications.'; \
+         read -r -p 'Entrée pour fermer… ' _; exit 0; fi; \
+         printf '\\n\\033[31m%s\\033[0m\\n' 'Échec de la mise à jour.'; read -r -p 'Entrée pour fermer… ' _",
+        "set -o pipefail; printf '\\033[36m%s\\033[0m\\n\\n' 'Updating Neuron to {latest}'; \
+         if {cmd}; then printf '\\n\\033[32m%s\\033[0m\\n' 'Neuron is up to date: start it again from the applications menu.'; \
+         read -r -p 'Press Enter to close… ' _; exit 0; fi; \
+         printf '\\n\\033[31m%s\\033[0m\\n' 'Update failed.'; read -r -p 'Press Enter to close… ' _"
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn update_script_is_a_valid_argument() {
+        let script = update_script("0.2.3+4e2eeec", "bash '/tmp/install.sh' --update --yes");
+        assert!(!script.contains('\0'), "NUL byte in {script:?}");
+        assert!(!script.contains('\n'), "raw newline in {script:?}");
+        assert!(script.starts_with(r"set -o pipefail; printf '\033[36m%s\033[0m\n\n' '"));
+        assert!(script.contains("0.2.3+4e2eeec") && script.contains("if bash '/tmp/install.sh' --update --yes; then"));
     }
 }
