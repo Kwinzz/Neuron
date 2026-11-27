@@ -122,6 +122,8 @@ function upsert(list: TermLine[], line: TermLine): TermLine[] {
 // Streaming text arrives in many small deltas: accumulate them and publish at most once per frame.
 const pendingText = new Map<string, { threadId: string; messageId: string; thinking: boolean; text: string }>();
 const fullText = new Map<string, string>();
+/** Completed messages whose last deltas are still pending: their text is forgotten once those are published. */
+const completedText = new Set<string>();
 let frame: (() => void) | null = null;
 
 export const useActivity = create<ActivityState>((set, get) => {
@@ -135,7 +137,8 @@ export const useActivity = create<ActivityState>((set, get) => {
       for (const p of batch) {
         const key = `${p.threadId}:${p.messageId}`;
         const text = (fullText.get(key) ?? "") + p.text;
-        fullText.set(key, text);
+        if (completedText.delete(key)) fullText.delete(key);
+        else fullText.set(key, text);
         // Directives for another app (`::browser-complete{…}`) are not shown, as in the chat.
         const shown = lastLine(stripAppDirectives(text, true));
         if (!shown) continue;
@@ -180,9 +183,13 @@ export const useActivity = create<ActivityState>((set, get) => {
           if (!frame) frame = nextFrame(flush);
           return;
         }
-        case "MessageCompleted":
-          fullText.delete(`${threadId}:${event.messageId}`);
+        case "MessageCompleted": {
+          // Its last deltas may still wait for the next frame: they are added to the whole text first.
+          const key = `${threadId}:${event.messageId}`;
+          if (pendingText.has(key)) completedText.add(key);
+          else fullText.delete(key);
           return;
+        }
         case "ToolCallStart": {
           push(threadId, {
             ...base,
