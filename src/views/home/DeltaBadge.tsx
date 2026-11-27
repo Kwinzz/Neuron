@@ -1,6 +1,7 @@
 import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { t } from "@/i18n";
+import { formatPercent } from "@/lib/format";
 
 interface DeltaBadgeProps {
   ratio: number | null;
@@ -17,7 +18,8 @@ export function DeltaBadge({ ratio }: DeltaBadgeProps) {
 
   const pct = Math.round(ratio * 100);
   const Icon = pct > 0 ? TrendingUp : pct < 0 ? TrendingDown : Minus;
-  const text = pct > 0 ? `+${pct} %` : pct < 0 ? `\u2212${Math.abs(pct)} %` : "0 %";
+  const sign = pct > 0 ? "+" : pct < 0 ? "\u2212" : "";
+  const text = `${sign}${formatPercent(Math.abs(pct) / 100)}`;
 
   return (
     <Badge variant="outline" className="tabular-nums">

@@ -1,4 +1,4 @@
-import { type PointerEvent, useRef } from "react";
+import { type PointerEvent, useEffect, useRef } from "react";
 import { SidebarRail, useSidebar } from "@/components/ui/sidebar";
 import { t } from "@/i18n";
 import { useLayout } from "@/stores/layout";
@@ -12,6 +12,12 @@ const DRAG_THRESHOLD = 3;
 export function SidebarResizer() {
   const { state, toggleSidebar } = useSidebar();
   const drag = useRef<{ x: number; width: number; moved: boolean } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      delete document.documentElement.dataset.sidebarResizing;
+    };
+  }, []);
 
   const onPointerDown = (e: PointerEvent<HTMLButtonElement>) => {
     if (e.button !== 0) return;

@@ -35,17 +35,19 @@ export const RecentThreadRow = memo(function RecentThreadRow({ thread }: RecentT
     }
   };
 
+  const title = th.title || t("common.untitledChat");
+
   return (
     <TableRow
       tabIndex={0}
-      aria-label={t("home.openChatAria", { title: th.title })}
+      aria-label={t("home.openChatAria", { title })}
       onClick={openThread}
       onKeyDown={handleKeyDown}
       className="cursor-pointer duration-150 outline-none focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
     >
       <TableCell>
         <div className="flex max-w-[280px] items-center gap-1.5">
-          <span className="min-w-0 truncate font-medium">{th.title}</span>
+          <span className="min-w-0 truncate font-medium">{title}</span>
           <DeviceBadge device={device} compact />
         </div>
         <div className="max-w-[280px] truncate text-xs text-muted-foreground">

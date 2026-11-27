@@ -74,7 +74,7 @@ function pastedName(file: File): string {
   if (file.name && file.name !== "image.png") return file.name;
   const ext = file.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
   const stamp = new Date().toLocaleTimeString(locale()).replace(/:/g, "-");
-  return `image-collee-${stamp}.${ext}`;
+  return `pasted-image-${stamp}.${ext}`;
 }
 
 interface ComposerProps {
@@ -457,7 +457,7 @@ export const Composer = memo(function Composer({
               aria-expanded={slashOpen}
               aria-controls={slashOpen ? "slash-menu-listbox" : undefined}
               aria-activedescendant={slashOpen && slashFiltered.length > 0 ? `slash-option-${slashIndex}` : undefined}
-              aria-label="Message"
+              aria-label={t("chat.messageAria")}
               placeholder={placeholder ?? t("chat.composerPlaceholder")}
               className="min-h-0 max-h-[256px] overflow-y-auto px-3.5 pt-3 text-sm leading-6 field-sizing-fixed"
             />

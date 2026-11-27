@@ -42,7 +42,7 @@ export function SiteHeader() {
       className="flex h-(--header-height) shrink-0 select-none items-center gap-2 border-b transition-[width,height] ease-linear"
     >
       <div data-tauri-drag-region className="flex w-full min-w-0 items-center gap-1 pl-4 pr-2 lg:gap-2 lg:pl-6">
-        <SidebarTrigger className="-ml-1" />
+        <SidebarTrigger className="-ml-1" aria-label={t("shell.scSidebar")} title={t("shell.scSidebar")} />
         <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
         <nav data-tauri-drag-region aria-label={t("shell.breadcrumb")} className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
           <span data-tauri-drag-region key={section} className="shrink-0 text-muted-foreground animate-in fade-in-0 slide-in-from-bottom-1 duration-200 ease-snappy">{section}</span>

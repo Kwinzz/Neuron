@@ -236,7 +236,6 @@ const settings = {
   devicesPairDescription:
     "Générez un code temporaire valable 2 minutes pour autoriser un autre appareil à piloter celui-ci.",
   devicesPairAction: "Appairer un appareil",
-  devicesPairStartFailed: "Impossible de démarrer l'appairage",
   devicesPairCancelFailed: "Impossible d'annuler l'appairage",
   devicesPairInstructions:
     "Sur l'autre appareil : Paramètres → Appareils → Ajouter un appareil, puis tapez ce code.",

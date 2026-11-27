@@ -1,4 +1,4 @@
-import { memo, type ReactNode, useState } from "react";
+import { memo, type ReactNode, useEffect, useRef, useState } from "react";
 import { Check, ChevronRight, Copy, FileText } from "lucide-react";
 import { cn } from "cn";
 import { Markdown } from "@/components/markdown/Markdown";
@@ -36,14 +36,25 @@ export const MarkdownFileCard = memo(function MarkdownFileCard({
   const [source, setSource] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<number | null>(null);
   const long = content.split("\n").length > FOLD_LINES;
   const folded = long && !expanded;
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(content);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
+      if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = window.setTimeout(() => {
+        copyTimerRef.current = null;
+        setCopied(false);
+      }, 1500);
     } catch {
       toast({ tone: "danger", title: t("chat.copyFailed") });
     }

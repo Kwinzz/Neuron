@@ -3,7 +3,7 @@ import { cn } from "cn";
 import { ClipboardPaste, FolderOpen, SquareTerminal } from "lucide-react";
 import type { MemoryImportOrigin } from "@/bindings/MemoryImportOrigin";
 import { Button } from "@/components/ui/button";
-import { Kbd } from "@/components/ui/Kbd";
+import { Kbd, MOD_LABEL } from "@/components/ui/Kbd";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -131,7 +131,7 @@ export function ImportSourceStep({
               </span>
             )}
             <span className="hidden items-center gap-1 sm:inline-flex">
-              <Kbd>Ctrl</Kbd>
+              <Kbd>{MOD_LABEL}</Kbd>
               <span>+</span>
               <Kbd>{t("memory.keyEnter")}</Kbd>
               <span>{t("memory.toContinue")}</span>

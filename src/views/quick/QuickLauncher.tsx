@@ -68,8 +68,22 @@ export function QuickLauncher() {
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const hideTimerRef = useRef<number | null>(null);
+  const focusTimerRef = useRef<number | null>(null);
+
+  const scheduleFocus = useCallback(() => {
+    if (focusTimerRef.current !== null) window.clearTimeout(focusTimerRef.current);
+    focusTimerRef.current = window.setTimeout(() => {
+      focusTimerRef.current = null;
+      inputRef.current?.focus();
+    }, 0);
+  }, []);
 
   const reset = useCallback(() => {
+    if (hideTimerRef.current !== null) {
+      window.clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
     setText("");
     setSelected(0);
     setChoiceState(initialChoice());
@@ -87,8 +101,8 @@ export function QuickLauncher() {
       .listProjects()
       .then(setProjects)
       .catch(() => setProjects([]));
-    window.setTimeout(() => inputRef.current?.focus(), 0);
-  }, []);
+    scheduleFocus();
+  }, [scheduleFocus]);
 
   useEffect(() => {
     document.documentElement.classList.add("quick-window");
@@ -105,6 +119,14 @@ export function QuickLauncher() {
     return () => {
       disposed = true;
       unlisten?.();
+      if (hideTimerRef.current !== null) {
+        window.clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = null;
+      }
+      if (focusTimerRef.current !== null) {
+        window.clearTimeout(focusTimerRef.current);
+        focusTimerRef.current = null;
+      }
     };
   }, [reset]);
 
@@ -170,7 +192,11 @@ export function QuickLauncher() {
         return;
       }
       setState("sent");
-      window.setTimeout(() => void quickWindow.hide(), 650);
+      if (hideTimerRef.current !== null) window.clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = window.setTimeout(() => {
+        hideTimerRef.current = null;
+        void quickWindow.hide();
+      }, 650);
     } catch (err) {
       setState("idle");
       setError(ipcErrorMessage(err));
@@ -278,7 +304,7 @@ export function QuickLauncher() {
                   open={projectOpen}
                   onOpenChange={(open) => {
                     setProjectOpen(open);
-                    if (!open) window.setTimeout(() => inputRef.current?.focus(), 0);
+                    if (!open) scheduleFocus();
                   }}
                   onChange={setProjectId}
                 />
@@ -289,7 +315,7 @@ export function QuickLauncher() {
                   onOpenChange={(open) => {
                     setPickerOpen(open);
                     if (open) setSelected(0);
-                    else window.setTimeout(() => inputRef.current?.focus(), 0);
+                    else scheduleFocus();
                   }}
                   listClassName="max-h-52"
                   onChange={(nextAgent, next) => {

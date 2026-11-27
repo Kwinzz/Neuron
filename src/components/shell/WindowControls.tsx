@@ -71,7 +71,7 @@ function ControlButton({
       className={cn(
         "flex h-8 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        danger ? "hover:bg-destructive hover:text-white" : "hover:bg-accent hover:text-foreground",
+        danger ? "hover:bg-destructive hover:text-foreground" : "hover:bg-accent hover:text-foreground",
       )}
     >
       {children}

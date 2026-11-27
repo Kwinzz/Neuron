@@ -41,6 +41,13 @@ export function DevicePairingCard() {
 
   const prevPairingRef = useRef<PairingCode | null>(null);
   const clientsBeforePairingRef = useRef<Set<string> | null>(null);
+  const copyTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const prevPairing = prevPairingRef.current;
@@ -105,7 +112,11 @@ export function DevicePairingCard() {
     try {
       await navigator.clipboard.writeText(invite);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
+      if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = window.setTimeout(() => {
+        copyTimerRef.current = null;
+        setCopied(false);
+      }, 1500);
     } catch {
       setCopied(false);
     }

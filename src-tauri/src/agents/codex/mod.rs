@@ -210,6 +210,7 @@ async fn session_loop(
         }
 
         let code = child.wait().await.ok().and_then(|s| s.code());
+        turn_pid.store(0, std::sync::atomic::Ordering::Relaxed);
         if !completed {
             let stderr_tail = tail.await.unwrap_or_default();
             let detail = stderr_tail.lines().rev().find(|l| !l.trim().is_empty()).map(str::trim).unwrap_or("");

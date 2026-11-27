@@ -8,6 +8,8 @@
 
 use std::time::{Duration, Instant};
 
+use crate::agents::events::{SubagentSource, SubagentStatus};
+
 /// Agent CLIs by program name → key shown by the UI (`claude`, `codex`, `antigravity`, `gemini`, or the name).
 const PROGRAMS: &[(&str, &str)] = &[
     ("claude", "claude"),
@@ -280,23 +282,28 @@ pub enum TrackerUpdate {
     /// A sub-agent process appeared. `merged`: it is the one a command already announced (same id).
     Started { id: String, agent: ProcAgent, merged: bool },
     /// A sub-agent process (or a background command never seen as a process) ended.
-    Ended { id: String },
+    Ended { id: String, source: SubagentSource },
 }
 
 #[derive(Debug)]
 struct Tracked {
     id: String,
-    key: &'static str,
+    source: SubagentSource,
+    key: Option<&'static str>,
     pid: Option<u32>,
     background: bool,
     /// When the launching tool call returned (a background command keeps running after it).
     returned_at: Option<Instant>,
+    /// When a foreground command's process disappeared from the process tree (grace before forcing end).
+    gone_at: Option<Instant>,
 }
 
 /// A background command whose process never showed up is considered over after this long.
 const UNSEEN_BACKGROUND_TTL: Duration = Duration::from_secs(15);
+/// Grace period after a foreground command's sub-agent process exits before ending it if the tool hasn't returned.
+const FOREGROUND_GONE_TTL: Duration = Duration::from_secs(6);
 
-/// Sub-agents of one session, from commands and processes (one entry each).
+/// Sub-agents of one session, from commands, processes and native tasks (one entry each).
 #[derive(Debug, Default)]
 pub struct SubagentTracker {
     entries: Vec<Tracked>,
@@ -304,17 +311,72 @@ pub struct SubagentTracker {
 
 impl SubagentTracker {
     pub fn command_started(&mut self, id: &str, key: &'static str, background: bool) {
-        self.entries.push(Tracked { id: id.to_string(), key, pid: None, background, returned_at: None });
+        self.entries.push(Tracked {
+            id: id.to_string(),
+            source: SubagentSource::Command,
+            key: Some(key),
+            pid: None,
+            background,
+            returned_at: None,
+            gone_at: None,
+        });
+    }
+
+    /// Track a native sub-agent launched by an agent tool (`Agent` / `Task`).
+    pub fn task_started(&mut self, id: &str, background: bool) {
+        if let Some(entry) = self.entries.iter_mut().find(|e| e.id == id) {
+            entry.background = background;
+            return;
+        }
+        self.entries.push(Tracked {
+            id: id.to_string(),
+            source: SubagentSource::Task,
+            key: None,
+            pid: None,
+            background,
+            returned_at: None,
+            gone_at: None,
+        });
+    }
+
+    /// Record a status update for a native (`Task`) sub-agent so turn-end / stop cleanup knows what is still running.
+    pub fn task_update(&mut self, id: &str, status: SubagentStatus) {
+        if status == SubagentStatus::Running {
+            if !self.entries.iter().any(|e| e.id == id) {
+                self.entries.push(Tracked {
+                    id: id.to_string(),
+                    source: SubagentSource::Task,
+                    key: None,
+                    pid: None,
+                    background: true,
+                    returned_at: None,
+                    gone_at: None,
+                });
+            }
+        } else {
+            self.entries.retain(|e| e.id != id);
+        }
+    }
+
+    /// The launching tool call of a foreground native task returned.
+    pub fn task_returned(&mut self, id: &str) {
+        self.entries.retain(|e| !(e.id == id && e.source == SubagentSource::Task && !e.background));
     }
 
     pub fn is_tracked(&self, id: &str) -> bool {
         self.entries.iter().any(|e| e.id == id)
     }
 
+    pub fn is_tracked_command(&self, id: &str) -> bool {
+        self.entries.iter().any(|e| e.id == id && e.source == SubagentSource::Command)
+    }
+
     /// The launching tool call returned. `true`: the sub-agent is over (foreground command); `false`: a
     /// background command, still running until its process ends.
     pub fn command_returned(&mut self, id: &str, now: Instant) -> bool {
-        let Some(index) = self.entries.iter().position(|e| e.id == id) else { return true };
+        let Some(index) = self.entries.iter().position(|e| e.id == id && e.source == SubagentSource::Command) else {
+            return true;
+        };
         if self.entries[index].background {
             self.entries[index].returned_at = Some(now);
             return false;
@@ -323,37 +385,63 @@ impl SubagentTracker {
         true
     }
 
+    /// Drain every still-running sub-agent (called when the parent turn ends or the chat stops / exits).
+    pub fn finish_all(&mut self) -> Vec<(String, SubagentSource)> {
+        self.entries.drain(..).map(|e| (e.id, e.source)).collect()
+    }
+
     /// Compares with the agent processes now running under the session.
     pub fn processes(&mut self, seen: &[ProcAgent], now: Instant) -> Vec<TrackerUpdate> {
         let mut updates = Vec::new();
         for agent in seen {
-            if self.entries.iter().any(|e| e.pid == Some(agent.pid)) {
+            if let Some(entry) = self.entries.iter_mut().find(|e| e.pid == Some(agent.pid)) {
+                entry.gone_at = None;
                 continue;
             }
-            if let Some(entry) = self.entries.iter_mut().find(|e| e.pid.is_none() && e.key == agent.key) {
+            if let Some(entry) = self
+                .entries
+                .iter_mut()
+                .find(|e| e.source != SubagentSource::Task && e.pid.is_none() && e.key == Some(agent.key))
+            {
                 entry.pid = Some(agent.pid);
+                entry.gone_at = None;
                 updates.push(TrackerUpdate::Started { id: entry.id.clone(), agent: agent.clone(), merged: true });
             } else {
                 let id = format!("proc:{}", agent.pid);
                 self.entries.push(Tracked {
                     id: id.clone(),
-                    key: agent.key,
+                    source: SubagentSource::Process,
+                    key: Some(agent.key),
                     pid: Some(agent.pid),
                     background: true,
                     returned_at: None,
+                    gone_at: None,
                 });
                 updates.push(TrackerUpdate::Started { id, agent: agent.clone(), merged: false });
             }
         }
-        self.entries.retain(|e| {
-            let gone = match e.pid {
-                Some(pid) => !seen.iter().any(|a| a.pid == pid),
+        self.entries.retain_mut(|e| {
+            if e.source == SubagentSource::Task {
+                return true;
+            }
+            let ended = match e.pid {
+                Some(pid) => {
+                    if seen.iter().any(|a| a.pid == pid) {
+                        e.gone_at = None;
+                        false
+                    } else if e.background {
+                        true
+                    } else {
+                        // A foreground command's process may end just before its tool call returns: give the tool
+                        // call a short grace period, then end it anyway if the shell keeps running something else.
+                        let since = *e.gone_at.get_or_insert(now);
+                        now.duration_since(since) >= FOREGROUND_GONE_TTL
+                    }
+                }
                 None => e.returned_at.is_some_and(|t| now.duration_since(t) >= UNSEEN_BACKGROUND_TTL),
             };
-            // A foreground command's process may end just before its tool call returns: the call ends it.
-            let ended = gone && (e.background || e.pid.is_none());
             if ended {
-                updates.push(TrackerUpdate::Ended { id: e.id.clone() });
+                updates.push(TrackerUpdate::Ended { id: e.id.clone(), source: e.source });
             }
             !ended
         });
@@ -437,19 +525,71 @@ mod tests {
         // An agy started by a script nobody announced.
         let up = tracker.processes(&[proc(20, "antigravity")], t0);
         assert!(matches!(&up[..], [TrackerUpdate::Started { id, merged: false, .. }] if id == "proc:20"));
-        assert_eq!(tracker.processes(&[], t0), vec![TrackerUpdate::Ended { id: "proc:20".into() }]);
+        assert_eq!(
+            tracker.processes(&[], t0),
+            vec![TrackerUpdate::Ended { id: "proc:20".into(), source: SubagentSource::Process }]
+        );
 
         // Background command: stays running after its call returned, ends with its process.
         tracker.command_started("call-2", "gemini", true);
         assert!(!tracker.command_returned("call-2", t0));
         tracker.processes(&[proc(30, "gemini")], t0);
-        assert_eq!(tracker.processes(&[], t0), vec![TrackerUpdate::Ended { id: "call-2".into() }]);
+        assert_eq!(
+            tracker.processes(&[], t0),
+            vec![TrackerUpdate::Ended { id: "call-2".into(), source: SubagentSource::Command }]
+        );
 
         // Background command never seen as a process: ended after the grace period.
         tracker.command_started("call-3", "claude", true);
         tracker.command_returned("call-3", t0);
         assert!(tracker.processes(&[], t0).is_empty());
         let later = t0 + UNSEEN_BACKGROUND_TTL;
-        assert_eq!(tracker.processes(&[], later), vec![TrackerUpdate::Ended { id: "call-3".into() }]);
+        assert_eq!(
+            tracker.processes(&[], later),
+            vec![TrackerUpdate::Ended { id: "call-3".into(), source: SubagentSource::Command }]
+        );
+    }
+
+    #[test]
+    fn tracker_ends_stale_foreground_process_and_finishes_all_on_turn_end() {
+        let t0 = Instant::now();
+        let mut tracker = SubagentTracker::default();
+
+        // Foreground command whose sub-agent process exits while the shell keeps running: ends after grace.
+        tracker.command_started("fg-1", "codex", false);
+        tracker.processes(&[proc(40, "codex")], t0);
+        assert!(tracker.processes(&[], t0).is_empty());
+        assert_eq!(
+            tracker.processes(&[], t0 + FOREGROUND_GONE_TTL),
+            vec![TrackerUpdate::Ended { id: "fg-1".into(), source: SubagentSource::Command }]
+        );
+        assert!(!tracker.is_tracked("fg-1"));
+
+        // Native tasks: foreground ends on tool return; background stays until task_update or finish_all.
+        tracker.task_started("task-fg", false);
+        tracker.task_started("task-bg", true);
+        tracker.task_update("agy:1:0", SubagentStatus::Running);
+        // Process ticks never prematurely end native tasks.
+        assert!(tracker.processes(&[], t0 + UNSEEN_BACKGROUND_TTL).is_empty());
+        tracker.task_returned("task-fg");
+        assert!(!tracker.is_tracked("task-fg"));
+        assert!(tracker.is_tracked("task-bg"));
+        tracker.task_returned("task-bg");
+        assert!(tracker.is_tracked("task-bg"));
+
+        // Also a running command and process sub-agent still active when the turn ends / chat stops.
+        tracker.command_started("cmd-1", "gemini", true);
+        tracker.processes(&[proc(50, "antigravity")], t0);
+        let ended = tracker.finish_all();
+        assert_eq!(
+            ended,
+            vec![
+                ("task-bg".into(), SubagentSource::Task),
+                ("agy:1:0".into(), SubagentSource::Task),
+                ("cmd-1".into(), SubagentSource::Command),
+                ("proc:50".into(), SubagentSource::Process),
+            ]
+        );
+        assert!(tracker.finish_all().is_empty());
     }
 }

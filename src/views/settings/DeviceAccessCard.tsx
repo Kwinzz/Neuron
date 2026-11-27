@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { MonitorSmartphone } from "lucide-react";
 import {
   Card,
@@ -29,6 +29,7 @@ export function DeviceAccessCard() {
   const [savingEnabled, setSavingEnabled] = useState(false);
   const [savingInternet, setSavingInternet] = useState(false);
   const [savingName, setSavingName] = useState(false);
+  const skipBlurRef = useRef(false);
 
   useEffect(() => {
     setNameDraft(savedName);
@@ -67,6 +68,10 @@ export function DeviceAccessCard() {
   };
 
   const commitName = async () => {
+    if (skipBlurRef.current) {
+      skipBlurRef.current = false;
+      return;
+    }
     if (!tauri || savingName) return;
     const trimmed = nameDraft.trim();
     if (!trimmed) {
@@ -96,6 +101,7 @@ export function DeviceAccessCard() {
     if (e.key === "Enter") {
       e.currentTarget.blur();
     } else if (e.key === "Escape") {
+      skipBlurRef.current = true;
       setNameDraft(savedName);
       e.currentTarget.blur();
     }

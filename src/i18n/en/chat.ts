@@ -25,6 +25,7 @@ const chat: Translation<typeof fr> = {
   runOnLabel: "Run on",
 
   // Composer
+  messageAria: "Message",
   composerPlaceholder: "Ask the agent something… (Enter to send, Shift+Enter for a new line, ↑ history)",
   attachFiles: "Attach files",
   attachFilesHint: "Attach files (or paste an image)",
@@ -157,6 +158,7 @@ const chat: Translation<typeof fr> = {
   commandUsedSuffix: "command",
 
   // ChatSettingsBar
+  permissions: "Permissions",
   reasoningLevel: "Reasoning level",
   reasoning: "Reasoning",
   byDefault: "Default",

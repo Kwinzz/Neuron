@@ -36,6 +36,7 @@ export function GeneralSection({ settings }: GeneralSectionProps) {
 
   const [customDraft, setCustomDraft] = useState(() => (isPreset ? "" : String(minutes)));
   const radioRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const skipBlurRef = useRef(false);
 
   useEffect(() => {
     setCustomDraft(PRESET_VALUES.has(minutes) ? "" : String(minutes));
@@ -47,6 +48,10 @@ export function GeneralSection({ settings }: GeneralSectionProps) {
   };
 
   const commitCustom = () => {
+    if (skipBlurRef.current) {
+      skipBlurRef.current = false;
+      return;
+    }
     const trimmed = customDraft.trim();
     if (!trimmed) {
       setCustomDraft(isPreset ? "" : String(minutes));
@@ -157,6 +162,7 @@ export function GeneralSection({ settings }: GeneralSectionProps) {
                       e.preventDefault();
                       commitCustom();
                     } else if (e.key === "Escape") {
+                      skipBlurRef.current = true;
                       setCustomDraft(isPreset ? "" : String(minutes));
                       e.currentTarget.blur();
                     }

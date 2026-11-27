@@ -55,7 +55,7 @@ export function CodeBlock({ children }: { children?: ReactNode }) {
   return (
     <div className="md-code my-3 overflow-hidden rounded-lg border bg-muted/40 animate-in fade-in-0 slide-in-from-bottom-1 zoom-in-[0.99] duration-300">
       <div className="flex h-8 items-center justify-between border-b px-3">
-        <span className="font-mono text-xs text-muted-foreground">{language ?? "texte"}</span>
+        <span className="font-mono text-xs text-muted-foreground">{language ?? t("common.plainText")}</span>
         <Button
           variant="ghost"
           size="xs"

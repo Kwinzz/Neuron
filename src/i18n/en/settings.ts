@@ -235,7 +235,6 @@ const settings: Translation<typeof fr> = {
   devicesPairDescription:
     "Generate a temporary code valid for 2 minutes to allow another device to control this one.",
   devicesPairAction: "Pair a device",
-  devicesPairStartFailed: "Couldn't start pairing",
   devicesPairCancelFailed: "Couldn't cancel pairing",
   devicesPairInstructions:
     "On the other device: Settings → Devices → Add a device, then enter this code.",

@@ -157,6 +157,18 @@ fn cli_subagent_event(tool_call_id: String, status: SubagentStatus, source: Suba
     }
 }
 
+/// Emit finished updates for any sub-agents still tracked when a turn ends or a chat stops / exits.
+fn finish_subagents(
+    events: &dyn EventSink,
+    thread_id: &str,
+    entries: Vec<(String, SubagentSource)>,
+    status: SubagentStatus,
+) {
+    for (id, source) in entries {
+        emit(events, thread_id, cli_subagent_event(id, status, source));
+    }
+}
+
 /// Command lines shown in the UI are cut to this many characters.
 const COMMAND_SHOWN: usize = 400;
 
@@ -588,7 +600,7 @@ impl AgentRegistry {
                 if let Some(pid) = pid {
                     kill_process_tree(pid);
                 }
-                registry.lock().remove(&id);
+                let dangling = registry.lock().remove(&id).map(|mut s| s.subagents.finish_all()).unwrap_or_default();
                 let tid = id.clone();
                 let _ = db
                     .call(move |c| {
@@ -597,6 +609,7 @@ impl AgentRegistry {
                         threads::set_status(c, &tid, ThreadStatus::Cancelled, now)
                     })
                     .await;
+                finish_subagents(events.as_ref(), &id, dangling, SubagentStatus::Failed);
                 emit(
                     events.as_ref(),
                     &id,
@@ -669,9 +682,7 @@ impl AgentRegistry {
                     }
                     event
                 }
-                TrackerUpdate::Ended { id } => {
-                    cli_subagent_event(id, SubagentStatus::Completed, SubagentSource::Process)
-                }
+                TrackerUpdate::Ended { id, source } => cli_subagent_event(id, SubagentStatus::Completed, source),
             };
             emit(events, &thread, event);
         }
@@ -820,6 +831,7 @@ impl AgentRegistry {
                         .then(|| subagents::shell_command(&input))
                         .flatten()
                         .and_then(|cmd| subagents::detect_cli(cmd).map(|found| (found, shorten(cmd))));
+                    let is_task_launcher = matches!(name.as_str(), "Agent" | "Task");
                     let background = input.get("run_in_background").and_then(Value::as_bool).unwrap_or(false);
                     let (status, detail) = tool_activity(&name, &input);
                     {
@@ -837,7 +849,11 @@ impl AgentRegistry {
                             parent_tool_call_id: parent_id,
                         },
                     );
-                    if let Some((found, command_line)) = launched {
+                    if is_task_launcher {
+                        if let Some(s) = self.lock().get_mut(&id) {
+                            s.subagents.task_started(&tool_id, background);
+                        }
+                    } else if let Some((found, command_line)) = launched {
                         if let Some(s) = self.lock().get_mut(&id) {
                             s.subagents.command_started(&tool_id, found.key, background);
                         }
@@ -860,11 +876,19 @@ impl AgentRegistry {
                 }
                 AdapterEvent::ToolCallResult { id: tool_id, output, is_error } => {
                     // The command of a sub-agent returned: over, unless it runs in the background.
-                    let returned = self
-                        .lock()
-                        .get_mut(&id)
-                        .filter(|s| s.subagents.is_tracked(&tool_id))
-                        .map(|s| s.subagents.command_returned(&tool_id, Instant::now()));
+                    let returned = {
+                        let mut sessions = self.lock();
+                        if let Some(s) = sessions.get_mut(&id) {
+                            if s.subagents.is_tracked_command(&tool_id) {
+                                Some(s.subagents.command_returned(&tool_id, Instant::now()))
+                            } else {
+                                s.subagents.task_returned(&tool_id);
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    };
                     if let Some(over) = returned {
                         let status = match (over, is_error) {
                             (false, _) => SubagentStatus::Running,
@@ -926,11 +950,13 @@ impl AgentRegistry {
                         }
                     }
                     let mut wall_ms = None;
+                    let mut dangling_subs = Vec::new();
                     if let Some(s) = self.lock().get_mut(&id).filter(|s| s.generation == generation) {
                         s.busy = false;
                         s.idle_since = Instant::now();
                         wall_ms =
                             s.turn_started.take().map(|t| i64::try_from(t.elapsed().as_millis()).unwrap_or(i64::MAX));
+                        dangling_subs = s.subagents.finish_all();
                     }
                     // Total time of the request as the user lived it (send → answer, approvals included);
                     // the CLI's own figure when Neuron didn't see the start (resumed process).
@@ -980,6 +1006,9 @@ impl AgentRegistry {
                         };
                         emit(sink, &id, AgentEvent::TurnSummary { outcome, summary });
                     }
+                    let sub_status =
+                        if stopped || error.is_some() { SubagentStatus::Failed } else { SubagentStatus::Completed };
+                    finish_subagents(sink, &id, dangling_subs, sub_status);
                     let status = if stopped {
                         ThreadStatus::Cancelled
                     } else if let Some(message) = error {
@@ -1012,6 +1041,9 @@ impl AgentRegistry {
                     parent_id,
                     output,
                 } => {
+                    if let Some(s) = self.lock().get_mut(&id) {
+                        s.subagents.task_update(&tool_call_id, status);
+                    }
                     emit(
                         sink,
                         &id,
@@ -1034,17 +1066,22 @@ impl AgentRegistry {
                 }
                 AdapterEvent::Warning(w) => tracing::debug!(thread = %id, "{w}"),
                 AdapterEvent::Exited { code, stderr_tail } => {
-                    let (stopped, shutdown) = {
+                    let (stopped, shutdown, dangling_subs) = {
                         let mut sessions = self.lock();
                         let flags = match sessions.get(&id) {
                             Some(s) if s.generation == generation => (s.stop_requested, s.shutdown_requested),
                             _ => (false, true),
                         };
-                        if sessions.get(&id).is_some_and(|s| s.generation == generation) {
-                            sessions.remove(&id);
-                        }
-                        flags
+                        let dangling = if sessions.get(&id).is_some_and(|s| s.generation == generation) {
+                            sessions.remove(&id).map(|mut s| s.subagents.finish_all()).unwrap_or_default()
+                        } else {
+                            Vec::new()
+                        };
+                        (flags.0, flags.1, dangling)
                     };
+                    if !shutdown {
+                        finish_subagents(sink, &id, dangling_subs, SubagentStatus::Failed);
+                    }
                     let was_active = last_status.as_ref().is_some_and(|(s, _)| s.is_active());
                     tracing::info!(thread = %id, ?code, was_active, "agent session exited");
                     if stopped && !shutdown {

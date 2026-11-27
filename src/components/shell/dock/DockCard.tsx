@@ -115,7 +115,7 @@ export const DockCard = memo(function DockCard({ id }: { id: string }) {
             ) : (
               <GitFork className="size-3" aria-hidden />
             )}
-            {t("shell.subagentCount", { n: subList.length })}
+            {t("shell.subagentCount", { n: runningSubagents })}
             <ChevronDown
               className={cn("size-3 transition-transform duration-150", expanded && "rotate-180")}
               aria-hidden

@@ -157,7 +157,7 @@ export function AddDeviceDialog({ open, onOpenChange }: AddDeviceDialogProps) {
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!submitting) onOpenChange(next);
+        if (!submitting && !inviteSubmitting) onOpenChange(next);
       }}
     >
       <DialogContent className="sm:max-w-md">
@@ -278,7 +278,12 @@ export function AddDeviceDialog({ open, onOpenChange }: AddDeviceDialogProps) {
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={inviteSubmitting}
+                onClick={() => onOpenChange(false)}
+              >
                 {t("common.cancel")}
               </Button>
             </DialogFooter>

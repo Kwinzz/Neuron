@@ -26,6 +26,8 @@ import {
 import { MOD_LABEL } from "@/components/ui/Kbd";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { t } from "@/i18n";
+import { AGENTS } from "@/lib/agents";
+import { readChatDefaults } from "@/lib/chatDefaults";
 import { formatRelative } from "@/lib/format";
 import { fuzzyScore, normalize } from "@/lib/fuzzy";
 import { ipcErrorMessage } from "@/lib/ipc";
@@ -74,6 +76,8 @@ function useCommands(): Command[] {
     useShallow((s) => Object.values(s.threads).sort((a, b) => b.updatedAt - a.updatedAt)),
   );
 
+  const defaultAgentLabel = (AGENTS[readChatDefaults().agent] ?? AGENTS.claude_code).label;
+
   return useMemo(() => {
     const openThread = (id: string) => {
       ui().focusThread(id);
@@ -86,7 +90,7 @@ function useCommands(): Command[] {
         id: "thread:new",
         group: t("shell.paletteGroupActions"),
         title: t("shell.navNewChat"),
-        subtitle: t("shell.paletteNewChatSubtitle"),
+        subtitle: t("shell.paletteNewChatSubtitle", { agent: defaultAgentLabel }),
         keywords: t("shell.paletteNewChatKeywords"),
         icon: <Plus size={15} />,
         hint: <CommandShortcut>{MOD_LABEL}+N</CommandShortcut>,
@@ -180,7 +184,7 @@ function useCommands(): Command[] {
     }
 
     return list;
-  }, [dockOpen, projects, threads, ui]);
+  }, [defaultAgentLabel, dockOpen, projects, threads, ui]);
 }
 
 function filterCommands(commands: Command[], query: string): Command[] {

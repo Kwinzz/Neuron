@@ -104,7 +104,7 @@ export const ChatSettingsBar = memo(function ChatSettingsBar({
                 size="sm"
                 className={cn(TRIGGER, shownMode === "bypassPermissions" && "text-warn hover:text-warn")}
                 disabled={disabled}
-                aria-label="Permissions"
+                aria-label={t("chat.permissions")}
               >
                 <ShieldCheck className="size-3.5" />
                 {permissionLabel(shownMode)}
@@ -112,7 +112,7 @@ export const ChatSettingsBar = memo(function ChatSettingsBar({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-72">
-              <DropdownMenuLabel className="text-xs text-muted-foreground">Permissions</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-xs text-muted-foreground">{t("chat.permissions")}</DropdownMenuLabel>
               <DropdownMenuRadioGroup
                 value={shownMode}
                 onValueChange={(v) => (plan ? setExecMode(v) : onChange({ ...value, permissionMode: v }))}

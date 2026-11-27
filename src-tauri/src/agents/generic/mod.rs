@@ -329,6 +329,7 @@ async fn session_loop(
             }
         }
         drop(turn._keep.take());
+        turn_pid.store(0, std::sync::atomic::Ordering::Relaxed);
 
         let text = full.trim_end().to_string();
         if !text.is_empty() {

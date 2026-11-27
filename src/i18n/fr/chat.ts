@@ -25,6 +25,7 @@ const chat = {
   runOnLabel: "Exécuter sur",
 
   // Composer
+  messageAria: "Message",
   composerPlaceholder:
     "Demandez quelque chose à l'agent… (Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne, ↑ historique)",
   attachFiles: "Joindre des fichiers",
@@ -160,6 +161,7 @@ const chat = {
   commandUsedSuffix: "utilisée",
 
   // ChatSettingsBar
+  permissions: "Permissions",
   reasoningLevel: "Niveau de raisonnement",
   reasoning: "Raisonnement",
   byDefault: "Par défaut",

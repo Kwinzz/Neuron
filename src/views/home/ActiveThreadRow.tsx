@@ -5,6 +5,7 @@ import { AgentBadge } from "@/components/ui/AgentBadge";
 import { DeviceBadge } from "@/components/ui/DeviceBadge";
 import { LiveTimer } from "@/components/ui/LiveTimer";
 import { StatusIconBox } from "@/components/ui/StatusIconBox";
+import { t as tr } from "@/i18n";
 import { deviceOfThread } from "@/lib/deviceRouting";
 import { formatTokens } from "@/lib/format";
 import { describeStatus, STATUS, TONE_TEXT } from "@/lib/status";
@@ -40,7 +41,7 @@ export const ActiveThreadRow = memo(function ActiveThreadRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-1.5">
-          <p className="min-w-0 truncate font-medium">{t.title}</p>
+          <p className="min-w-0 truncate font-medium">{t.title || tr("common.untitledChat")}</p>
           <DeviceBadge device={device} compact />
         </div>
         <p className={cn("truncate text-xs", TONE_TEXT[meta.tone])}>

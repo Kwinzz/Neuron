@@ -7,8 +7,10 @@ import { create } from "zustand";
 import type { AgentEventEnvelope } from "@/bindings/AgentEventEnvelope";
 import type { SubagentSource } from "@/bindings/SubagentSource";
 import type { SubagentStatus } from "@/bindings/SubagentStatus";
+import { t } from "@/i18n";
 import { nextFrame } from "@/lib/frame";
 import { stripAppDirectives } from "@/lib/appDirectives";
+import { STATUS } from "@/lib/status";
 
 export type TermLineKind = "tool" | "text" | "thinking" | "permission" | "status" | "error";
 export type TermLineState = "running" | "ok" | "error";
@@ -62,6 +64,8 @@ interface ActivityState {
 /** Lines kept per chat (sub-agent lines included). */
 const MAX_LINES = 120;
 const MAX_TEXT = 220;
+/** How long a finished sub-agent stays visible before disappearing from the dock card. */
+const FINISHED_LINGER_MS = 3_000;
 /** Tools that launch a sub-agent (Claude Code). */
 const LAUNCHERS = new Set(["Agent", "Task"]);
 
@@ -125,6 +129,29 @@ const fullText = new Map<string, string>();
 /** Completed messages whose last deltas are still pending: their text is forgotten once those are published. */
 const completedText = new Set<string>();
 let frame: (() => void) | null = null;
+/** Pending removals for finished sub-agents, keyed by `<threadId>\0<subId>`. */
+const pruneTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+const pruneKey = (threadId: string, subId: string) => `${threadId}\0${subId}`;
+
+function cancelPrune(threadId: string, subId: string): void {
+  const key = pruneKey(threadId, subId);
+  const timer = pruneTimers.get(key);
+  if (timer !== undefined) {
+    clearTimeout(timer);
+    pruneTimers.delete(key);
+  }
+}
+
+function cancelAllPrunes(threadId: string): void {
+  const prefix = `${threadId}\0`;
+  for (const [key, timer] of pruneTimers) {
+    if (key.startsWith(prefix)) {
+      clearTimeout(timer);
+      pruneTimers.delete(key);
+    }
+  }
+}
 
 export const useActivity = create<ActivityState>((set, get) => {
   const flush = () => {
@@ -167,6 +194,32 @@ export const useActivity = create<ActivityState>((set, get) => {
       subagents: { ...state.subagents, [threadId]: { ...(state.subagents[threadId] ?? EMPTY_SUBAGENTS), [info.id]: info } },
     }));
 
+  const schedulePrune = (threadId: string, subId: string) => {
+    cancelPrune(threadId, subId);
+    const key = pruneKey(threadId, subId);
+    pruneTimers.set(
+      key,
+      setTimeout(() => {
+        pruneTimers.delete(key);
+        set((state) => {
+          const map = state.subagents[threadId];
+          const current = map?.[subId];
+          if (!map || !current || current.status === "running") return state;
+          const nextMap = { ...map };
+          delete nextMap[subId];
+          const subagents = { ...state.subagents };
+          if (Object.keys(nextMap).length === 0) delete subagents[threadId];
+          else subagents[threadId] = nextMap;
+          const prevLines = state.lines[threadId];
+          const nextLines = prevLines?.some((l) => l.parentId === subId)
+            ? { ...state.lines, [threadId]: prevLines.filter((l) => l.parentId !== subId) }
+            : state.lines;
+          return { subagents, lines: nextLines };
+        });
+      }, FINISHED_LINGER_MS),
+    );
+  };
+
   const base = { state: null, tool: null, result: null, parentId: null } as const;
 
   return {
@@ -203,9 +256,10 @@ export const useActivity = create<ActivityState>((set, get) => {
           });
           if (LAUNCHERS.has(event.name)) {
             const input = (event.input ?? {}) as Record<string, unknown>;
+            cancelPrune(threadId, event.toolCallId);
             setSubagent(threadId, {
               id: event.toolCallId,
-              description: oneLine(str(input.description) ?? "Sous-agent"),
+              description: oneLine(str(input.description) ?? t("shell.subagentFallback")),
               type: str(input.subagent_type),
               status: "running",
               toolUses: null,
@@ -232,26 +286,32 @@ export const useActivity = create<ActivityState>((set, get) => {
               result: lastLine(event.output.split("\n").find((l) => l.trim()) ?? "") || null,
             });
           }
+          // `command` / `process` sub-agents get their own SubagentUpdate from the backend (background ones keep running).
           const sub = get().subagents[threadId]?.[event.toolCallId];
-          if (sub && sub.status === "running") {
+          if (sub && sub.source === "task" && sub.status === "running") {
             setSubagent(threadId, { ...sub, status: event.isError ? "failed" : "completed", endedAt: ts });
+            schedulePrune(threadId, event.toolCallId);
           }
           return;
         }
         case "SubagentUpdate": {
           const prev = get().subagents[threadId]?.[event.toolCallId];
+          // Ignore orphan finish updates for sub-agents already pruned or never seen.
+          if (!prev && event.status !== "running" && !event.description && !event.command && !event.agent) {
+            return;
+          }
           // Older hosts send no source: a Claude Task.
           const source = prev?.source ?? event.source ?? "task";
           setSubagent(threadId, {
             id: event.toolCallId,
-            description: prev?.description ?? oneLine(event.description ?? event.command ?? event.agent ?? "Sous-agent"),
+            description: prev?.description ?? oneLine(event.description ?? event.command ?? event.agent ?? t("shell.subagentFallback")),
             type: event.subagentType ?? prev?.type ?? null,
             status: event.status,
             toolUses: event.toolUses ?? prev?.toolUses ?? null,
             tokens: event.tokens ?? prev?.tokens ?? null,
             lastTool: event.lastTool ?? prev?.lastTool ?? null,
             startedAt: prev?.startedAt ?? ts,
-            endedAt: event.status === "running" ? null : ts,
+            endedAt: event.status === "running" ? null : (prev?.endedAt ?? ts),
             source,
             agent: prev?.agent ?? event.agent ?? null,
             command: prev?.command ?? event.command ?? null,
@@ -262,6 +322,31 @@ export const useActivity = create<ActivityState>((set, get) => {
               event.parentToolCallId ??
               (source === "process" ? runningShellLine(get().lines[threadId] ?? EMPTY_LINES) : null),
           });
+          if (event.status === "running") cancelPrune(threadId, event.toolCallId);
+          else schedulePrune(threadId, event.toolCallId);
+          return;
+        }
+        case "ThreadStatusChanged": {
+          if (STATUS[event.status].active) return;
+          const map = get().subagents[threadId];
+          if (!map) return;
+          const running = Object.values(map).filter((sub) => sub.status === "running");
+          if (running.length === 0) return;
+          const finalStatus: SubagentStatus =
+            event.status === "error" || event.status === "cancelled" ? "failed" : "completed";
+          set((state) => {
+            const cur = state.subagents[threadId];
+            if (!cur) return state;
+            let next: Record<string, SubagentInfo> | null = null;
+            for (const sub of Object.values(cur)) {
+              if (sub.status === "running") {
+                next ??= { ...cur };
+                next[sub.id] = { ...sub, status: finalStatus, endedAt: ts };
+              }
+            }
+            return next ? { subagents: { ...state.subagents, [threadId]: next } } : state;
+          });
+          for (const sub of running) schedulePrune(threadId, sub.id);
           return;
         }
         case "PermissionRequest":
@@ -275,13 +360,15 @@ export const useActivity = create<ActivityState>((set, get) => {
       }
     },
 
-    clear: (threadId) =>
+    clear: (threadId) => {
+      cancelAllPrunes(threadId);
       set((state) => {
         const lines = { ...state.lines };
         const subagents = { ...state.subagents };
         delete lines[threadId];
         delete subagents[threadId];
         return { lines, subagents };
-      }),
+      });
+    },
   };
 });

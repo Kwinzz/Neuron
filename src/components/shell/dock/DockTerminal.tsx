@@ -31,7 +31,7 @@ export const DockTerminal = memo(function DockTerminal({ id, title, active, stat
 
   const { main, attached, orphanSubs, resultIds } = useMemo(() => {
     // A Claude sub-agent's own calls are in its terminal (expanded card), not in the chat's.
-    const mainLines = lines.filter((line) => line.parentId === null || !(line.parentId in subs));
+    const mainLines = lines.filter((line) => line.parentId === null);
     const mainIds = new Set(mainLines.map((l) => l.id));
 
     // Each sub-agent is mentioned under the line that launched it (process-tree ones: the shell call running when

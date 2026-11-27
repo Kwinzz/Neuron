@@ -83,7 +83,7 @@ const shell = {
   attentionDone: "Terminé",
   attentionApproval: "À valider",
   dockCardAria: "{title} — {agent}, {status}. Entrée pour ouvrir le chat",
-  subagentCount: (v) => (Number(v.n) === 1 ? `${v.n} sous-agent` : `${v.n} sous-agents`),
+  subagentCount: (v) => (Number(v.n) <= 1 ? `${v.n} sous-agent` : `${v.n} sous-agents`),
   openChat: "Ouvrir le chat",
   stop: "Arrêter",
   tokensInOut: "Tokens (entrée + sortie)",
@@ -97,9 +97,10 @@ const shell = {
   subRunning: "En cours",
   subCompleted: "Terminé",
   subFailed: "Échec",
-  toolCount: (v) => (Number(v.n) === 1 ? `${v.n} outil` : `${v.n} outils`),
+  toolCount: (v) => (Number(v.n) <= 1 ? `${v.n} outil` : `${v.n} outils`),
   subStarting: "démarrage…",
   subagentClaude: "Sous-agent Claude",
+  subagentFallback: "Sous-agent",
   subagentUnknown: "Agent",
   subagentShow: "Voir ses détails",
   subagentTerminalAria: (v) => `Terminal du sous-agent ${v.name}`,
@@ -107,7 +108,6 @@ const shell = {
   subagentNoOutput: "aucune sortie",
   subagentsToggleShow: "Afficher les terminaux des sous-agents",
   subagentsToggleHide: "Masquer les terminaux des sous-agents",
-  hiddenLines: (v) => (Number(v.n) === 1 ? `${v.n} ligne masquée` : `${v.n} lignes masquées`),
   // TermLineView
   termThinking: "réflexion…",
   termPermission: "Autorisation : {text}",
@@ -202,7 +202,7 @@ const shell = {
   paletteGroupActions: "Actions",
   paletteGroupActiveChats: "Chats actifs",
   paletteGroupRecentChats: "Chats récents",
-  paletteNewChatSubtitle: "Ouvrir un chat vide avec Claude",
+  paletteNewChatSubtitle: "Ouvrir un chat vide avec {agent}",
   paletteNewChatKeywords: "nouveau chat créer lancer agent claude",
   paletteNewProjectSubtitle: "Créer un dossier ou ajouter un dossier existant, ici ou sur un appareil",
   paletteNewProjectKeywords: "nouveau projet dossier créer ajouter appareil serveur",
@@ -216,7 +216,7 @@ const shell = {
   paletteDockShow: "Afficher les threads live",
   paletteDockHide: "Masquer les threads live",
   paletteDockKeywords: "dock threads live panneau",
-  paletteChatCount: "{n} chats",
+  paletteChatCount: (v) => (Number(v.n) <= 1 ? `${v.n} chat` : `${v.n} chats`),
 } satisfies Record<string, Message>;
 
 export default shell;
