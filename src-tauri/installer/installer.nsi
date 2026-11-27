@@ -76,8 +76,17 @@ Var UpdateMode
 Var NoShortcutMode
 Var WixMode
 Var OldMainBinaryName
+; NEURON: fresh-install option choices/handles (read by hooks.nsh) and dynamic window caption.
+Var NeuronAutostart
+Var NeuronCliPath
+Var NeuronAutostartCheck
+Var NeuronCliPathCheck
+Var SetupCaption
 
 Name "${PRODUCTNAME}"
+; NEURON: switch window caption to an update title when installing over an existing install.
+Caption "$SetupCaption"
+!define MUI_CUSTOMFUNCTION_GUIINIT NeuronOnGUIInit
 BrandingText "${COPYRIGHT}"
 OutFile "${OUTFILE}"
 
@@ -167,7 +176,8 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 
 ; Installer pages, must be ordered as they appear
 ; 1. Welcome Page
-!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+; NEURON: skip welcome page when updating an existing installation.
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassiveOrUpdate
 !insertmacro MUI_PAGE_WELCOME
 
 ; 2. License Page (if defined)
@@ -217,6 +227,11 @@ Function FindWixInstall
 FunctionEnd
 
 Function PageReinstall
+  ; NEURON: existing installations always update in place; never show the reinstall page or run the old uninstaller.
+  ${If} $UpdateMode = 1
+    Abort
+  ${EndIf}
+
   ; Uninstall previous WiX installation if exists.
   Call FindWixInstall
   ${If} $R6 != ""
@@ -371,7 +386,8 @@ Function PageLeaveReinstall
     ${Else}
       ReadRegStr $4 SHCTX "${MANUPRODUCTKEY}" ""
       ReadRegStr $R1 SHCTX "${UNINSTKEY}" "UninstallString"
-      ${IfThen} $UpdateMode = 1 ${|} StrCpy $R1 "$R1 /UPDATE" ${|} ; append /UPDATE
+      ; NEURON: safety net — if the old uninstaller were ever invoked, keep it silent and preserve app data.
+      StrCpy $R1 "$R1 /S /UPDATE"
       ${IfThen} $PassiveMode = 1 ${|} StrCpy $R1 "$R1 /P" ${|} ; append /P
       StrCpy $R1 "$R1 _?=$4" ; append uninstall directory
       ExecWait '$R1' $0
@@ -411,18 +427,74 @@ Function PageLeaveReinstall
 FunctionEnd
 
 ; 5. Choose install directory page
-!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+; NEURON: skip directory page when updating (reuses existing install folder).
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassiveOrUpdate
 !insertmacro MUI_PAGE_DIRECTORY
 
 ; 6. Start menu shortcut page
 Var AppStartMenuFolder
 !if "${STARTMENUFOLDER}" != ""
-  !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+  ; NEURON: skip Start menu page when updating.
+  !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassiveOrUpdate
   !define MUI_STARTMENUPAGE_DEFAULTFOLDER "${STARTMENUFOLDER}"
 !else
   !define MUI_PAGE_CUSTOMFUNCTION_PRE Skip
 !endif
 !insertmacro MUI_PAGE_STARTMENU Application $AppStartMenuFolder
+
+; NEURON: fresh-install options page (autostart + CLI in PATH), skipped on updates, passive and silent installs.
+Page custom PageOptions PageLeaveOptions
+
+Function PageOptions
+  ${If} ${Silent}
+  ${OrIf} $PassiveMode = 1
+  ${OrIf} $UpdateMode = 1
+    Abort
+  ${EndIf}
+
+  !insertmacro MUI_HEADER_TEXT "$(neuronOptionsTitle)" "$(neuronOptionsSubtitle)"
+
+  nsDialogs::Create 1018
+  Pop $R0
+  ${If} $R0 == error
+    Abort
+  ${EndIf}
+  ${IfThen} $(^RTL) = 1 ${|} nsDialogs::SetRTL $(^RTL) ${|}
+
+  ${NSD_CreateCheckbox} 0u 10u 100% 12u "$(neuronOptAutostart)"
+  Pop $NeuronAutostartCheck
+  ${If} $NeuronAutostart = 1
+    SendMessage $NeuronAutostartCheck ${BM_SETCHECK} ${BST_CHECKED} 0
+  ${EndIf}
+  ${NSD_CreateLabel} 14u 24u -14u 26u "$(neuronOptAutostartDesc)"
+  Pop $R1
+
+  ${NSD_CreateCheckbox} 0u 56u 100% 12u "$(neuronOptCliPath)"
+  Pop $NeuronCliPathCheck
+  ${If} $NeuronCliPath = 1
+    SendMessage $NeuronCliPathCheck ${BM_SETCHECK} ${BST_CHECKED} 0
+  ${EndIf}
+  ${NSD_CreateLabel} 14u 70u -14u 26u "$(neuronOptCliPathDesc)"
+  Pop $R1
+
+  nsDialogs::Show
+FunctionEnd
+
+Function PageLeaveOptions
+  ${NSD_GetState} $NeuronAutostartCheck $R0
+  ${If} $R0 == ${BST_CHECKED}
+    StrCpy $NeuronAutostart 1
+  ${Else}
+    StrCpy $NeuronAutostart 0
+  ${EndIf}
+
+  ${NSD_GetState} $NeuronCliPathCheck $R0
+  ${If} $R0 == ${BST_CHECKED}
+    StrCpy $NeuronCliPath 1
+  ${Else}
+    StrCpy $NeuronCliPath 0
+  ${EndIf}
+FunctionEnd
 
 ; 7. Installation page
 !insertmacro MUI_PAGE_INSTFILES
@@ -439,8 +511,18 @@ Var AppStartMenuFolder
 ; Show run app after installation.
 !define MUI_FINISHPAGE_RUN
 !define MUI_FINISHPAGE_RUN_FUNCTION RunMainBinary
+; NEURON: hide the desktop-shortcut checkbox on updates (updating preserves existing shortcuts).
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW FinishShow
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 !insertmacro MUI_PAGE_FINISH
+
+; NEURON: hide the desktop-shortcut checkbox when updating an existing installation.
+Function FinishShow
+  ${If} $UpdateMode = 1
+    ShowWindow $mui.FinishPage.ShowReadme ${SW_HIDE}
+    SendMessage $mui.FinishPage.ShowReadme ${BM_SETCHECK} ${BST_UNCHECKED} 0
+  ${EndIf}
+FunctionEnd
 
 Function RunMainBinary
   nsis_tauri_utils::RunAsUser "$INSTDIR\${MAINBINARYNAME}.exe" ""
@@ -507,7 +589,27 @@ LangString choowHowToInstall 0 ""
   !include "{{this}}"
 {{/each}}
 
+; NEURON: localized strings for the update caption and the fresh-install options page.
+LangString neuronUpdateCaption ${LANG_ENGLISH} "${PRODUCTNAME} Update"
+LangString neuronUpdateCaption ${LANG_FRENCH} "Mise à jour de ${PRODUCTNAME}"
+LangString neuronOptionsTitle ${LANG_ENGLISH} "Installation Options"
+LangString neuronOptionsTitle ${LANG_FRENCH} "Options d'installation"
+LangString neuronOptionsSubtitle ${LANG_ENGLISH} "Choose how ${PRODUCTNAME} integrates with Windows."
+LangString neuronOptionsSubtitle ${LANG_FRENCH} "Choisissez comment ${PRODUCTNAME} s'intègre à Windows."
+LangString neuronOptAutostart ${LANG_ENGLISH} "Start ${PRODUCTNAME} when I sign in to Windows"
+LangString neuronOptAutostart ${LANG_FRENCH} "Lancer ${PRODUCTNAME} à l'ouverture de session Windows"
+LangString neuronOptAutostartDesc ${LANG_ENGLISH} "Starts quietly in the notification area. Change anytime in Settings."
+LangString neuronOptAutostartDesc ${LANG_FRENCH} "Démarre discrètement dans la zone de notification. Modifiable dans les Paramètres."
+LangString neuronOptCliPath ${LANG_ENGLISH} "Add the “neuron” command to the terminal"
+LangString neuronOptCliPath ${LANG_FRENCH} "Ajouter la commande « neuron » au terminal"
+LangString neuronOptCliPathDesc ${LANG_ENGLISH} "Lets you run neuron status, remote or update from PowerShell or Command Prompt."
+LangString neuronOptCliPathDesc ${LANG_FRENCH} "Permet d'utiliser neuron status, remote ou update depuis PowerShell ou l'invite de commandes."
+
 Function .onInit
+  ; NEURON: defaults for fresh installs (also used in /S silent mode): autostart off, CLI in PATH on.
+  StrCpy $NeuronAutostart 0
+  StrCpy $NeuronCliPath 1
+
   ${GetOptions} $CMDLINE "/P" $PassiveMode
   ${IfNot} ${Errors}
     StrCpy $PassiveMode 1
@@ -554,6 +656,13 @@ Function .onInit
   !if "${INSTALLMODE}" == "both"
     !insertmacro MULTIUSER_INIT
   !endif
+
+  ; NEURON: any existing installation (older, same or newer) updates in place instead of uninstalling.
+  ReadRegStr $R0 SHCTX "${UNINSTKEY}" ""
+  ReadRegStr $R1 SHCTX "${UNINSTKEY}" "UninstallString"
+  ${If} "$R0$R1" != ""
+    StrCpy $UpdateMode 1
+  ${EndIf}
 
   ; Abort downgrades if they are disabled, in the modes that skip the reinstall page choice:
   ; silent, passive and update
@@ -951,6 +1060,22 @@ FunctionEnd
 
 Function SkipIfPassive
   ${IfThen} $PassiveMode = 1  ${|} Abort ${|}
+FunctionEnd
+; NEURON: skip setup-only pages when passive or updating an existing installation.
+Function SkipIfPassiveOrUpdate
+  ${If} $PassiveMode = 1
+  ${OrIf} $UpdateMode = 1
+    Abort
+  ${EndIf}
+FunctionEnd
+; NEURON: set the window caption once the chosen language is active (update vs fresh install).
+Function NeuronOnGUIInit
+  ${If} $UpdateMode = 1
+    StrCpy $SetupCaption "$(neuronUpdateCaption)"
+  ${Else}
+    StrCpy $SetupCaption "$(^SetupCaption)"
+  ${EndIf}
+  SendMessage $HWNDPARENT ${WM_SETTEXT} 0 "STR:$SetupCaption"
 FunctionEnd
 Function un.SkipIfPassive
   ${IfThen} $PassiveMode = 1  ${|} Abort ${|}

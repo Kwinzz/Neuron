@@ -7,7 +7,7 @@ use tauri::State;
 use crate::error::{AppError, AppResult};
 use crate::events;
 use crate::state::Shared;
-use crate::update::{self, UPDATE_PROGRESS_EVENT, UpdateInfo};
+use crate::update::{self, UPDATE_PROGRESS_EVENT, UpdateInfo, UpdateResult};
 
 /// Last known answer (no network).
 #[tauri::command]
@@ -21,7 +21,16 @@ pub async fn update_check(state: State<'_, Shared>) -> AppResult<UpdateInfo> {
     update::check(&state).await
 }
 
-/// Installs the latest version. Windows: downloads the installer (`update://progress`), starts it in passive update
+/// Result of a silent Windows update launched just before this startup, if any (consumed once).
+#[tauri::command]
+pub async fn take_update_result(state: State<'_, Shared>) -> AppResult<Option<UpdateResult>> {
+    let data_dir = state.paths.data_dir.clone();
+    tokio::task::spawn_blocking(move || update::take_pending_result(&data_dir))
+        .await
+        .map_err(|e| AppError::Other(e.to_string()))
+}
+
+/// Installs the latest version. Windows: downloads the installer (`update://progress`), starts it in silent update
 /// mode (Neuron restarts by itself) and quits. Linux: downloads `main`'s package (`update://progress`), installs it
 /// through `pkexec`, restarts Neuron; a build from source runs `install.sh --update` in a terminal window.
 #[tauri::command]
@@ -43,7 +52,14 @@ pub async fn update_install(app: tauri::AppHandle, state: State<'_, Shared>) -> 
             events::emit_local(sink.as_ref(), UPDATE_PROGRESS_EVENT, &p);
         })
         .await?;
-        update::launch_installer(&path, true).await?;
+        let data_dir = state.paths.data_dir.clone();
+        let target = info.latest.clone();
+        let _ = tokio::task::spawn_blocking(move || update::record_pending(&data_dir, &target)).await;
+        if let Err(err) = update::launch_installer(&path, true).await {
+            let data_dir = state.paths.data_dir.clone();
+            let _ = tokio::task::spawn_blocking(move || update::clear_pending(&data_dir)).await;
+            return Err(err);
+        }
         // Let the answer reach the window, then leave the installer a free exe to replace.
         tauri::async_runtime::spawn(async move {
             tokio::time::sleep(Duration::from_millis(600)).await;

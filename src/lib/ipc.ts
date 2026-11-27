@@ -49,6 +49,7 @@ import type { RemoteEventPayload } from "@/bindings/RemoteEventPayload";
 import type { RemoteStatus } from "@/bindings/RemoteStatus";
 import type { UpdateInfo } from "@/bindings/UpdateInfo";
 import type { UpdateProgress } from "@/bindings/UpdateProgress";
+import type { UpdateResult } from "@/bindings/UpdateResult";
 import {
   connectedHosts,
   deviceOfProject,
@@ -482,8 +483,10 @@ export const updates = {
   /** Last known answer, no network. */
   status: () => invoke<UpdateInfo | null>("update_status"),
   check: () => invoke<UpdateInfo>("update_check"),
-  /** Windows: downloads, starts the installer and quits (Neuron restarts). Linux: update in a terminal. */
+  /** Windows: downloads, starts the silent installer and quits (Neuron restarts). Linux: installs or opens a terminal. */
   install: () => invoke<void>("update_install"),
+  /** Result of a silent Windows update launched just before this startup (consumed once). */
+  takeResult: () => invoke<UpdateResult | null>("take_update_result"),
 } as const;
 
 /** `threadId` of the « update available » notification: its click opens Paramètres → Mises à jour. */

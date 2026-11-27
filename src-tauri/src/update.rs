@@ -1,6 +1,6 @@
 //! New versions of Neuron. Updates only ever deliver what is on `main`:
 //! - Windows (and any install without `install.sh`): GitHub's latest release, installed by the Windows installer
-//!   (passive update mode);
+//!   (silent update mode);
 //! - Linux, installed by `install.sh` (`~/.config/neuron/install`: `commit=…`, `method=prebuilt|source`): the
 //!   installed commit against the package GitHub built for `main` (`main-build` pre-release, `build-info.txt`), or
 //!   against the head of `main` for a build from source. The app installs `main`'s package by itself (download,
@@ -36,6 +36,8 @@ pub const UPDATE_AVAILABLE_EVENT: &str = "update://available";
 pub const UPDATE_PROGRESS_EVENT: &str = "update://progress";
 const CACHE_KEY: &str = "update.last";
 const NOTIFIED_KEY: &str = "update.notified";
+const PENDING_FILE: &str = "pending-update.json";
+const PENDING_MAX_AGE_MS: i64 = crate::util::HOUR_MS;
 const FIRST_CHECK_DELAY: Duration = Duration::from_secs(30);
 const CHECK_EVERY: Duration = Duration::from_secs(12 * 3600);
 const FETCH_TIMEOUT: Duration = Duration::from_secs(20);
@@ -75,6 +77,23 @@ pub struct UpdateProgress {
     pub downloaded: u64,
     #[ts(type = "number | null")]
     pub total: Option<u64>,
+}
+
+/// Outcome of a silent Windows update launched before this restart (consumed once from `pending-update.json`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct UpdateResult {
+    pub from: String,
+    pub to: String,
+    pub ok: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct PendingUpdate {
+    from: String,
+    to: String,
+    at: i64,
 }
 
 pub fn current_version() -> &'static str {
@@ -368,13 +387,69 @@ async fn download(url: &str, path: &Path, progress: &mut impl FnMut(UpdateProgre
     Ok(())
 }
 
-/// Starts the downloaded installer in passive update mode (progress bar only, no question, previous choices kept);
+/// Records an outgoing Windows update (`<data_dir>/pending-update.json`) right before launching the silent installer
+/// so the next launch can report whether it succeeded.
+pub fn record_pending(data_dir: &Path, to: &str) {
+    // A release tag (`v0.2.5`) and the crate version (`0.2.5`) must compare equal: store the bare version.
+    let to = to.trim().trim_start_matches(['v', 'V']).to_string();
+    let pending = PendingUpdate { from: current_version().to_string(), to, at: now_ms() };
+    let path = data_dir.join(PENDING_FILE);
+    let written = std::fs::create_dir_all(data_dir)
+        .and_then(|()| serde_json::to_vec(&pending).map_err(std::io::Error::other))
+        .and_then(|bytes| std::fs::write(&path, bytes));
+    if let Err(err) = written {
+        tracing::warn!(%err, path = %path.display(), "pending update marker not written");
+    }
+}
+
+/// Removes `<data_dir>/pending-update.json` (e.g. when launching the installer fails or UAC is refused).
+pub fn clear_pending(data_dir: &Path) {
+    let _ = std::fs::remove_file(data_dir.join(PENDING_FILE));
+}
+
+/// Reads and deletes `<data_dir>/pending-update.json`, returning whether Neuron now runs the target version.
+/// Markers older than 1 hour (or unreadable) are deleted and ignored.
+pub fn take_pending_result(data_dir: &Path) -> Option<UpdateResult> {
+    take_pending_result_at(data_dir, current_version(), now_ms())
+}
+
+fn take_pending_result_at(data_dir: &Path, current: &str, now: i64) -> Option<UpdateResult> {
+    let path = data_dir.join(PENDING_FILE);
+    let bytes = match std::fs::read(&path) {
+        Ok(b) => b,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return None,
+        Err(err) => {
+            tracing::warn!(%err, path = %path.display(), "pending update marker not read");
+            let _ = std::fs::remove_file(&path);
+            return None;
+        }
+    };
+    if let Err(err) = std::fs::remove_file(&path) {
+        tracing::warn!(%err, path = %path.display(), "pending update marker not removed");
+    }
+    let pending: PendingUpdate = match serde_json::from_slice(&bytes) {
+        Ok(p) => p,
+        Err(err) => {
+            tracing::warn!(%err, "invalid pending update marker ignored");
+            return None;
+        }
+    };
+    if now.saturating_sub(pending.at) > PENDING_MAX_AGE_MS {
+        tracing::info!(from = %pending.from, to = %pending.to, "stale pending update marker ignored");
+        return None;
+    }
+    let ok = parse_version(current).is_some() && parse_version(current) == parse_version(&pending.to);
+    tracing::info!(from = %pending.from, to = %pending.to, current, ok, "pending update result");
+    Some(UpdateResult { from: pending.from, to: pending.to, ok })
+}
+
+/// Starts the downloaded installer in silent update mode (no window, no question, previous choices kept);
 /// `relaunch`: it starts Neuron again at the end. The caller then quits (the installer replaces the exe).
 /// Windows: the per-machine installer needs administrator rights, which `CreateProcess` (`std::process::Command`)
 /// cannot request (os error 740): it goes through `ShellExecuteW` with the `runas` verb, which shows the UAC prompt.
 /// It waits while the prompt is shown, hence `spawn_blocking`.
 pub async fn launch_installer(path: &Path, relaunch: bool) -> AppResult<()> {
-    let args = if relaunch { "/P /UPDATE /R" } else { "/P /UPDATE" };
+    let args = if relaunch { "/S /UPDATE /R" } else { "/S /UPDATE" };
     let path = path.to_path_buf();
     tokio::task::spawn_blocking(move || {
         #[cfg(windows)]
@@ -698,5 +773,57 @@ mod tests {
         assert_eq!(key_value(info, "version"), Some("0.2.2"));
         assert_eq!(key_value(info, "missing"), None);
         assert_eq!(key_value("commitx=1\n", "commit"), None);
+    }
+
+    #[test]
+    fn pending_update_result_lifecycle() {
+        let dir = std::env::temp_dir().join(format!("neuron-pending-test-{}", uuid::Uuid::new_v4().simple()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join(PENDING_FILE);
+
+        // Missing file -> None.
+        assert_eq!(take_pending_result_at(&dir, "0.2.5", 10_000), None);
+
+        // Matching target version -> ok = true, file deleted.
+        std::fs::write(&file, r#"{"from":"0.2.4","to":"0.2.5","at":1000}"#).unwrap();
+        assert_eq!(
+            take_pending_result_at(&dir, "0.2.5", 1000 + PENDING_MAX_AGE_MS),
+            Some(UpdateResult { from: "0.2.4".into(), to: "0.2.5".into(), ok: true })
+        );
+        assert!(!file.exists(), "marker must be deleted after read");
+        assert_eq!(take_pending_result_at(&dir, "0.2.5", 1000 + PENDING_MAX_AGE_MS), None);
+
+        // Mismatched version (update did not complete) -> ok = false, file deleted.
+        std::fs::write(&file, r#"{"from":"0.2.4","to":"0.2.5","at":5000}"#).unwrap();
+        assert_eq!(
+            take_pending_result_at(&dir, "0.2.4", 15_000),
+            Some(UpdateResult { from: "0.2.4".into(), to: "0.2.5".into(), ok: false })
+        );
+        assert!(!file.exists());
+
+        // Older than 1 hour -> ignored (None) and deleted.
+        std::fs::write(&file, r#"{"from":"0.2.4","to":"0.2.5","at":1000}"#).unwrap();
+        assert_eq!(take_pending_result_at(&dir, "0.2.5", 1000 + PENDING_MAX_AGE_MS + 1), None);
+        assert!(!file.exists(), "stale marker must be deleted");
+
+        // Corrupt JSON -> ignored (None) and deleted.
+        std::fs::write(&file, b"not-json").unwrap();
+        assert_eq!(take_pending_result_at(&dir, "0.2.5", 5000), None);
+        assert!(!file.exists());
+
+        // record_pending + take_pending_result / clear_pending round-trip.
+        record_pending(&dir, current_version());
+        assert!(file.exists());
+        assert_eq!(
+            take_pending_result(&dir),
+            Some(UpdateResult { from: current_version().into(), to: current_version().into(), ok: true })
+        );
+        assert!(!file.exists());
+
+        record_pending(&dir, "9.9.9");
+        clear_pending(&dir);
+        assert_eq!(take_pending_result(&dir), None);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -82,6 +82,7 @@
         "sidebarImage": "installer/sidebar.bmp",
         "startMenuFolder": "Neuron",
         "installerHooks": "installer/hooks.nsh",
+        "template": "installer/installer.nsi",
         "compression": "lzma"
       }
     }

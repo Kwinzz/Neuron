@@ -204,6 +204,7 @@ pub fn run() {
             commands::update::update_status,
             commands::update::update_check,
             commands::update::update_install,
+            commands::update::take_update_result,
         ])
         .build(context)
         .expect("error while building Neuron");

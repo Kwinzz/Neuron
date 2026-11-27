@@ -297,8 +297,10 @@ const settings = {
   updatesInstall: "Installer {version}",
   updatesDownloading: "Téléchargement… {percent}",
   updatesInstallingStep: "Installation…",
+  updatesSucceededToast: "Neuron est à jour (v{version})",
+  updatesFailedToast: "La mise à jour vers v{version} n'a pas abouti",
   updatesHowWindows:
-    "L'installateur se lance en mode mise à jour (autorisation administrateur demandée), puis Neuron redémarre tout seul. Vos réglages et choix d'installation sont conservés.",
+    "Neuron se ferme, acceptez l'autorisation Windows, la mise à jour s'installe en arrière-plan et Neuron redémarre tout seul.",
   updatesHowLinuxInApp:
     "Neuron télécharge la nouvelle version, l'installe (mot de passe administrateur demandé) puis redémarre tout seul. Les chats en cours sont interrompus.",
   updatesHowLinux:

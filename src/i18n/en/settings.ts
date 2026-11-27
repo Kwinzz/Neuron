@@ -296,8 +296,10 @@ const settings: Translation<typeof fr> = {
   updatesInstall: "Install {version}",
   updatesDownloading: "Downloading… {percent}",
   updatesInstallingStep: "Installing…",
+  updatesSucceededToast: "Neuron is up to date (v{version})",
+  updatesFailedToast: "The update to v{version} didn't complete",
   updatesHowWindows:
-    "The installer starts in update mode (administrator permission asked), then Neuron restarts by itself. Your settings and install choices are kept.",
+    "Neuron closes, accept the Windows prompt, the update installs in the background and Neuron restarts by itself.",
   updatesHowLinuxInApp:
     "Neuron downloads the new version, installs it (administrator password asked) and restarts by itself. Running chats are interrupted.",
   updatesHowLinux:

@@ -37,14 +37,19 @@ Neuron contains no AI of its own: it runs the CLIs installed on your computer, w
 1. Download the `Neuron_<version>_x64-setup.exe` installer from the
    [latest release](https://github.com/Kwinzz/Neuron/releases/latest).
 2. Run it and accept the administrator prompt (installs into *Program Files*).
-3. Pick the language (English or French) at the start of the installer, then whether Neuron starts with Windows
-   and whether to add the `neuron` command to the terminal, and launch it from the Start menu.
+3. Pick the language (English or French) at the start of the installer, choose your options on the options page
+   (start Neuron with Windows, add the `neuron` command to the terminal), and launch Neuron at the end.
 
 > Windows SmartScreen may say « Windows protected your PC » (the installer isn't signed): click
 > **More info** → **Run anyway**.
 
-Update: Neuron tells you when a new version is out (**Settings → Updates**, or `neuron update` in a terminal) and
-installs it in one click; your data and choices are kept. You can also download the new installer and run it.
+**Update or reinstall:**
+- **From Neuron** (**Settings → Updates**, or `neuron update` in a terminal): Neuron closes, you accept the Windows
+  administrator prompt, the update installs silently in the background and Neuron restarts on its own (confirming the
+  result with a toast).
+- **With the installer directly**: running the installer when Neuron is already installed automatically updates it in
+  place — no uninstall wizard, straight to installing over the existing folder, keeping all your data, settings and
+  previous install choices.
 
 > The release may lag a little behind the code in this repository: to get the very latest version, build it
 > (below).
