@@ -8,6 +8,7 @@ import type { AgentEventEnvelope } from "@/bindings/AgentEventEnvelope";
 import type { SubagentSource } from "@/bindings/SubagentSource";
 import type { SubagentStatus } from "@/bindings/SubagentStatus";
 import { nextFrame } from "@/lib/frame";
+import { stripAppDirectives } from "@/lib/appDirectives";
 
 export type TermLineKind = "tool" | "text" | "thinking" | "permission" | "status" | "error";
 export type TermLineState = "running" | "ok" | "error";
@@ -135,7 +136,8 @@ export const useActivity = create<ActivityState>((set, get) => {
         const key = `${p.threadId}:${p.messageId}`;
         const text = (fullText.get(key) ?? "") + p.text;
         fullText.set(key, text);
-        const shown = lastLine(text);
+        // Directives for another app (`::browser-complete{…}`) are not shown, as in the chat.
+        const shown = lastLine(stripAppDirectives(text, true));
         if (!shown) continue;
         const id = `msg:${p.messageId}`;
         const prev = (lines[p.threadId] ?? EMPTY_LINES).find((l) => l.id === id);
