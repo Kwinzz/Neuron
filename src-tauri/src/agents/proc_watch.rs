@@ -6,12 +6,14 @@ use std::time::Duration;
 
 use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 
-use crate::agents::subagents::{ProcAgent, program_key};
+use crate::agents::subagents::{ProcAgent, program_key, program_name_key};
 use crate::state::Shared;
 
 const TICK: Duration = Duration::from_secs(2);
 /// Programs that run a script: the agent is named by the script (`node …/gemini-cli/…`).
 const RUNTIMES: &[&str] = &["node", "bun", "deno", "python", "python3"];
+/// First arguments of an agent's own helper processes (`codex sandbox …`, `codex app-server`), not an agent at work.
+const HELPER_ARGS: &[&str] = &["sandbox", "app-server", "exec-server", "mcp-server"];
 
 /// One process of a snapshot.
 #[derive(Debug, Clone)]
@@ -20,6 +22,8 @@ pub struct ProcInfo {
     pub parent: Option<u32>,
     pub name: String,
     pub cmd: Vec<String>,
+    /// A thread of `parent` (Linux lists them as its children, with its command line).
+    pub thread: bool,
 }
 
 fn runtime(name: &str) -> bool {
@@ -28,37 +32,62 @@ fn runtime(name: &str) -> bool {
     RUNTIMES.contains(&base)
 }
 
-/// Agent key of a process: its program, or the script a runtime runs.
+/// Agent of a process and whether it is one of its helpers. The program is the name it was started as (argv[0], after
+/// `env` from a shebang): the `codex` executable started as `codex-linux-sandbox` is not `codex`. Package paths only
+/// name the script a runtime runs (`node …/@google/gemini-cli/…`), not a binary shipped inside a package.
+fn agent_program(p: &ProcInfo) -> Option<(&'static str, bool)> {
+    let (mut program, mut args) = match p.cmd.split_first() {
+        Some((first, rest)) => (first.as_str(), rest),
+        None => (p.name.as_str(), &[][..]),
+    };
+    if program.rsplit(['/', '\\']).next() == Some("env") {
+        let skip = args.iter().take_while(|a| a.starts_with('-') || a.contains('=')).count();
+        let (first, rest) = args[skip..].split_first()?;
+        (program, args) = (first.as_str(), rest);
+    }
+    let key = match program_name_key(program) {
+        Some(key) => key,
+        None if runtime(program) => {
+            let script = args.iter().position(|a| !a.starts_with('-'))?;
+            let key = program_key(&args[script])?;
+            args = &args[script + 1..];
+            key
+        }
+        None => return None,
+    };
+    let helper = args.iter().find(|a| !a.starts_with('-')).is_some_and(|a| HELPER_ARGS.contains(&a.as_str()));
+    Some((key, helper))
+}
+
+/// Agent key of a process: its program, or the script a runtime runs; none for an agent's helper.
 fn agent_key(p: &ProcInfo) -> Option<&'static str> {
-    if let Some(key) = program_key(&p.name) {
-        return Some(key);
-    }
-    if runtime(&p.name) {
-        return p.cmd.iter().skip(1).find(|a| !a.starts_with('-')).and_then(|script| program_key(script));
-    }
-    None
+    agent_program(p).filter(|(_, helper)| !helper).map(|(key, _)| key)
 }
 
 /// Agent processes under `roots` (not the roots themselves), the highest of each chain only: the processes an
-/// agent CLI starts (its own tools, MCP servers, a nested agent) are not listed.
+/// agent CLI starts (its own tools, MCP servers, a nested agent) are not listed. A root's direct child that is the
+/// same agent (npm wrapper → native binary) is the chat's agent itself: looked through, not listed.
 pub fn agents_under(procs: &[ProcInfo], roots: &[u32]) -> Vec<ProcAgent> {
     let mut children: HashMap<u32, Vec<&ProcInfo>> = HashMap::new();
-    for p in procs {
+    for p in procs.iter().filter(|p| !p.thread) {
         if let Some(parent) = p.parent.filter(|parent| *parent != p.pid) {
             children.entry(parent).or_default().push(p);
         }
     }
+    let own_agent = |pid: u32| procs.iter().find(|p| p.pid == pid).and_then(agent_program).map(|(key, _)| key);
     let mut found = Vec::new();
-    let mut stack: Vec<u32> = roots.to_vec();
+    // (pid, agent of the chat when `pid` is its process).
+    let mut stack: Vec<(u32, Option<&'static str>)> = roots.iter().map(|pid| (*pid, own_agent(*pid))).collect();
     let mut visited = std::collections::HashSet::new();
-    while let Some(pid) = stack.pop() {
+    while let Some((pid, own)) = stack.pop() {
         if !visited.insert(pid) {
             continue;
         }
         for child in children.get(&pid).map(Vec::as_slice).unwrap_or_default() {
             match agent_key(child) {
+                Some(key) if own == Some(key) => stack.push((child.pid, own)),
                 Some(key) => found.push(ProcAgent { pid: child.pid, key, command: child.cmd.join(" ") }),
-                None => stack.push(child.pid),
+                None => stack.push((child.pid, None)),
             }
         }
     }
@@ -80,6 +109,7 @@ fn snapshot(system: &mut System) -> Vec<ProcInfo> {
             parent: p.parent().map(|parent| parent.as_u32()),
             name: p.name().to_string_lossy().into_owned(),
             cmd: p.cmd().iter().map(|a| a.to_string_lossy().into_owned()).collect(),
+            thread: p.thread_kind().is_some(),
         })
         .collect()
 }
@@ -118,7 +148,43 @@ mod tests {
     use super::*;
 
     fn p(pid: u32, parent: u32, name: &str, cmd: &str) -> ProcInfo {
-        ProcInfo { pid, parent: Some(parent), name: name.into(), cmd: cmd.split(' ').map(String::from).collect() }
+        ProcInfo {
+            pid,
+            parent: Some(parent),
+            name: name.into(),
+            cmd: cmd.split(' ').map(String::from).collect(),
+            thread: false,
+        }
+    }
+
+    /// Codex on Linux (issue #7): none of these is a sub-agent, only the `codex exec` started from one of its shells.
+    #[test]
+    fn codex_own_processes_are_not_subagents() {
+        let wrapper = "node /usr/local/bin/codex exec --json hi";
+        let native = "/usr/lib/node_modules/@openai/codex/vendor/x86_64-unknown-linux-musl/codex/codex exec --json hi";
+        let mut procs = vec![
+            p(10, 1, "node", wrapper),
+            // The wrapper's threads (same command line).
+            ProcInfo { thread: true, ..p(11, 10, "node", wrapper) },
+            ProcInfo { thread: true, ..p(12, 10, "node", wrapper) },
+            // The native binary, its threads and helpers.
+            p(20, 10, "codex", native),
+            ProcInfo { thread: true, ..p(21, 20, "codex", native) },
+            p(30, 20, "codex", "codex-linux-sandbox --sandbox-policy x -- bash -lc ls"),
+            p(31, 30, "bwrap", "bwrap --ro-bind / / bash -lc ls"),
+            p(32, 31, "bash", "bash -lc sleep 3"),
+            p(40, 20, "node", "node /home/me/.codex/node_repl.js"),
+            p(41, 40, "codex", "codex sandbox linux --full-auto node x.js"),
+            p(50, 20, "codex-code-mode", "/usr/lib/node_modules/@openai/codex/vendor/codex-code-mode-host"),
+            p(60, 1, "bash", "bash -lc echo"),
+        ];
+        assert!(agents_under(&procs, &[10]).is_empty(), "{:?}", agents_under(&procs, &[10]));
+
+        // A real sub-agent, from a sandboxed shell; a script with `#!/usr/bin/env node` is named by its script.
+        procs.push(p(33, 32, "codex", "codex exec --json review"));
+        procs.push(p(34, 32, "node", "/usr/bin/env node /usr/local/bin/gemini -p hi"));
+        let keys: Vec<(u32, &str)> = agents_under(&procs, &[10]).iter().map(|a| (a.pid, a.key)).collect();
+        assert_eq!(keys, vec![(33, "codex"), (34, "gemini")]);
     }
 
     #[test]
