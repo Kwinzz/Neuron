@@ -37,16 +37,30 @@ pub fn run() {
     let started = Instant::now();
     init_tracing();
 
-    let app = tauri::Builder::default()
+    let isolated_dev = state::isolated_dev();
+    let mut context = tauri::generate_context!();
+    if isolated_dev {
+        // Created in `setup` instead, with their own webview data (the installed app's stays untouched).
+        for window in &mut context.config_mut().app.windows {
+            window.create = false;
+        }
+    }
+
+    let mut builder = tauri::Builder::default();
+    if !isolated_dev {
         // First: a second launch (shortcut, autostart while running) just brings the window back.
         // `neuron --quick` (bound to a desktop shortcut, Wayland) opens the quick prompt of the running instance.
-        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+        // An isolated dev build skips it so that it can run next to the installed Neuron; the control channel still
+        // locks its data folder.
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             if args.iter().any(|a| a == desktop::QUICK_ARG) {
                 desktop::toggle_quick(app);
             } else {
                 desktop::show_main(app);
             }
-        }))
+        }));
+    }
+    let app = builder
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec![desktop::BACKGROUND_ARG]),
@@ -59,6 +73,9 @@ pub fn run() {
             env_path::probe_login_shell();
             env_path::refresh_path();
             let paths = AppPaths::resolve()?;
+            if isolated_dev {
+                create_isolated_windows(app, &paths.data_dir)?;
+            }
             // `neuron serve` running on the same data (server mode, before the app was opened): it stops, the app
             // takes over its chats and endpoint.
             tauri::async_runtime::block_on(control::take_over(&paths.data_dir));
@@ -77,7 +94,8 @@ pub fn run() {
             }) {
                 tracing::warn!(%err, "attachments folder not served");
             }
-            {
+            // The identity (name + icon in the registry) belongs to the installed app.
+            if !isolated_dev {
                 let handle = app.handle().clone();
                 let data_dir = state.paths.data_dir.clone();
                 std::thread::spawn(move || notifications::register(&handle, &data_dir));
@@ -186,7 +204,7 @@ pub fn run() {
             commands::update::update_check,
             commands::update::update_install,
         ])
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while building Neuron");
 
     app.run(|handle, event| {
@@ -205,6 +223,20 @@ pub fn run() {
 }
 
 /// The `neuron` command line talks to this instance through the control channel (also the instance lock).
+/// Isolated dev build: the windows of `tauri.conf.json`, with their webview data (local storage, cache) in
+/// `<data_dir>/webview` instead of the installed app's folder, and « (dev) » in their title.
+fn create_isolated_windows(app: &tauri::App, data_dir: &std::path::Path) -> tauri::Result<()> {
+    let webview_dir = data_dir.join("webview");
+    std::fs::create_dir_all(&webview_dir)?;
+    for config in &app.config().app.windows {
+        tauri::WebviewWindowBuilder::from_config(app.handle(), config)?
+            .title(format!("{} (dev)", config.title))
+            .data_directory(webview_dir.clone())
+            .build()?;
+    }
+    Ok(())
+}
+
 fn spawn_control(app: &tauri::AppHandle, state: &Shared) {
     let handle = app.clone();
     let ctl = control::Control {

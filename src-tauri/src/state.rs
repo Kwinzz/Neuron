@@ -13,6 +13,13 @@ use crate::util::now_ms;
 /// Application identifier shared with `tauri.conf.json` (used to locate the OS app-data folder).
 const APP_IDENTIFIER: &str = "dev.neuron.app";
 
+/// Development build on its own data (`NEURON_DATA_DIR`, e.g. `npm run dev:isolated`): it may run next to the
+/// installed Neuron (no app-wide single instance, its own webview data, the OS notification identity left alone).
+/// Release builds are always single-instance, whatever the environment.
+pub fn isolated_dev() -> bool {
+    cfg!(debug_assertions) && std::env::var_os("NEURON_DATA_DIR").is_some_and(|d| !d.is_empty())
+}
+
 /// Filesystem locations used by Neuron.
 #[derive(Debug, Clone)]
 pub struct AppPaths {

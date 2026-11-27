@@ -83,7 +83,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let menu = tray_menu(app)?;
 
     let mut builder = TrayIconBuilder::with_id("neuron")
-        .tooltip("Neuron")
+        .tooltip(if crate::state::isolated_dev() { "Neuron (dev)" } else { "Neuron" })
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {

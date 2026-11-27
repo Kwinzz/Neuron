@@ -51,7 +51,8 @@ coverage/
 CLAUDE.md
 project.md
 .claude/
-scripts/
+scripts/*
+!scripts/dev-isolated.mjs
 
 # Neuron project context (local)
 .neuron/
