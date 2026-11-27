@@ -47,7 +47,7 @@ pub async fn run(data_dir: &Path, check_only: bool, yes: bool) -> AppResult<i32>
         println!();
         // The app reopens after the update if it was open (the installer closes it).
         let app_running = control::probe(data_dir).await.is_some_and(|i| i.mode == InstanceMode::App);
-        update::launch_installer(&path, app_running)?;
+        update::launch_installer(&path, app_running).await?;
         println!(
             "{}",
             crate::tr!(

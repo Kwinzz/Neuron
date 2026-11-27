@@ -370,16 +370,68 @@ async fn download(url: &str, path: &Path, progress: &mut impl FnMut(UpdateProgre
 
 /// Starts the downloaded installer in passive update mode (progress bar only, no question, previous choices kept);
 /// `relaunch`: it starts Neuron again at the end. The caller then quits (the installer replaces the exe).
-pub fn launch_installer(path: &Path, relaunch: bool) -> AppResult<()> {
-    let mut cmd = std::process::Command::new(path);
-    cmd.args(["/P", "/UPDATE"]);
-    if relaunch {
-        cmd.arg("/R");
+/// Windows: the per-machine installer needs administrator rights, which `CreateProcess` (`std::process::Command`)
+/// cannot request (os error 740): it goes through `ShellExecuteW` with the `runas` verb, which shows the UAC prompt.
+/// It waits while the prompt is shown, hence `spawn_blocking`.
+pub async fn launch_installer(path: &Path, relaunch: bool) -> AppResult<()> {
+    let args = if relaunch { "/P /UPDATE /R" } else { "/P /UPDATE" };
+    let path = path.to_path_buf();
+    tokio::task::spawn_blocking(move || {
+        #[cfg(windows)]
+        {
+            shell_execute_elevated(&path, args)
+        }
+        #[cfg(not(windows))]
+        {
+            std::process::Command::new(&path).args(args.split(' ')).spawn().map_err(|e| {
+                AppError::Other(crate::tr!(
+                    "impossible de lancer l'installateur ({e})",
+                    "could not start the installer ({e})"
+                ))
+            })?;
+            Ok(())
+        }
+    })
+    .await
+    .map_err(|e| AppError::Other(e.to_string()))?
+}
+
+#[cfg(windows)]
+fn shell_execute_elevated(path: &Path, args: &str) -> AppResult<()> {
+    use std::os::windows::ffi::OsStrExt;
+    const SW_SHOWNORMAL: i32 = 1;
+    const SE_ERR_ACCESSDENIED: isize = 5;
+    #[link(name = "shell32")]
+    unsafe extern "system" {
+        fn ShellExecuteW(
+            hwnd: isize,
+            operation: *const u16,
+            file: *const u16,
+            parameters: *const u16,
+            directory: *const u16,
+            show_cmd: i32,
+        ) -> isize;
     }
-    cmd.spawn().map_err(|e| {
-        AppError::Other(crate::tr!("impossible de lancer l'installateur ({e})", "could not start the installer ({e})"))
-    })?;
-    Ok(())
+    let wide = |s: &std::ffi::OsStr| -> Vec<u16> { s.encode_wide().chain(std::iter::once(0)).collect() };
+    let verb = wide("runas".as_ref());
+    let file = wide(path.as_os_str());
+    let params = wide(args.as_ref());
+    // SAFETY: every pointer is a NUL-terminated UTF-16 string alive for the whole (synchronous) call; a null
+    // directory means the current one.
+    let code =
+        unsafe { ShellExecuteW(0, verb.as_ptr(), file.as_ptr(), params.as_ptr(), std::ptr::null(), SW_SHOWNORMAL) };
+    match code {
+        c if c > 32 => Ok(()),
+        // Also what a dismissed UAC prompt returns.
+        SE_ERR_ACCESSDENIED => Err(AppError::Other(crate::tr!(
+            "installateur non lancé : autorisation administrateur refusée",
+            "installer not started: administrator permission refused"
+        ))),
+        c => Err(AppError::Other(crate::tr!(
+            "impossible de lancer l'installateur (code {c})",
+            "could not start the installer (code {c})"
+        ))),
+    }
 }
 
 /// Package manager of a Linux machine (the families `install.sh` supports).

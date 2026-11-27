@@ -43,7 +43,7 @@ pub async fn update_install(app: tauri::AppHandle, state: State<'_, Shared>) -> 
             events::emit_local(sink.as_ref(), UPDATE_PROGRESS_EVENT, &p);
         })
         .await?;
-        update::launch_installer(&path, true)?;
+        update::launch_installer(&path, true).await?;
         // Let the answer reach the window, then leave the installer a free exe to replace.
         tauri::async_runtime::spawn(async move {
             tokio::time::sleep(Duration::from_millis(600)).await;
