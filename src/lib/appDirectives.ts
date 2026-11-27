@@ -7,6 +7,7 @@ const DIRECTIVE_LINE = /^[ \t]*::[A-Za-z][\w-]*(?:\[[^\]\n]*\])?\{[^\n]*\}[ \t]*
 /** While streaming: a directive that has started on the last line but isn't closed yet (`::browser-comp…`). */
 const PARTIAL_TAIL = /^[ \t]*::(?:[A-Za-z][\w-]*(?:\[[^\]\n]*\]?)?(?:\{[^}\n]*)?)?$/;
 const FENCE = /^[ \t]*(`{3,}|~{3,})/;
+const FENCE_CLOSE = /^[ \t]*(`{3,}|~{3,})[ \t]*$/;
 
 /**
  * Agent text as shown in the chat: app directive lines removed (outside code blocks). While `streaming`, an
@@ -20,7 +21,9 @@ export function stripAppDirectives(text: string, streaming = false): string {
   lines.forEach((line, i) => {
     const marker = FENCE.exec(line)?.[1];
     if (fence) {
-      if (marker && marker[0] === fence[0] && marker.length >= fence.length) fence = null;
+      // A closing fence has nothing after it (```python inside a block doesn't close it).
+      const closing = FENCE_CLOSE.exec(line)?.[1];
+      if (closing && closing[0] === fence[0] && closing.length >= fence.length) fence = null;
     } else if (marker) {
       fence = marker;
     } else if (DIRECTIVE_LINE.test(line) || (streaming && i === lines.length - 1 && PARTIAL_TAIL.test(line))) {

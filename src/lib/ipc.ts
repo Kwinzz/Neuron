@@ -338,6 +338,8 @@ export const ipc = {
   openMemoryFile: () => invoke<void>("open_memory_file"),
   /** Open a folder (project, chat working directory) in the system file manager. */
   openFolder: (path: string) => invoke<void>("open_folder", { path }),
+  /** Open a web / mail link (from a chat answer) in the default browser — http, https and mailto only. */
+  openLink: (url: string) => invoke<void>("open_link", { url }),
   memoryImportSources: () => invoke<LocalMemorySource[]>("memory_import_sources"),
   readMemoryImportFile: (path: string) => invoke<string>("read_memory_import_file", { path }),
   splitMemoryImport: (text: string) => invoke<ImportedMemory[]>("split_memory_import", { text }),

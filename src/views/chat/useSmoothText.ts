@@ -12,6 +12,8 @@ const FRAME_MS = 1000 / 60;
 /** Most display frames one step may catch up on. */
 const MAX_FRAMES = 6;
 
+const isHighSurrogate = (code: number) => code >= 0xd800 && code <= 0xdbff;
+
 /**
  * Reveals `target` progressively (one rAF step per frame) so text appears fluidly instead of in
  * network-sized chunks. The step grows with the backlog: a slow stream types steadily, a big block
@@ -60,6 +62,8 @@ export function useSmoothText(target: string, animate: boolean): { text: string;
     return () => cancel();
   }, [target, animate]);
 
-  const shown = Math.min(length, target.length);
+  let shown = Math.min(length, target.length);
+  // Never cut an emoji (UTF-16 surrogate pair) in half: it would flash as « � ».
+  if (shown > 0 && shown < target.length && isHighSurrogate(target.charCodeAt(shown - 1))) shown -= 1;
   return { text: target.slice(0, shown), revealing: shown < target.length };
 }

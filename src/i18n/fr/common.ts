@@ -24,6 +24,8 @@ const common = {
   untitledChat: "Chat sans titre",
   openFolder: "Ouvrir le dossier",
   openFolderFailed: "Dossier non ouvert",
+  openLinkFailed: "Lien non ouvert",
+  openFileFolder: "Ouvrir le dossier de {path}",
   justNow: "à l'instant",
   error: "Erreur",
 } satisfies Record<string, Message>;

@@ -4,34 +4,28 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
 import { CodeBlock } from "./CodeBlock";
-import { splitBlocks } from "./splitBlocks";
+import { chatUrlTransform } from "./links";
+import { MarkdownLink } from "./MarkdownLink";
+import { remarkBreaks, remarkLooseStrong } from "./remarkChat";
+import { settleStreamingTail, splitBlocks } from "./splitBlocks";
 import "./markdown.css";
 import { t } from "@/i18n";
 
 type ReactMarkdownProps = ComponentProps<typeof ReactMarkdown>;
 
-const REMARK: ReactMarkdownProps["remarkPlugins"] = [remarkGfm];
+const REMARK: ReactMarkdownProps["remarkPlugins"] = [remarkGfm, remarkLooseStrong];
+const REMARK_BREAKS: ReactMarkdownProps["remarkPlugins"] = [remarkGfm, remarkLooseStrong, remarkBreaks];
 const REHYPE: ReactMarkdownProps["rehypePlugins"] = [[rehypeHighlight, { detect: false }]];
 const NO_REHYPE: ReactMarkdownProps["rehypePlugins"] = [];
 const COMPONENTS: Components = {
   pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
-  a: ({ href, children }) => (
-    <a href={href} target="_blank" rel="noreferrer">
-      {children}
-    </a>
-  ),
+  a: ({ href, children }) => <MarkdownLink href={href}>{children}</MarkdownLink>,
   // Local files can't be loaded from markdown (the chat shows an agent's images under its message instead);
   // remote images are blocked by the CSP, so they become links.
   img: ({ src, alt }) => {
     const url = typeof src === "string" ? src : "";
     if (url.startsWith("data:image/")) return <img src={url} alt={alt ?? ""} />;
-    if (/^https?:/i.test(url)) {
-      return (
-        <a href={url} target="_blank" rel="noreferrer">
-          {alt || url}
-        </a>
-      );
-    }
+    if (/^https?:/i.test(url)) return <MarkdownLink href={url}>{alt || url}</MarkdownLink>;
     return null;
   },
   table: ({ children }) => (
@@ -62,6 +56,8 @@ interface MarkdownProps {
    * chaque mise à jour). Analysée d'un seul tenant une fois terminée.
    */
   streaming?: boolean;
+  /** Chat text: a single line break stays a line break (as in ChatGPT / Claude), not a space. */
+  breaks?: boolean;
 }
 
 /** Document mode: the « Section vide » annotation is CSS `content`, fed by a custom property in the UI language. */
@@ -72,14 +68,33 @@ function docStyle(): CSSProperties {
   return style;
 }
 
-/** One top-level block of a streaming answer; unchanged blocks keep their parsed output. */
-const MarkdownBlock = memo(function MarkdownBlock({ text, highlight }: { text: string; highlight: boolean }) {
+interface BlockProps {
+  text: string;
+  highlight: boolean;
+  breaks: boolean;
+}
+
+/** One parsed piece of Markdown (a whole text, or one top-level block of a streaming answer). */
+const MarkdownBlock = memo(function MarkdownBlock({ text, highlight, breaks }: BlockProps) {
   return (
-    <ReactMarkdown remarkPlugins={REMARK} rehypePlugins={highlight ? REHYPE : NO_REHYPE} components={COMPONENTS}>
+    <ReactMarkdown
+      remarkPlugins={breaks ? REMARK_BREAKS : REMARK}
+      rehypePlugins={highlight ? REHYPE : NO_REHYPE}
+      components={COMPONENTS}
+      urlTransform={chatUrlTransform}
+    >
       {text}
     </ReactMarkdown>
   );
 });
+
+/** Blocks of a streaming answer: unchanged ones keep their parsed output; the last one is shown settled. */
+function streamingBlocks(text: string): string[] {
+  const blocks = splitBlocks(text);
+  const last = blocks.length - 1;
+  if (last >= 0) blocks[last] = settleStreamingTail(blocks[last] ?? "");
+  return blocks;
+}
 
 export const Markdown = memo(function Markdown({
   children,
@@ -89,6 +104,7 @@ export const Markdown = memo(function Markdown({
   trailing,
   highlight = true,
   streaming = false,
+  breaks = false,
 }: MarkdownProps) {
   return (
     <div
@@ -101,11 +117,11 @@ export const Markdown = memo(function Markdown({
       style={doc ? docStyle() : undefined}
     >
       {streaming ? (
-        splitBlocks(children).map((block, i) => <MarkdownBlock key={i} text={block} highlight={highlight} />)
+        streamingBlocks(children).map((block, i) => (
+          <MarkdownBlock key={i} text={block} highlight={highlight} breaks={breaks} />
+        ))
       ) : (
-        <ReactMarkdown remarkPlugins={REMARK} rehypePlugins={highlight ? REHYPE : NO_REHYPE} components={COMPONENTS}>
-          {children}
-        </ReactMarkdown>
+        <MarkdownBlock text={children} highlight={highlight} breaks={breaks} />
       )}
       {trailing}
     </div>

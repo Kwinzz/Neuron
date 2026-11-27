@@ -114,3 +114,9 @@
 .chat-reveal > * {
   animation: chat-rise 0.35s ease-out both;
 }
+
+/* User messages (Markdown in a bg-muted bubble): inline code and code blocks stand out from the bubble. */
+.user-bubble .md-prose :not(pre) > code,
+.user-bubble .md-code {
+  background-color: var(--background);
+}

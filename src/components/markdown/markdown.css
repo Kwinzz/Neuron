@@ -198,6 +198,15 @@
   color: var(--muted-foreground);
 }
 
+/* Relative path or anchor: looks like a link, does nothing. */
+.md-prose a.md-link-inert {
+  cursor: text;
+}
+
+.md-prose a.md-link-inert:hover {
+  color: var(--foreground);
+}
+
 .md-prose strong {
   color: var(--foreground);
   font-weight: 600;

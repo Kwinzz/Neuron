@@ -21,6 +21,7 @@ import { SlashMenu } from "@/components/chat/SlashMenu";
 import { AGENTS } from "@/lib/agents";
 import { deviceOfThread } from "@/lib/deviceRouting";
 import { fuzzyScore, normalize } from "@/lib/fuzzy";
+import { caretInOpenFence, continueBlock, type TextEdit, toggleWrap } from "@/lib/markdownInput";
 import { useLive } from "@/stores/live";
 import { EMPTY_COMMANDS, slashKey, useSlash } from "@/stores/slash";
 import { AttachmentTray } from "@/components/attachments/AttachmentTray";
@@ -47,6 +48,25 @@ function toBase64(buffer: ArrayBuffer): string {
     binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   }
   return btoa(binary);
+}
+
+/**
+ * Apply a Markdown edit to the input. `insertText` keeps it in the native undo history (Ctrl+Z) and fires the
+ * input event React listens to; `setRangeText` is the fallback where `execCommand` is unavailable.
+ */
+function applyEdit(el: HTMLTextAreaElement, edit: TextEdit): void {
+  el.focus();
+  el.setSelectionRange(edit.start, edit.end);
+  let done = edit.start === edit.end && edit.text === "";
+  if (!done) {
+    // Deprecated, but still the only way to keep the undo history of a textarea (WebView2 and WebKitGTK).
+    done = edit.text === "" ? document.execCommand("delete") : document.execCommand("insertText", false, edit.text);
+  }
+  if (!done) {
+    el.setRangeText(edit.text, edit.start, edit.end, "end");
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  el.setSelectionRange(edit.selStart, edit.selEnd);
 }
 
 /** Clipboard images are all called "image.png": give them a readable, unique name. */
@@ -78,6 +98,10 @@ interface ComposerProps {
   /** Same column as the timeline, whose left gutter (pl-10) holds the agent cursor. */
   timelineGutter?: boolean;
 }
+
+/** Ctrl+<key> (⌘ on macOS) → Markdown marker wrapped around the selection. */
+const MARKDOWN_KEYS: Partial<Record<string, string>> = { b: "**", i: "*", e: "`" };
+const SHIFT_MARKDOWN_KEYS: Partial<Record<string, string>> = { x: "~~" };
 
 /** Max rows in the « / » menu. */
 const SLASH_LIMIT = 50;
@@ -297,6 +321,28 @@ export const Composer = memo(function Composer({
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    const el = e.currentTarget;
+    const mod = e.ctrlKey || e.metaKey;
+
+    // Markdown: Ctrl+B bold, Ctrl+I italic, Ctrl+E inline code (block over several lines), Ctrl+Maj+X strikethrough.
+    // Handled here, the event doesn't reach the window shortcuts (Ctrl+B = sidebar elsewhere).
+    if (mod && !e.altKey && !e.nativeEvent.isComposing) {
+      const key = e.key.toLowerCase();
+      const marker = (e.shiftKey ? SHIFT_MARKDOWN_KEYS : MARKDOWN_KEYS)[key];
+      if (marker) {
+        e.preventDefault();
+        e.stopPropagation();
+        applyEdit(el, toggleWrap(el.value, el.selectionStart, el.selectionEnd, marker));
+        return;
+      }
+      // Ctrl+Entrée always sends (even inside an open code block).
+      if (key === "enter" && !e.shiftKey) {
+        e.preventDefault();
+        if (canSend) void sendCurrent();
+        return;
+      }
+    }
+
     if (slashOpen) {
       const active = slashFiltered[slashIndex];
       if (e.key === "Escape") {
@@ -324,7 +370,18 @@ export const Composer = memo(function Composer({
       window.dispatchEvent(new Event(TOGGLE_PLAN_EVENT));
       return;
     }
-    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+    if (e.key === "Enter" && !e.nativeEvent.isComposing && !mod) {
+      if (e.shiftKey) {
+        // Maj+Entrée in a list / quote: the next line starts with the next marker.
+        const edit = continueBlock(el.value, el.selectionStart, el.selectionEnd);
+        if (edit) {
+          e.preventDefault();
+          applyEdit(el, edit);
+        }
+        return;
+      }
+      // Inside a code block that isn't closed yet, Entrée is a new line (Ctrl+Entrée sends anyway).
+      if (caretInOpenFence(el.value, el.selectionStart)) return;
       e.preventDefault();
       if (canSend) {
         void sendCurrent();
@@ -332,7 +389,6 @@ export const Composer = memo(function Composer({
       return;
     }
 
-    const el = e.currentTarget;
     if (e.key === "ArrowUp") {
       const onFirstLine =
         value.length === 0 ||

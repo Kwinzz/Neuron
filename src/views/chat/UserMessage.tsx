@@ -2,6 +2,7 @@ import { memo } from "react";
 import { SquareTerminal } from "lucide-react";
 import type { ChatItem } from "@/bindings/ChatItem";
 import { MessageAttachments } from "@/components/attachments/MessageAttachments";
+import { Markdown } from "@/components/markdown/Markdown";
 import { parseSlash } from "./slashText";
 import { t } from "@/i18n";
 
@@ -28,8 +29,11 @@ export const UserMessage = memo(function UserMessage({ item }: { item: UserItem 
         </div>
       ) : (
         item.text && (
-          <div className="max-w-[80%] rounded-2xl bg-muted px-4 py-2.5 text-sm leading-6 text-foreground min-w-0 whitespace-pre-wrap wrap-anywhere select-text">
-            {item.text}
+          // Written in Markdown like the answers; a single line break stays a line break.
+          <div className="user-bubble max-w-[80%] min-w-0 rounded-2xl bg-muted px-4 py-2.5">
+            <Markdown breaks className="leading-6">
+              {item.text}
+            </Markdown>
           </div>
         )
       )}

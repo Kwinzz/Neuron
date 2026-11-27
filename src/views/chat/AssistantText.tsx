@@ -42,6 +42,7 @@ export const AssistantText = memo(function AssistantText({
       <Markdown
         highlight={!writing}
         streaming={writing}
+        breaks
         className={cn(
           "min-h-7 min-w-0 text-foreground",
           writing && "chat-streaming",
