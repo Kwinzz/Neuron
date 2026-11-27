@@ -4,6 +4,7 @@ import type { ChatItem } from "@/bindings/ChatItem";
 import { Markdown } from "@/components/markdown/Markdown";
 import { useReveal } from "@/stores/reveal";
 import { AgentImages } from "./AgentImages";
+import { stripDirectives } from "@/lib/agentDirectives";
 import { stripSummaryLine } from "@/lib/turnSummary";
 import { useSmoothText } from "./useSmoothText";
 
@@ -21,8 +22,11 @@ export const AssistantText = memo(function AssistantText({
   fresh,
   threadId,
 }: AssistantTextProps) {
-  // The agent's hidden summary line (for the notification) never shows, even mid-stream.
-  const visible = useMemo(() => stripSummaryLine(item.text), [item.text]);
+  // The agent's hidden summary line (for the notification) and its app directives never show, even mid-stream.
+  const visible = useMemo(
+    () => stripDirectives(stripSummaryLine(item.text), item.streaming),
+    [item.text, item.streaming],
+  );
   const { text, revealing } = useSmoothText(visible, fresh || item.streaming);
   const writing = item.streaming || revealing;
 
