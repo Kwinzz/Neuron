@@ -8,7 +8,7 @@ interface UpdateState {
   info: UpdateInfo | null;
   checking: boolean;
   installing: boolean;
-  /** Download of the installer (Windows), while installing. */
+  /** Download of the installer (Windows) or of the package (Linux), while installing. */
   progress: UpdateProgress | null;
   load: () => Promise<void>;
   check: () => Promise<UpdateInfo>;
@@ -43,7 +43,7 @@ export const useUpdate = create<UpdateState>((set, get) => ({
     try {
       await updates.install();
     } finally {
-      // Windows: the app quits right after; Linux: the terminal window takes over.
+      // Windows and Linux package: the app quits (and restarts) right after; Linux from source: a terminal takes over.
       set({ installing: false });
     }
   },

@@ -3,7 +3,9 @@
 //!   (passive update mode);
 //! - Linux, installed by `install.sh` (`~/.config/neuron/install`: `commit=…`, `method=prebuilt|source`): the
 //!   installed commit against the package GitHub built for `main` (`main-build` pre-release, `build-info.txt`), or
-//!   against the head of `main` for a build from source; `install.sh --update` installs it.
+//!   against the head of `main` for a build from source. The app installs `main`'s package by itself (download,
+//!   `pkexec` for the package manager, restart: [`install_linux_prebuilt`]); a build from source and `neuron
+//!   update` go through `install.sh --update`.
 //!
 //! Used by the app (background check, Paramètres → Mises à jour) and by `neuron update`. Besides model prices, this
 //! is the app's only network call (none when the check is turned off).
@@ -26,6 +28,8 @@ const REPO_URL: &str = "https://github.com/Kwinzz/Neuron";
 const RAW_INSTALL_SH: &str = "https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh";
 /// Written last by `.github/workflows/linux-main.yml` once the packages of that commit are uploaded.
 const PREBUILT_INFO: &str = "https://github.com/Kwinzz/Neuron/releases/download/main-build/build-info.txt";
+/// Packages of `main` (same names as `install.sh`'s `prebuilt_asset`).
+const PREBUILT_URL: &str = "https://github.com/Kwinzz/Neuron/releases/download/main-build";
 /// A newer version was found (payload: [`UpdateInfo`]); emitted once per version.
 pub const UPDATE_AVAILABLE_EVENT: &str = "update://available";
 /// Download of the installer (payload: [`UpdateProgress`]).
@@ -58,6 +62,9 @@ pub struct UpdateInfo {
     pub installed_commit: Option<String>,
     #[serde(default)]
     pub latest_commit: Option<String>,
+    /// Linux: `main`'s package is installed by the app itself (no terminal), then Neuron restarts.
+    #[serde(default)]
+    pub in_app_install: bool,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]
@@ -117,6 +124,7 @@ pub fn parse_release(release: &Value, current: &str, now: i64) -> AppResult<Upda
         checked_at: now,
         installed_commit: None,
         latest_commit: None,
+        in_app_install: false,
     })
 }
 
@@ -136,6 +144,7 @@ pub fn source_info(version: &str, installed: &str, latest_version: &str, latest:
         checked_at: now,
         installed_commit: Some(installed.to_string()),
         latest_commit: Some(latest.to_string()),
+        in_app_install: false,
     }
 }
 
@@ -233,7 +242,9 @@ pub async fn fetch_latest() -> AppResult<UpdateInfo> {
         let info = get_text(&http, PREBUILT_INFO).await?;
         let latest = key_value(&info, "commit").ok_or_else(unexpected_answer)?;
         let latest_version = key_value(&info, "version").unwrap_or("?");
-        return Ok(source_info(current_version(), &installed, latest_version, latest, now_ms()));
+        let mut info = source_info(current_version(), &installed, latest_version, latest, now_ms());
+        info.in_app_install = linux_package().is_some();
+        return Ok(info);
     }
     let head = get_json(&http, MAIN_HEAD_API).await?;
     let latest = head.get("sha").and_then(Value::as_str).ok_or_else(unexpected_answer)?;
@@ -255,7 +266,9 @@ pub async fn check(state: &Shared) -> AppResult<UpdateInfo> {
 pub async fn cached(state: &Shared) -> AppResult<Option<UpdateInfo>> {
     let stored = state.db.call(|c| crate::db::settings::get(c, CACHE_KEY)).await?;
     let Some(mut info) = stored.and_then(|v| serde_json::from_value::<UpdateInfo>(v).ok()) else { return Ok(None) };
-    match (info.latest_commit.clone(), linux_install().await.map(|i| i.commit)) {
+    let install = linux_install().await;
+    info.in_app_install = install.as_ref().is_some_and(|i| i.prebuilt) && linux_package().is_some();
+    match (info.latest_commit.clone(), install.map(|i| i.commit)) {
         (Some(latest), Some(installed)) => {
             info.current = format!("{}+{}", current_version(), short(&installed));
             info.available = installed != latest;
@@ -321,6 +334,12 @@ pub async fn download_installer(info: &UpdateInfo, mut progress: impl FnMut(Upda
     let dir = std::env::temp_dir().join("neuron-update");
     tokio::fs::create_dir_all(&dir).await?;
     let path = dir.join(crate::attachments::safe_name(name));
+    download(url, &path, &mut progress).await?;
+    Ok(path)
+}
+
+/// Downloads `url` into `path` (through `<path>.part`), reporting progress.
+async fn download(url: &str, path: &Path, progress: &mut impl FnMut(UpdateProgress)) -> AppResult<()> {
     let partial = path.with_extension("part");
     let mut response =
         client(None)?.get(url).send().await.map_err(network_error)?.error_for_status().map_err(network_error)?;
@@ -345,8 +364,8 @@ pub async fn download_installer(info: &UpdateInfo, mut progress: impl FnMut(Upda
     if total.is_some_and(|t| t != downloaded) {
         return Err(AppError::Other(crate::tr!("téléchargement incomplet", "incomplete download")));
     }
-    tokio::fs::rename(&partial, &path).await?;
-    Ok(path)
+    tokio::fs::rename(&partial, path).await?;
+    Ok(())
 }
 
 /// Starts the downloaded installer in passive update mode (progress bar only, no question, previous choices kept);
@@ -363,6 +382,168 @@ pub fn launch_installer(path: &Path, relaunch: bool) -> AppResult<()> {
     Ok(())
 }
 
+/// Package manager of a Linux machine (the families `install.sh` supports).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinuxFamily {
+    Arch,
+    Debian,
+    Fedora,
+}
+
+/// Name of `main`'s package for a family and a CPU (`std::env::consts::ARCH`); none when GitHub doesn't build it.
+pub fn prebuilt_asset(family: LinuxFamily, arch: &str) -> Option<&'static str> {
+    Some(match (family, arch) {
+        (LinuxFamily::Arch, "x86_64") => "neuron-x86_64.pkg.tar.zst",
+        (LinuxFamily::Debian, "x86_64") => "neuron-x86_64.deb",
+        (LinuxFamily::Debian, "aarch64") => "neuron-aarch64.deb",
+        (LinuxFamily::Fedora, "x86_64") => "neuron-x86_64.rpm",
+        (LinuxFamily::Fedora, "aarch64") => "neuron-aarch64.rpm",
+        _ => return None,
+    })
+}
+
+/// This machine's family and package of `main`, when the app can install it itself (`pkexec` present).
+fn linux_package() -> Option<(LinuxFamily, &'static str)> {
+    use crate::env_path::find_program;
+    if !cfg!(target_os = "linux") || find_program("pkexec").is_none() {
+        return None;
+    }
+    let family = if find_program("pacman").is_some() {
+        LinuxFamily::Arch
+    } else if find_program("apt-get").is_some() {
+        LinuxFamily::Debian
+    } else if find_program("dnf").is_some() {
+        LinuxFamily::Fedora
+    } else {
+        return None;
+    };
+    Some((family, prebuilt_asset(family, std::env::consts::ARCH)?))
+}
+
+/// Package manager command installing `file`, its dependencies included (run through `pkexec`). `reinstall`: the
+/// same version is installed already (an update of `main` often keeps the version number; pacman and apt reinstall
+/// it anyway).
+pub fn install_command(family: LinuxFamily, file: &Path, reinstall: bool) -> (&'static str, Vec<String>) {
+    let file = file.display().to_string();
+    match family {
+        LinuxFamily::Arch => ("pacman", vec!["-U".into(), "--noconfirm".into(), file]),
+        LinuxFamily::Debian => {
+            ("apt-get", vec!["install".into(), "-y".into(), "--reinstall".into(), "--allow-downgrades".into(), file])
+        }
+        LinuxFamily::Fedora => ("dnf", vec![if reinstall { "reinstall" } else { "install" }.into(), "-y".into(), file]),
+    }
+}
+
+/// Fedora: `dnf install` of the version already installed does nothing, `dnf reinstall` is needed.
+async fn same_rpm_installed(file: &Path) -> bool {
+    let query = |args: Vec<std::ffi::OsString>| async move {
+        let out = tokio::process::Command::new("rpm").args(args).output().await.ok()?;
+        let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        (out.status.success() && !version.is_empty()).then_some(version)
+    };
+    let format = "%{VERSION}-%{RELEASE}";
+    let installed = query(vec!["-q".into(), "--qf".into(), format.into(), "neuron".into()]).await;
+    let offered = query(vec!["-qp".into(), "--qf".into(), format.into(), file.into()]).await;
+    installed.is_some() && installed == offered
+}
+
+/// Linux, installed by `install.sh` from `main`'s package: downloads the package GitHub built for `main`, installs
+/// it with the package manager through `pkexec` (the desktop asks for the password) and records the installed
+/// commit, as `install.sh --update` does. `None`: not possible here (build from source, no package for this
+/// machine, no `pkexec`), the caller falls back on `install.sh` in a terminal. The running app is not stopped: the
+/// caller restarts it ([`relaunch_when_closed`]).
+pub async fn install_linux_prebuilt(mut progress: impl FnMut(UpdateProgress)) -> AppResult<Option<String>> {
+    let Some((family, asset)) = linux_package() else { return Ok(None) };
+    if !linux_install().await.is_some_and(|i| i.prebuilt) {
+        return Ok(None);
+    }
+    let http = client(Some(FETCH_TIMEOUT))?;
+    let build = get_text(&http, PREBUILT_INFO).await?;
+    let commit = key_value(&build, "commit").ok_or_else(unexpected_answer)?.to_string();
+
+    let dir = std::env::temp_dir().join(format!("neuron-update-{}", uuid::Uuid::new_v4().simple()));
+    tokio::fs::create_dir_all(&dir).await?;
+    let result = async {
+        // apt reads the package as its own user.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            tokio::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).await?;
+        }
+        let file = dir.join(asset);
+        download(&format!("{PREBUILT_URL}/{asset}"), &file, &mut progress).await?;
+        let reinstall = family == LinuxFamily::Fedora && same_rpm_installed(&file).await;
+        let (program, args) = install_command(family, &file, reinstall);
+        let program = crate::env_path::find_program(program).unwrap_or_else(|| PathBuf::from(program));
+        let pkexec = crate::env_path::find_program("pkexec").unwrap_or_else(|| PathBuf::from("pkexec"));
+        let out = tokio::process::Command::new(pkexec)
+            .arg(&program)
+            .args(&args)
+            .stdin(std::process::Stdio::null())
+            .output()
+            .await
+            .map_err(|e| {
+                AppError::Other(crate::tr!("impossible de lancer pkexec ({e})", "could not start pkexec ({e})"))
+            })?;
+        match out.status.code() {
+            Some(0) => Ok(()),
+            // pkexec: the password dialog was dismissed, or the user is not allowed.
+            Some(126 | 127) => Err(AppError::Invalid(crate::tr!(
+                "installation annulée : autorisation administrateur refusée",
+                "installation cancelled: administrator permission denied"
+            ))),
+            _ => {
+                let log = String::from_utf8_lossy(&out.stderr);
+                let tail = crate::agents::subagents::output_tail(&log, 3);
+                Err(AppError::Other(crate::tr!(
+                    "{} n'a pas pu installer la mise à jour : {tail}\nDans un terminal : {}",
+                    "{} could not install the update: {tail}\nIn a terminal: {}",
+                    program.display(),
+                    linux_update_command()
+                )))
+            }
+        }
+    }
+    .await;
+    let _ = tokio::fs::remove_dir_all(&dir).await;
+    result?;
+
+    if let Some(state) = dirs::config_dir().map(|d| d.join("neuron").join("install")) {
+        tokio::fs::write(&state, format!("commit={commit}\nmethod=prebuilt\n")).await?;
+    }
+    // `neuron service install` was used and the server is running: it restarts on the new version.
+    let _ = tokio::process::Command::new("systemctl")
+        .args(["--user", "try-restart", "neuron.service"])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .await;
+    Ok(Some(commit))
+}
+
+/// Linux: starts Neuron again once this process has ended (a detached `sh` waits for it). The installed binary,
+/// not `current_exe`: the package replaced it.
+#[cfg(unix)]
+pub fn relaunch_when_closed() -> AppResult<()> {
+    use std::os::unix::process::CommandExt;
+    let program = crate::env_path::find_program("neuron").unwrap_or_else(|| PathBuf::from("/usr/bin/neuron"));
+    std::process::Command::new("sh")
+        .args(["-c", r#"while kill -0 "$1" 2>/dev/null; do sleep 0.2; done; exec "$2""#, "sh"])
+        .arg(std::process::id().to_string())
+        .arg(program)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        // Its own process group: not stopped with the app's.
+        .process_group(0)
+        .spawn()
+        .map_err(|e| {
+            AppError::Other(crate::tr!("impossible de relancer Neuron ({e})", "could not restart Neuron ({e})"))
+        })?;
+    Ok(())
+}
+
 /// Linux: the update command (always the `install.sh` of `main`: it knows how the packages are published today).
 pub fn linux_update_command() -> String {
     format!("curl -fsSL {RAW_INSTALL_SH} | bash -s -- --update --yes")
@@ -372,6 +553,30 @@ pub fn linux_update_command() -> String {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn linux_packages() {
+        assert_eq!(prebuilt_asset(LinuxFamily::Arch, "x86_64"), Some("neuron-x86_64.pkg.tar.zst"));
+        assert_eq!(prebuilt_asset(LinuxFamily::Arch, "aarch64"), None);
+        assert_eq!(prebuilt_asset(LinuxFamily::Debian, "aarch64"), Some("neuron-aarch64.deb"));
+        assert_eq!(prebuilt_asset(LinuxFamily::Fedora, "riscv64"), None);
+        let file = Path::new("/tmp/neuron-update-x/neuron-x86_64.rpm");
+        assert_eq!(install_command(LinuxFamily::Fedora, file, true).1[0], "reinstall");
+        assert_eq!(install_command(LinuxFamily::Fedora, file, false).1[0], "install");
+        let (program, args) = install_command(LinuxFamily::Arch, Path::new("/tmp/a/neuron-x86_64.pkg.tar.zst"), false);
+        assert_eq!((program, args.join(" ").as_str()), ("pacman", "-U --noconfirm /tmp/a/neuron-x86_64.pkg.tar.zst"));
+    }
+
+    /// This machine's package of `main` exists: `cargo test main_package -- --ignored` (Linux, network).
+    #[test]
+    #[ignore]
+    fn main_package_is_published() {
+        let (_, asset) = linux_package().expect("no package of main for this machine (or no pkexec)");
+        let response = tauri::async_runtime::block_on(async {
+            client(Some(FETCH_TIMEOUT)).unwrap().head(format!("{PREBUILT_URL}/{asset}")).send().await.unwrap()
+        });
+        assert!(response.status().is_success(), "{asset}: {}", response.status());
+    }
 
     #[test]
     fn versions() {

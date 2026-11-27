@@ -21,4 +21,8 @@ assetUrl: string | null, assetName: string | null, checkedAt: number,
  * Linux build from source: commit installed and head of `main` (`current` / `latest` then read
  * `<version>+<short commit>`). `None` for a release install.
  */
-installedCommit: string | null, latestCommit: string | null, };
+installedCommit: string | null, latestCommit: string | null, 
+/**
+ * Linux: `main`'s package is installed by the app itself (no terminal), then Neuron restarts.
+ */
+inAppInstall: boolean, };

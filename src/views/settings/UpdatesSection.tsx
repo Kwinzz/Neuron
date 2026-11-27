@@ -54,6 +54,9 @@ export function UpdatesSection({ settings }: { settings: AppSettings }) {
     installing && progress !== null && progress.total !== null && progress.total > 0
       ? formatPercent(progress.downloaded / progress.total)
       : null;
+  // Linux: downloaded, the package manager installs it (the desktop asks for the password meanwhile).
+  const installingPackage =
+    installing && progress !== null && progress.total !== null && progress.downloaded >= progress.total;
 
   return (
     <div className="flex flex-col gap-4">
@@ -102,9 +105,11 @@ export function UpdatesSection({ settings }: { settings: AppSettings }) {
                 <Button type="button" size="sm" disabled={!tauri || installing} onClick={() => void handleInstall()}>
                   {installing && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
                   <span>
-                    {downloading !== null
-                      ? t("settings.updatesDownloading", { percent: downloading })
-                      : t("settings.updatesInstall", { version: info.latest })}
+                    {installingPackage
+                      ? t("settings.updatesInstallingStep")
+                      : downloading !== null
+                        ? t("settings.updatesDownloading", { percent: downloading })
+                        : t("settings.updatesInstall", { version: info.latest })}
                   </span>
                 </Button>
               )}
@@ -112,7 +117,11 @@ export function UpdatesSection({ settings }: { settings: AppSettings }) {
           </div>
           {info?.available && (
             <p className="text-xs text-muted-foreground">
-              {IS_WINDOWS ? t("settings.updatesHowWindows") : t("settings.updatesHowLinux")}
+              {IS_WINDOWS
+                ? t("settings.updatesHowWindows")
+                : info.inAppInstall
+                  ? t("settings.updatesHowLinuxInApp")
+                  : t("settings.updatesHowLinux")}
             </p>
           )}
           {error !== null && (

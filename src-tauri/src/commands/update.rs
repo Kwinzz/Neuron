@@ -22,7 +22,8 @@ pub async fn update_check(state: State<'_, Shared>) -> AppResult<UpdateInfo> {
 }
 
 /// Installs the latest version. Windows: downloads the installer (`update://progress`), starts it in passive update
-/// mode (Neuron restarts by itself) and quits. Linux: `install.sh --update` in a terminal window.
+/// mode (Neuron restarts by itself) and quits. Linux: downloads `main`'s package (`update://progress`), installs it
+/// through `pkexec`, restarts Neuron; a build from source runs `install.sh --update` in a terminal window.
 #[tauri::command]
 pub async fn update_install(app: tauri::AppHandle, state: State<'_, Shared>) -> AppResult<()> {
     let info = match update::cached(&state).await? {
@@ -50,6 +51,22 @@ pub async fn update_install(app: tauri::AppHandle, state: State<'_, Shared>) -> 
         });
         Ok(())
     } else if cfg!(target_os = "linux") {
+        // `main`'s package: installed here (password asked by the desktop), then Neuron restarts by itself.
+        let sink = state.events.clone();
+        let installed = update::install_linux_prebuilt(|p| {
+            events::emit_local(sink.as_ref(), UPDATE_PROGRESS_EVENT, &p);
+        })
+        .await?;
+        if installed.is_some() {
+            #[cfg(unix)]
+            update::relaunch_when_closed()?;
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(600)).await;
+                app.exit(0);
+            });
+            return Ok(());
+        }
+        // A build from source (or no package for this machine): install.sh in a terminal.
         let script = update_script(&info.latest, &update::linux_update_command());
         crate::agents::access::open_terminal(&crate::tr!("Neuron — mise à jour", "Neuron — update"), &script)
     } else {

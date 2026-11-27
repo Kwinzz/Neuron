@@ -296,8 +296,11 @@ const settings = {
   updatesCheck: "Vérifier",
   updatesInstall: "Installer {version}",
   updatesDownloading: "Téléchargement… {percent}",
+  updatesInstallingStep: "Installation…",
   updatesHowWindows:
     "L'installateur se lance en mode mise à jour (autorisation administrateur demandée), puis Neuron redémarre tout seul. Vos réglages et choix d'installation sont conservés.",
+  updatesHowLinuxInApp:
+    "Neuron télécharge la nouvelle version, l'installe (mot de passe administrateur demandé) puis redémarre tout seul. Les chats en cours sont interrompus.",
   updatesHowLinux:
     "La mise à jour s'exécute dans un terminal (install.sh) : Neuron se ferme le temps de l'installer (quelques secondes), relancez-le ensuite.",
   updatesAuto: "Vérifier automatiquement",

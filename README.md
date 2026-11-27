@@ -95,7 +95,8 @@ curl -fsSL https://raw.githubusercontent.com/Kwinzz/Neuron/main/install.sh | bas
 (`--yes` answers yes to the questions; deleting your data is never automatic.)
 
 Updates follow `main`: **Settings → Updates** (or `neuron update`) tells you when a newer build of `main` is
-available and installs it in a terminal.
+available. The app installs the package itself (your password is asked by the desktop) and restarts; an install
+built from source, and `neuron update`, run `install.sh` in a terminal.
 
 Building from source: the sources stay in `~/.local/share/neuron-src` so later builds are faster. To test another
 branch of this repository, put `NEURON_BRANCH=<branch>` before `bash` (`... | NEURON_BRANCH=<branch> bash`; always
