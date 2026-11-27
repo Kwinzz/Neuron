@@ -79,15 +79,10 @@ fn base_name(program: &str) -> String {
     name
 }
 
-/// Key of an agent CLI from its program name only (`/usr/local/bin/codex` → `codex`), package paths aside.
-pub fn program_name_key(program: &str) -> Option<&'static str> {
-    let base = base_name(program);
-    PROGRAMS.iter().find(|(name, _)| *name == base).map(|(_, key)| *key)
-}
-
 /// Key of an agent CLI from a program name, or of a package path (`…/node_modules/@google/gemini-cli/…`).
 pub fn program_key(program: &str) -> Option<&'static str> {
-    if let Some(key) = program_name_key(program) {
+    let base = base_name(program);
+    if let Some((_, key)) = PROGRAMS.iter().find(|(name, _)| *name == base) {
         return Some(key);
     }
     let path = program.replace('\\', "/").to_lowercase();
