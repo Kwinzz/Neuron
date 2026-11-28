@@ -71,6 +71,8 @@ const shell = {
   liveThreads: "Threads live",
   liveThreadsTooltip: "Threads live ({combo})",
   dockHide: "Masquer ({combo})",
+  dockClearFinished: "Fermer les threads terminés",
+  dockDismiss: "Fermer de l'affichage",
   dockEmptyTitle: "Aucun chat actif",
   dockEmptyBody: "Les chats en cours, tous projets confondus, apparaissent ici en temps réel.",
   dockProjectFilter: "Projet :",

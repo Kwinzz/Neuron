@@ -1,6 +1,6 @@
 import { memo, useMemo } from "react";
 import { cn } from "cn";
-import { ArrowUpRight, ChevronDown, GitFork, Square } from "lucide-react";
+import { ArrowUpRight, ChevronDown, GitFork, Square, X } from "lucide-react";
 import { AgentLogo } from "@/components/ui/AgentLogo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -155,6 +155,21 @@ export const DockCard = memo(function DockCard({ id }: { id: string }) {
               <Square className="size-3" />
             </Button>
           )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-6"
+            aria-label={t("shell.dockDismiss")}
+            title={t("shell.dockDismiss")}
+            onClick={(e) => {
+              e.stopPropagation();
+              useLive.getState().dismissFromDock(id);
+            }}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <X className="size-3.5" />
+          </Button>
         </div>
       </div>
 

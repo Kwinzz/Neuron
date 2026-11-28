@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { cn } from "cn";
-import { Activity, PanelRightClose, X } from "lucide-react";
+import { Activity, ListX, PanelRightClose, X } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,9 @@ export function LiveDock() {
 function DockPanel({ open }: { open: boolean }) {
   const ids = useDockIds();
   const activeCount = useLive((s) => Object.values(s.threads).filter((t) => STATUS[t.status].active).length);
+  const finishedIds = useLive(
+    useShallow((s) => ids.filter((id) => s.threads[id] && !STATUS[s.threads[id].status].active)),
+  );
   const projectId = useUi((s) => s.selectedProjectId);
 
   return (
@@ -77,16 +80,30 @@ function DockPanel({ open }: { open: boolean }) {
             {activeCount}
           </Badge>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="ml-auto size-7"
-          onClick={() => useUi.getState().toggleDock()}
-          aria-label={t("shell.dockHide", { combo: `${MOD_LABEL}+J` })}
-          title={t("shell.dockHide", { combo: `${MOD_LABEL}+J` })}
-        >
-          <PanelRightClose />
-        </Button>
+        <div className="ml-auto flex items-center gap-0.5">
+          {finishedIds.length > 0 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 text-muted-foreground hover:text-foreground"
+              onClick={() => useLive.getState().dismissFinishedFromDock(finishedIds)}
+              aria-label={t("shell.dockClearFinished")}
+              title={t("shell.dockClearFinished")}
+            >
+              <ListX className="size-4" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            onClick={() => useUi.getState().toggleDock()}
+            aria-label={t("shell.dockHide", { combo: `${MOD_LABEL}+J` })}
+            title={t("shell.dockHide", { combo: `${MOD_LABEL}+J` })}
+          >
+            <PanelRightClose />
+          </Button>
+        </div>
         <Separator orientation="vertical" className="mx-0.5 data-[orientation=vertical]:h-4" />
         <WindowControls />
       </header>

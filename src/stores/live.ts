@@ -25,14 +25,48 @@ export type Attention = "done" | "approval" | "error";
 /** Finished threads stay visible in the dock for this long. */
 export const DOCK_LINGER_MS = 15 * 60_000;
 
+const DOCK_DISMISSED_KEY = "neuron.dockDismissed";
+const DISMISSED_TTL_MS = 24 * 60 * 60_000;
+
+function readDismissed(): Record<string, number> {
+  try {
+    const raw = window.localStorage.getItem(DOCK_DISMISSED_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    const cutoff = Date.now() - DISMISSED_TTL_MS;
+    const out: Record<string, number> = {};
+    for (const [id, ts] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof ts === "number" && ts > cutoff) out[id] = ts;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function writeDismissed(map: Record<string, number>) {
+  try {
+    window.localStorage.setItem(DOCK_DISMISSED_KEY, JSON.stringify(map));
+  } catch {
+    // ignore storage errors
+  }
+}
+
 interface LiveState {
   threads: Record<string, LiveThread>;
   attention: Record<string, Attention>;
+  /** Threads manually closed from the Live threads dock (`id -> dismissedAtMs`). */
+  dockDismissed: Record<string, number>;
 
   hydrate: (summaries: ThreadSummary[]) => void;
   applyEvent: (envelope: AgentEventEnvelope, focusedThreadId: string | null) => void;
   markSeen: (id: string) => void;
   clearAttention: () => void;
+  /** Hide a single thread card from the Live threads dock (does not stop or delete the chat). */
+  dismissFromDock: (id: string) => void;
+  /** Hide multiple finished thread cards from the Live threads dock at once. */
+  dismissFinishedFromDock: (ids: string[]) => void;
   /** A deleted chat leaves the dock and every live view. */
   remove: (id: string) => void;
 }
@@ -64,12 +98,14 @@ const pending = new Set<string>();
 export const useLive = create<LiveState>((set, get) => ({
   threads: {},
   attention: {},
+  dockDismissed: readDismissed(),
 
   hydrate: (summaries) =>
     set((state) => {
       // Periodic refreshes mostly bring unchanged rows: keep those objects (and the map itself when nothing
       // changed), otherwise every chat in the sidebar, dock and header re-renders at each refresh.
       let threads: Record<string, LiveThread> | null = null;
+      let dockDismissed: Record<string, number> | null = null;
       for (const s of summaries) {
         const prev = state.threads[s.id];
         // Never let an older DB snapshot overwrite fresher live state (status, tokens, timers)…
@@ -95,8 +131,24 @@ export const useLive = create<LiveState>((set, get) => ({
           threads ??= { ...state.threads };
           threads[s.id] = kept;
         }
+        // A dismissed thread re-enters the dock when a new run starts after it was closed.
+        const dismissedAt = state.dockDismissed[s.id];
+        if (
+          dismissedAt !== undefined &&
+          STATUS[s.status].active &&
+          (!prev || !STATUS[prev.status].active) &&
+          s.updatedAt > dismissedAt
+        ) {
+          dockDismissed ??= { ...state.dockDismissed };
+          delete dockDismissed[s.id];
+        }
       }
-      return threads ? { threads } : state;
+      if (dockDismissed) writeDismissed(dockDismissed);
+      if (!threads && !dockDismissed) return state;
+      return {
+        ...(threads ? { threads } : {}),
+        ...(dockDismissed ? { dockDismissed } : {}),
+      };
     }),
 
   applyEvent: ({ threadId, ts, event }, focusedThreadId) => {
@@ -118,6 +170,7 @@ export const useLive = create<LiveState>((set, get) => ({
       if (!t) return state;
       let next: LiveThread = { ...t, lastEventAt: ts, updatedAt: ts };
       let attention = state.attention;
+      let dockDismissed = state.dockDismissed;
 
       switch (event.kind) {
         case "ThreadStatusChanged": {
@@ -130,6 +183,11 @@ export const useLive = create<LiveState>((set, get) => ({
             runStartedAt: !wasActive && isActive ? ts : t.runStartedAt,
             endedAt: isActive ? null : ts,
           };
+          if (!wasActive && isActive && threadId in dockDismissed) {
+            dockDismissed = { ...dockDismissed };
+            delete dockDismissed[threadId];
+            writeDismissed(dockDismissed);
+          }
           const why = attentionFor(event.status);
           if (why && threadId !== focusedThreadId) attention = { ...attention, [threadId]: why };
           break;
@@ -167,7 +225,7 @@ export const useLive = create<LiveState>((set, get) => ({
         case "ToolCallResult":
           break;
       }
-      return { threads: { ...state.threads, [threadId]: next }, attention };
+      return { threads: { ...state.threads, [threadId]: next }, attention, dockDismissed };
     });
   },
 
@@ -181,20 +239,59 @@ export const useLive = create<LiveState>((set, get) => ({
 
   clearAttention: () => set({ attention: {} }),
 
+  dismissFromDock: (id) =>
+    set((state) => {
+      const dockDismissed = { ...state.dockDismissed, [id]: Date.now() };
+      writeDismissed(dockDismissed);
+      if (id in state.attention) {
+        const attention = { ...state.attention };
+        delete attention[id];
+        return { dockDismissed, attention };
+      }
+      return { dockDismissed };
+    }),
+
+  dismissFinishedFromDock: (ids) =>
+    set((state) => {
+      if (ids.length === 0) return state;
+      const now = Date.now();
+      const dockDismissed = { ...state.dockDismissed };
+      let attention: Record<string, Attention> | null = null;
+      let changed = false;
+      for (const id of ids) {
+        const thread = state.threads[id];
+        if (thread && STATUS[thread.status].active) continue;
+        dockDismissed[id] = now;
+        changed = true;
+        if (id in state.attention) {
+          attention ??= { ...state.attention };
+          delete attention[id];
+        }
+      }
+      if (!changed) return state;
+      writeDismissed(dockDismissed);
+      return attention ? { dockDismissed, attention } : { dockDismissed };
+    }),
+
   remove: (id) =>
     set((state) => {
-      if (!(id in state.threads) && !(id in state.attention)) return state;
+      if (!(id in state.threads) && !(id in state.attention) && !(id in state.dockDismissed)) return state;
       const threads = { ...state.threads };
       const attention = { ...state.attention };
+      const dockDismissed = { ...state.dockDismissed };
       delete threads[id];
       delete attention[id];
-      return { threads, attention };
+      if (id in dockDismissed) {
+        delete dockDismissed[id];
+        writeDismissed(dockDismissed);
+      }
+      return { threads, attention, dockDismissed };
     }),
 }));
 
 /** Ids shown in the dock: active threads first (newest run first), then recently finished. */
 export function selectDockIds(state: LiveState, now: number): string[] {
-  const all = Object.values(state.threads);
+  const all = Object.values(state.threads).filter((t) => !(t.id in state.dockDismissed));
   const active = all
     .filter((t) => STATUS[t.status].active)
     .sort((a, b) => b.runStartedAt - a.runStartedAt);

@@ -72,6 +72,8 @@ const shell: Translation<typeof fr> = {
   liveThreads: "Live threads",
   liveThreadsTooltip: "Live threads ({combo})",
   dockHide: "Hide ({combo})",
+  dockClearFinished: "Clear finished threads",
+  dockDismiss: "Dismiss from dock",
   dockEmptyTitle: "No active chat",
   dockEmptyBody: "Running chats from every project show up here in real time.",
   dockProjectFilter: "Project:",
