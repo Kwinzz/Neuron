@@ -1,6 +1,6 @@
 [package]
 name = "neuron"
-version = "0.2.7"
+version = "0.2.8"
 description = "Neuron — unified desktop cockpit for CLI AI agents"
 edition = "2024"
 rust-version = "1.85"
