@@ -86,7 +86,7 @@ pub async fn update_install(app: tauri::AppHandle, state: State<'_, Shared>) -> 
         let script = update_script(&info.latest, &update::linux_update_command());
         crate::agents::access::open_terminal(&crate::tr!("Neuron — mise à jour", "Neuron — update"), &script)
     } else {
-        crate::util::open_with_system(std::path::Path::new(&info.page_url))?;
+        crate::util::open_url(&info.page_url)?;
         Ok(())
     }
 }

@@ -76,7 +76,7 @@ pub async fn open_link(url: String) -> AppResult<()> {
     if !matches!(parsed.scheme(), "http" | "https" | "mailto") {
         return Err(AppError::Other(crate::tr!("lien non pris en charge : {url}", "unsupported link: {url}")));
     }
-    crate::util::open_with_system(std::path::Path::new(parsed.as_str()))?;
+    crate::util::open_url(parsed.as_str())?;
     Ok(())
 }
 
