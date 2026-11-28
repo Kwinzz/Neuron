@@ -1,7 +1,7 @@
 //! Command line of `neuron` (hand-parsed: a handful of subcommands, no dependency).
 
 use super::service::ServiceCmd;
-use crate::db::remote::AccessLevel;
+use crate::db::remote::{AccessLevel, WorkspaceScope};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Command {
@@ -29,6 +29,7 @@ pub enum RemoteCmd {
     Enable { internet: bool },
     Disable,
     Internet(bool),
+    Tools { enabled: bool, scope: WorkspaceScope },
     Name(String),
     Code,
     Devices,
@@ -114,6 +115,24 @@ fn parse_remote(args: &[String]) -> Result<RemoteCmd, String> {
             [v] if v == "off" => Ok(RemoteCmd::Internet(false)),
             _ => Err(crate::tr!("usage : neuron remote internet on|off", "usage: neuron remote internet on|off")),
         },
+        "tools" => match rest {
+            [v] if v == "on" => Ok(RemoteCmd::Tools { enabled: true, scope: WorkspaceScope::ProjectOnly }),
+            [v] if v == "off" => Ok(RemoteCmd::Tools { enabled: false, scope: WorkspaceScope::ProjectOnly }),
+            [v, flag, scope] if v == "on" && flag == "--scope" => match scope.as_str() {
+                "projects" | "project_only" => {
+                    Ok(RemoteCmd::Tools { enabled: true, scope: WorkspaceScope::ProjectOnly })
+                }
+                "full" => Ok(RemoteCmd::Tools { enabled: true, scope: WorkspaceScope::Full }),
+                _ => Err(crate::tr!(
+                    "usage : neuron remote tools on|off [--scope projects|full]",
+                    "usage: neuron remote tools on|off [--scope projects|full]"
+                )),
+            },
+            _ => Err(crate::tr!(
+                "usage : neuron remote tools on|off [--scope projects|full]",
+                "usage: neuron remote tools on|off [--scope projects|full]"
+            )),
+        },
         "name" => {
             let name = rest.join(" ");
             if name.trim().is_empty() {
@@ -163,6 +182,7 @@ Usage : neuron <commande>
   remote enable [--internet]      autorise d'autres appareils à piloter celui-ci
   remote disable                  n'autorise plus aucun appareil
   remote internet on|off          accessible hors du réseau local (relais publics)
+  remote tools on|off [--scope projects|full]  outils distants (fichiers/shell) pour pairs Full
   remote name <nom>               nom montré aux autres appareils
   remote code                     ouvre l'appairage : code à saisir sur l'autre appareil
   remote devices                  appareils appairés
@@ -184,6 +204,7 @@ Usage: neuron <command>
   remote enable [--internet]      let other devices control this one
   remote disable                  no device may control this one anymore
   remote internet on|off          reachable outside the local network (public relays)
+  remote tools on|off [--scope projects|full]  remote workspace tools (files/shell) for Full peers
   remote name <name>              name shown to the other devices
   remote code                     open pairing: the code to type on the other device
   remote devices                  paired devices
@@ -225,6 +246,18 @@ mod tests {
         assert_eq!(p("remote enable"), Some(Ok(Command::Remote(RemoteCmd::Enable { internet: false }))));
         assert_eq!(p("remote enable --internet"), Some(Ok(Command::Remote(RemoteCmd::Enable { internet: true }))));
         assert_eq!(p("remote internet off"), Some(Ok(Command::Remote(RemoteCmd::Internet(false)))));
+        assert_eq!(
+            p("remote tools on"),
+            Some(Ok(Command::Remote(RemoteCmd::Tools { enabled: true, scope: WorkspaceScope::ProjectOnly })))
+        );
+        assert_eq!(
+            p("remote tools on --scope full"),
+            Some(Ok(Command::Remote(RemoteCmd::Tools { enabled: true, scope: WorkspaceScope::Full })))
+        );
+        assert_eq!(
+            p("remote tools off"),
+            Some(Ok(Command::Remote(RemoteCmd::Tools { enabled: false, scope: WorkspaceScope::ProjectOnly })))
+        );
         assert_eq!(p("remote name Mon serveur"), Some(Ok(Command::Remote(RemoteCmd::Name("Mon serveur".into())))));
         assert_eq!(p("remote code"), Some(Ok(Command::Remote(RemoteCmd::Code))));
         assert_eq!(

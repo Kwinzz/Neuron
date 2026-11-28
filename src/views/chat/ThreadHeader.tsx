@@ -3,16 +3,19 @@ import { type KeyboardEvent, memo, useEffect, useMemo, useRef, useState } from "
 import { cn } from "cn";
 import { ContextIndicator } from "@/components/context/ContextIndicator";
 import {
+  ArrowRight,
   Folder,
   FolderInput,
   FolderKanban,
   FolderMinus,
   FolderOpen,
+  Monitor,
   MoreHorizontal,
   Pencil,
   Square,
   Trash2,
 } from "lucide-react";
+import type { WorkspaceTarget } from "@/bindings/WorkspaceTarget";
 import { AgentLogo } from "@/components/ui/AgentLogo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,6 +49,7 @@ import { openFolder } from "@/lib/openFolder";
 import { describeStatus, STATUS, TONE_TEXT } from "@/lib/status";
 import { useChat } from "@/stores/chat";
 import { useChatDeletion } from "@/stores/chatDeletion";
+import { useDevices } from "@/stores/devices";
 import { useLive } from "@/stores/live";
 import { effortLabel } from "@/lib/models";
 import { findModel, useDeviceProviders } from "@/stores/models";
@@ -118,6 +122,20 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
   const statusMeta = STATUS[live.status];
   const agentMeta = AGENTS[live.agent];
   const device = deviceOfThread(threadId);
+  const ownNodeId = useDevices((s) => s.status?.nodeId ?? null);
+  const navProjects = useNav((s) => s.projects);
+  const workspace = live.workspace;
+  const localFolderPath =
+    workspace !== null
+      ? workspace.deviceId === ownNodeId
+        ? workspace.cwd
+        : null
+      : !device
+        ? live.cwd
+        : null;
+  const linkedProjectId =
+    live.projectId ??
+    (workspace?.projectId && navProjects.some((p) => p.id === workspace.projectId) ? workspace.projectId : null);
 
   const startEdit = () => {
     settledRef.current = false;
@@ -186,8 +204,10 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
             agent={live.agent}
             model={live.model}
             effort={live.effort}
-            cwd={live.cwd}
+            cwd={workspace ? workspace.cwd : live.cwd}
             device={device}
+            workspace={workspace}
+            canOpenLocalFolder={Boolean(localFolderPath)}
           />
         </div>
 
@@ -228,19 +248,21 @@ export const ThreadHeader = memo(function ThreadHeader({ threadId }: { threadId:
                 <Pencil />
                 {t("chat.rename")}
               </DropdownMenuItem>
-              <ThreadMoveSubmenu
-                threadId={threadId}
-                currentProjectId={live.projectId}
-                device={device ?? deviceOfProject(live.projectId)}
-              />
-              {live.cwd && !device && (
-                <DropdownMenuItem onClick={() => live.cwd && void openFolder(live.cwd)}>
+              {workspace === null && (
+                <ThreadMoveSubmenu
+                  threadId={threadId}
+                  currentProjectId={live.projectId}
+                  device={device ?? deviceOfProject(live.projectId)}
+                />
+              )}
+              {localFolderPath && (
+                <DropdownMenuItem onClick={() => void openFolder(localFolderPath)}>
                   <FolderOpen />
                   {t("common.openFolder")}
                 </DropdownMenuItem>
               )}
-              {live.projectId && (
-                <DropdownMenuItem onClick={() => live.projectId && useUi.getState().openProject(live.projectId)}>
+              {linkedProjectId && (
+                <DropdownMenuItem onClick={() => useUi.getState().openProject(linkedProjectId)}>
                   <FolderKanban />
                   {t("chat.openProject")}
                 </DropdownMenuItem>
@@ -320,6 +342,8 @@ const HeaderMeta = memo(function HeaderMeta({
   effort,
   cwd,
   device,
+  workspace,
+  canOpenLocalFolder,
 }: {
   agentLabel: string;
   agent: Parameters<typeof findModel>[1];
@@ -327,8 +351,15 @@ const HeaderMeta = memo(function HeaderMeta({
   effort: string | null;
   cwd: string | null;
   device: string | null;
+  workspace: WorkspaceTarget | null;
+  canOpenLocalFolder: boolean;
 }) {
   const providers = useDeviceProviders(device);
+  const ownNodeId = useDevices((s) => s.status?.nodeId ?? null);
+  const aiHostName = useDevices((s) =>
+    device ? (s.devices?.hosts.find((h) => h.nodeId === device)?.name ?? null) : null,
+  );
+  const aiLabel = device ? (aiHostName ?? t("shell.unknownDevice")) : t("chat.thisPc");
   const modelInfo = findModel(providers, agent, model);
   // Antigravity families: the level is the selected variant's.
   const level =
@@ -337,15 +368,35 @@ const HeaderMeta = memo(function HeaderMeta({
   const parts = [agentLabel, modelInfo?.label ?? model ?? t("chat.defaultModel"), level ? effortLabel(level) : null].filter(
     (p): p is string => Boolean(p),
   );
+  const workspaceLabel = workspace
+    ? workspace.deviceId === ownNodeId
+      ? t("chat.thisPc")
+      : workspace.deviceName || t("shell.unknownDevice")
+    : null;
   return (
     <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
       <span className="truncate">{parts.join(" · ")}</span>
-      <DeviceBadge device={device} />
+      {workspace ? (
+        <span
+          className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-xs leading-none text-muted-foreground"
+          title={t("chat.crossDeviceSummary", {
+            ai: aiLabel,
+            workspace: workspaceLabel ?? t("shell.unknownDevice"),
+          })}
+        >
+          <Monitor className="size-3 shrink-0" aria-hidden />
+          <span className="max-w-24 truncate">{aiLabel}</span>
+          <ArrowRight className="size-3 shrink-0 opacity-60" aria-hidden />
+          <span className="max-w-24 truncate text-foreground">{workspaceLabel}</span>
+        </span>
+      ) : (
+        <DeviceBadge device={device} />
+      )}
       {cwd && (
         <TooltipProvider delayDuration={300}>
           <Tooltip>
             <TooltipTrigger asChild>
-              {device ? (
+              {!canOpenLocalFolder ? (
                 <span
                   tabIndex={0}
                   className="inline-flex min-w-0 shrink items-center gap-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
@@ -369,7 +420,7 @@ const HeaderMeta = memo(function HeaderMeta({
             </TooltipTrigger>
             <TooltipContent className="max-w-md flex-col items-start gap-0.5 break-all">
               <span className="font-mono">{cwd}</span>
-              {!device && <span className="block opacity-70">{t("common.openFolder")}</span>}
+              {canOpenLocalFolder && <span className="block opacity-70">{t("common.openFolder")}</span>}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

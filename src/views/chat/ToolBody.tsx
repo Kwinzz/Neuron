@@ -27,13 +27,13 @@ function renderInput(name: string, input: JsonValue): ReactNode {
   const base = baseToolName(name);
   const obj = asObject(input);
 
-  if (base === "Edit") {
-    const oldStr = str(obj, "old_string");
-    const newStr = str(obj, "new_string");
+  if (base === "Edit" || base === "remote_edit") {
+    const oldStr = str(obj, "old_string") ?? str(obj, "old_text");
+    const newStr = str(obj, "new_string") ?? str(obj, "new_text");
     if (oldStr !== null && newStr !== null) {
       return (
         <div className="flex flex-col gap-2">
-          <FileHeader path={str(obj, "file_path")} />
+          <FileHeader path={str(obj, "file_path") ?? str(obj, "path")} />
           <DiffView oldText={oldStr} newText={newStr} />
         </div>
       );
@@ -65,25 +65,27 @@ function renderInput(name: string, input: JsonValue): ReactNode {
     }
   }
 
-  if (base === "Write") {
+  if (base === "Write" || base === "remote_write") {
     const content = str(obj, "content");
     if (content !== null) {
       return (
         <div className="flex flex-col gap-2">
-          <FileHeader path={str(obj, "file_path")} />
+          <FileHeader path={str(obj, "file_path") ?? str(obj, "path")} />
           <OutputBlock text={content} maxLines={40} />
         </div>
       );
     }
   }
 
-  if (base === "Bash" || base === "PowerShell") {
+  if (base === "Bash" || base === "PowerShell" || base === "remote_run") {
     const command = str(obj, "command");
     if (command !== null) {
       const description = str(obj, "description");
+      const cwd = str(obj, "cwd");
       return (
         <div className="flex flex-col gap-1.5">
           {description && <p className="wrap-anywhere text-xs text-muted-foreground">{description}</p>}
+          {cwd && <FileHeader path={cwd} />}
           <pre className="rounded-md border bg-muted/40 px-3 py-2 font-mono text-xs text-foreground whitespace-pre-wrap break-all select-text">
             <span className="select-none text-muted-foreground">$ </span>
             {command}
@@ -93,8 +95,8 @@ function renderInput(name: string, input: JsonValue): ReactNode {
     }
   }
 
-  if (base === "Read") {
-    const filePath = str(obj, "file_path");
+  if (base === "Read" || base === "remote_read") {
+    const filePath = str(obj, "file_path") ?? str(obj, "path");
     if (filePath !== null) {
       const offset = num(obj, "offset");
       const limit = num(obj, "limit");
@@ -131,11 +133,11 @@ function renderInput(name: string, input: JsonValue): ReactNode {
     }
   }
 
-  if (base === "Grep") {
+  if (base === "Grep" || base === "remote_search") {
     const pattern = str(obj, "pattern");
     if (pattern !== null) {
       const path = str(obj, "path");
-      const glob = str(obj, "glob");
+      const glob = str(obj, "glob") ?? str(obj, "mode");
       return (
         <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
           <Badge variant="secondary" className="h-auto max-w-full font-mono whitespace-normal wrap-anywhere text-left select-text">

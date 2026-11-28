@@ -177,6 +177,7 @@ export function partitionSidebar(
     }
   }
 
+  const knownProjectIds = new Set(projects.map((p) => p.id));
   const scores = filtering ? new Map<string, number>() : null;
   const chatsByProject = new Map<string, ThreadSummary[]>();
   const localLooseChats: ThreadSummary[] = [];
@@ -196,16 +197,25 @@ export function partitionSidebar(
       continue;
     }
 
-    const device = deviceOfThread(c.id) ?? deviceOfProject(c.projectId);
-    if (device !== null) {
+    const effectiveProjectId =
+      c.projectId ?? (c.workspace?.projectId && knownProjectIds.has(c.workspace.projectId) ? c.workspace.projectId : null);
+    const device = deviceOfThread(c.id) ?? deviceOfProject(effectiveProjectId);
+    if (device !== null && effectiveProjectId === null) {
       const all = chatsByDevice.get(device);
       if (all) all.push(c);
       else chatsByDevice.set(device, [c]);
+    } else if (effectiveProjectId !== null) {
+      const projDevice = deviceOfProject(effectiveProjectId);
+      if (projDevice !== null) {
+        const all = chatsByDevice.get(projDevice);
+        if (all) all.push(c);
+        else chatsByDevice.set(projDevice, [c]);
+      }
     }
-    if (c.projectId !== null) {
-      const list = chatsByProject.get(c.projectId);
+    if (effectiveProjectId !== null) {
+      const list = chatsByProject.get(effectiveProjectId);
       if (list) list.push(c);
-      else chatsByProject.set(c.projectId, [c]);
+      else chatsByProject.set(effectiveProjectId, [c]);
     } else if (device === null) {
       localLooseChats.push(c);
     } else {

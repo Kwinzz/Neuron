@@ -1,7 +1,7 @@
 //! Thread summaries for the Live Dock, the palette and recent activity.
 
 use rusqlite::{Connection, OptionalExtension, Row};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::agents::events::{AgentKind, ThreadStatus};
@@ -9,6 +9,26 @@ use crate::error::{AppError, AppResult};
 
 /// Soft-deleted threads stay restorable for this long before background purge removes them.
 pub const DELETE_RETENTION_MS: i64 = 30_000;
+
+/// Remote device whose files and terminal a chat operates on (when different from the AI host).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct WorkspaceTarget {
+    pub device_id: String,
+    pub device_name: String,
+    pub cwd: String,
+    pub project_id: Option<String>,
+    pub project_name: Option<String>,
+    pub os: Option<String>,
+}
+
+/// Runtime metadata for a cross-device workspace chat (includes the optional reverse-channel grant id).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspaceRuntime {
+    pub target: WorkspaceTarget,
+    pub grant_id: Option<String>,
+}
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -42,17 +62,37 @@ pub struct ThreadSummary {
     pub effort: Option<String>,
     /// A project context was injected when the chat was created.
     pub has_context: bool,
+    /// Remote workspace target when this chat's AI acts on another paired device.
+    #[serde(default)]
+    pub workspace: Option<WorkspaceTarget>,
 }
 
 const SELECT: &str = "SELECT t.id, t.project_id, p.name, t.agent, t.model, t.title, t.status,
             t.created_at, t.updated_at, t.ended_at, t.pinned_at, t.archived_at,
-            COALESCE(u.tokens, 0), COALESCE(u.cost, 0.0), t.cwd, t.permission_mode, t.effort, t.context IS NOT NULL
+            COALESCE(u.tokens, 0), COALESCE(u.cost, 0.0), t.cwd, t.permission_mode, t.effort, t.context IS NOT NULL,
+            t.workspace_device, t.workspace_device_name, t.workspace_cwd, t.workspace_project_id,
+            t.workspace_project_name, t.workspace_os
      FROM threads t
      LEFT JOIN projects p ON p.id = t.project_id
      LEFT JOIN (SELECT thread_id, SUM(input_tokens + output_tokens) AS tokens, SUM(cost_usd) AS cost
                 FROM token_usage WHERE thread_id IS NOT NULL GROUP BY thread_id) u ON u.thread_id = t.id";
 
+fn workspace_from_cols(
+    device_id: Option<String>,
+    device_name: Option<String>,
+    cwd: Option<String>,
+    project_id: Option<String>,
+    project_name: Option<String>,
+    os: Option<String>,
+) -> Option<WorkspaceTarget> {
+    let device_id = device_id.filter(|s| !s.is_empty())?;
+    let cwd = cwd.filter(|s| !s.is_empty())?;
+    Some(WorkspaceTarget { device_id, device_name: device_name.unwrap_or_default(), cwd, project_id, project_name, os })
+}
+
 fn from_row(row: &Row<'_>) -> rusqlite::Result<ThreadSummary> {
+    let workspace =
+        workspace_from_cols(row.get(18)?, row.get(19)?, row.get(20)?, row.get(21)?, row.get(22)?, row.get(23)?);
     Ok(ThreadSummary {
         id: row.get(0)?,
         project_id: row.get(1)?,
@@ -72,6 +112,7 @@ fn from_row(row: &Row<'_>) -> rusqlite::Result<ThreadSummary> {
         permission_mode: row.get(15)?,
         effort: row.get(16)?,
         has_context: row.get(17)?,
+        workspace,
     })
 }
 
@@ -89,6 +130,7 @@ pub struct ThreadRuntime {
     /// Frozen project context (markdown) injected into this chat.
     pub context: Option<String>,
     pub title: String,
+    pub workspace: Option<WorkspaceRuntime>,
 }
 
 pub struct NewThread<'a> {
@@ -101,14 +143,17 @@ pub struct NewThread<'a> {
     pub permission_mode: &'a str,
     pub effort: Option<&'a str>,
     pub context: Option<&'a crate::context::ContextBundle>,
+    pub workspace: Option<&'a WorkspaceRuntime>,
     pub now: i64,
 }
 
 pub fn create(conn: &Connection, t: &NewThread<'_>) -> AppResult<()> {
+    let ws = t.workspace;
     conn.execute(
         "INSERT INTO threads (id, project_id, agent, model, title, status, created_at, updated_at, cwd, permission_mode, effort,
-                              context, context_sources)
-         VALUES (?1, ?2, ?3, ?4, ?5, 'idle', ?6, ?6, ?7, ?8, ?9, ?10, ?11)",
+                              context, context_sources, workspace_device, workspace_device_name, workspace_cwd,
+                              workspace_project_id, workspace_project_name, workspace_grant_id, workspace_os)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'idle', ?6, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
         rusqlite::params![
             t.id,
             t.project_id,
@@ -121,6 +166,13 @@ pub fn create(conn: &Connection, t: &NewThread<'_>) -> AppResult<()> {
             t.effort,
             t.context.map(|c| c.markdown.as_str()),
             t.context.map(|c| serde_json::to_string(&c.sources)).transpose()?,
+            ws.map(|w| w.target.device_id.as_str()),
+            ws.map(|w| w.target.device_name.as_str()),
+            ws.map(|w| w.target.cwd.as_str()),
+            ws.and_then(|w| w.target.project_id.as_deref()),
+            ws.and_then(|w| w.target.project_name.as_deref()),
+            ws.and_then(|w| w.grant_id.as_deref()),
+            ws.and_then(|w| w.target.os.as_deref()),
         ],
     )?;
     Ok(())
@@ -128,11 +180,16 @@ pub fn create(conn: &Connection, t: &NewThread<'_>) -> AppResult<()> {
 
 pub fn runtime(conn: &Connection, id: &str) -> AppResult<Option<ThreadRuntime>> {
     let mut stmt = conn.prepare_cached(
-        "SELECT id, agent, project_id, model, cwd, permission_mode, session_ref, title, effort, context
+        "SELECT id, agent, project_id, model, cwd, permission_mode, session_ref, title, effort, context,
+                workspace_device, workspace_device_name, workspace_cwd, workspace_project_id, workspace_project_name,
+                workspace_grant_id, workspace_os
          FROM threads WHERE id = ?1 AND deleted_at IS NULL",
     )?;
     Ok(stmt
         .query_row([id], |r| {
+            let grant_id: Option<String> = r.get(15)?;
+            let workspace = workspace_from_cols(r.get(10)?, r.get(11)?, r.get(12)?, r.get(13)?, r.get(14)?, r.get(16)?)
+                .map(|target| WorkspaceRuntime { target, grant_id });
             Ok(ThreadRuntime {
                 id: r.get(0)?,
                 agent: r.get(1)?,
@@ -144,6 +201,7 @@ pub fn runtime(conn: &Connection, id: &str) -> AppResult<Option<ThreadRuntime>> 
                 title: r.get(7)?,
                 effort: r.get(8)?,
                 context: r.get(9)?,
+                workspace,
             })
         })
         .optional()?)

@@ -22,7 +22,10 @@ function useDockIds(): string[] {
   const projectId = useUi((s) => s.selectedProjectId);
   return useLive(
     useShallow((s) =>
-      selectDockIds(s, now).filter((id) => projectId === null || s.threads[id]?.projectId === projectId),
+      selectDockIds(s, now).filter(
+        (id) =>
+          projectId === null || (s.threads[id]?.projectId ?? s.threads[id]?.workspace?.projectId) === projectId,
+      ),
     ),
   );
 }

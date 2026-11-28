@@ -183,6 +183,7 @@ export function QuickLauncher() {
           projectId: project?.id ?? null,
           prompt,
           attachments: [],
+          workspace: null,
         });
         threadId = chat.id;
       }

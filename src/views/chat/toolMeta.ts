@@ -23,15 +23,20 @@ export function toolIcon(name: string): LucideIcon {
     case "Write":
     case "MultiEdit":
     case "NotebookEdit":
+    case "remote_edit":
+    case "remote_write":
       return FilePen;
     case "Read":
     case "Glob":
     case "Grep":
     case "LS":
+    case "remote_read":
+    case "remote_search":
       return FileSearch;
     case "Bash":
     case "PowerShell":
     case "BashOutput":
+    case "remote_run":
       return SquareTerminal;
     case "Task":
     case "Agent":

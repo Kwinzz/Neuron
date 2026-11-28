@@ -2,13 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DraftContextPreview } from "@/components/context/DraftContextPreview";
 import type { AgentKind } from "@/bindings/AgentKind";
 import type { Attachment } from "@/bindings/Attachment";
-import { FolderGit2, FolderOpen, MessageSquarePlus } from "lucide-react";
+import type { RemoteHost } from "@/bindings/RemoteHost";
+import { AlertTriangle, ArrowRightLeft, FolderGit2, FolderOpen, MessageSquarePlus } from "lucide-react";
 import { AgentAccessNotice } from "@/components/chat/AgentAccessNotice";
 import { ChatSettingsBar } from "@/components/chat/ChatSettingsBar";
 import { DevicePicker } from "@/components/chat/DevicePicker";
 import { Button } from "@/components/ui/button";
 import { DeviceBadge } from "@/components/ui/DeviceBadge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { startChatWithDevices, validateCrossDevice } from "@/lib/crossDevice";
 import { deviceOfProject } from "@/lib/deviceRouting";
 import { ipc, ipcErrorMessage } from "@/lib/ipc";
 import { readChatDefaults, saveChatDefaults } from "@/lib/chatDefaults";
@@ -23,6 +25,8 @@ import { useUi } from "@/stores/ui";
 import { Composer } from "./Composer";
 import { t } from "@/i18n";
 
+const EMPTY_HOSTS: readonly RemoteHost[] = [];
+
 function folderName(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
 }
@@ -32,10 +36,24 @@ export function DraftChat({ projectId, agent }: { projectId: string | null; agen
   const view = useUi((s) => s.view);
   const project = useNav((s) => (projectId ? s.projects.find((p) => p.id === projectId) : undefined));
   const projectDevice = deviceOfProject(projectId);
-  const [pickedDevice, setPickedDevice] = useState<string | null>(null);
-  const device = projectId ? projectDevice : pickedDevice;
-  const deviceName = useDevices((s) =>
-    device ? s.devices?.hosts.find((h) => h.nodeId === device)?.name : undefined,
+  const hosts = useDevices((s) => s.devices?.hosts) ?? EMPTY_HOSTS;
+  const capabilities = useDevices((s) => s.capabilities);
+  const [pickedWorkspaceDevice, setPickedWorkspaceDevice] = useState<string | null>(null);
+  const [pickedAiDevice, setPickedAiDevice] = useState<string | null | undefined>(undefined);
+  const workspaceDevice = projectId ? projectDevice : pickedWorkspaceDevice;
+  // By default AI runs on the same device as the workspace; the user may pick another paired device.
+  const aiDevice = pickedAiDevice === undefined ? workspaceDevice : pickedAiDevice;
+  const isCrossDevice = aiDevice !== workspaceDevice;
+
+  // Reset manual AI override when switching projects.
+  useEffect(() => {
+    setPickedAiDevice(undefined);
+  }, [projectId]);
+
+  const deviceNameOf = useCallback(
+    (id: string | null) =>
+      id ? (hosts.find((h) => h.nodeId === id)?.name ?? t("shell.unknownDevice")) : t("chat.thisPc"),
+    [hosts],
   );
   const [settings, setSettings] = useState<ChatSettings>(() => {
     const defaults = readChatDefaults();
@@ -52,21 +70,21 @@ export function DraftChat({ projectId, agent }: { projectId: string | null; agen
     setSettings((cur) => (cur.agent === target ? cur : { ...cur, agent: target, model: null, effort: null }));
   }, [view]);
 
-  // When switching to another device, fall back to its default model if the chosen one does not exist there.
-  const deviceProviders = useDeviceProviders(device);
-  const providersLoaded = useModels((s) => (device ? Boolean(s.remoteLoaded[device]) : s.loaded));
+  // When switching AI device, fall back to its default model if the chosen one does not exist there.
+  const deviceProviders = useDeviceProviders(aiDevice);
+  const providersLoaded = useModels((s) => (aiDevice ? Boolean(s.remoteLoaded[aiDevice]) : s.loaded));
   const lastCheckedDeviceRef = useRef<string | null>(null);
   useEffect(() => {
-    if (lastCheckedDeviceRef.current === device) return;
+    if (lastCheckedDeviceRef.current === aiDevice) return;
     if (!providersLoaded) return;
-    lastCheckedDeviceRef.current = device;
+    lastCheckedDeviceRef.current = aiDevice;
     if (deviceProviders.length === 0) return;
     setSettings((cur) => {
       if (cur.model === null) return cur;
       if (findModel(deviceProviders, cur.agent, cur.model)) return cur;
       return { ...cur, model: null, effort: null };
     });
-  }, [device, deviceProviders, providersLoaded]);
+  }, [aiDevice, deviceProviders, providersLoaded]);
 
   useEffect(() => {
     if (projectId) return;
@@ -74,7 +92,7 @@ export function DraftChat({ projectId, agent }: { projectId: string | null; agen
     manualCwdRef.current = false;
     setCwd("");
     ipc
-      .defaultCwd(device)
+      .defaultCwd(workspaceDevice)
       .then((dir) => {
         if (!cancelled && !manualCwdRef.current) setCwd(dir);
       })
@@ -82,7 +100,7 @@ export function DraftChat({ projectId, agent }: { projectId: string | null; agen
     return () => {
       cancelled = true;
     };
-  }, [projectId, device]);
+  }, [projectId, workspaceDevice]);
 
   const onSettings = useCallback((next: ChatSettings) => {
     setSettings(next);
@@ -101,13 +119,26 @@ export function DraftChat({ projectId, agent }: { projectId: string | null; agen
     }
   }, [cwd]);
 
+  const crossCheck = useMemo(
+    () => validateCrossDevice(settings.agent, aiDevice, workspaceDevice, capabilities, (id) => deviceNameOf(id)),
+    [settings.agent, aiDevice, workspaceDevice, capabilities, deviceNameOf],
+  );
+
   const submit = useCallback(
     async (text: string, attachments: Attachment[]) => {
+      if (!crossCheck.ok) {
+        toast({
+          tone: "danger",
+          title: t("chat.startChatFailed"),
+          description: crossCheck.reason ?? undefined,
+        });
+        return false;
+      }
       try {
-        const chat = await ipc.createThread(
-          {
+        const chat = await startChatWithDevices({
+          input: {
             agent: settings.agent,
-            cwd: projectId || device ? null : cwd || null,
+            cwd: projectId || workspaceDevice ? null : cwd || null,
             model: settings.model,
             effort: settings.effort,
             permissionMode: settings.permissionMode,
@@ -116,8 +147,11 @@ export function DraftChat({ projectId, agent }: { projectId: string | null; agen
             prompt: text,
             attachments,
           },
-          device,
-        );
+          aiDevice,
+          workspaceDevice,
+          project: project ?? null,
+          workspaceCwd: cwd || null,
+        });
         useLive.getState().hydrate([chat]);
         useUi.getState().focusThread(chat.id);
         void useNav.getState().load();
@@ -128,19 +162,33 @@ export function DraftChat({ projectId, agent }: { projectId: string | null; agen
         return false;
       }
     },
-    [cwd, device, projectId, settings],
+    [aiDevice, crossCheck.ok, crossCheck.reason, cwd, project, projectId, settings, workspaceDevice],
   );
 
-  const remoteName = deviceName ?? t("shell.unknownDevice");
+  const remoteName = deviceNameOf(workspaceDevice);
 
   const toolbar = useMemo(
     () => (
       <>
-        <ChatSettingsBar value={settings} onChange={onSettings} device={device} />
-        {!projectId && (
+        <ChatSettingsBar value={settings} onChange={onSettings} device={aiDevice} />
+        {projectId ? (
+          <DevicePicker labelMode="ai" value={aiDevice} onChange={setPickedAiDevice} />
+        ) : (
           <>
-            <DevicePicker value={pickedDevice} onChange={setPickedDevice} />
-            {device ? (
+            <DevicePicker
+              labelMode="ai"
+              value={aiDevice}
+              onChange={(next) => setPickedAiDevice(next)}
+            />
+            <DevicePicker
+              labelMode="workspace"
+              value={workspaceDevice}
+              onChange={(next) => {
+                setPickedWorkspaceDevice(next);
+                if (pickedAiDevice === undefined) return;
+              }}
+            />
+            {workspaceDevice ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span
@@ -176,7 +224,7 @@ export function DraftChat({ projectId, agent }: { projectId: string | null; agen
         )}
       </>
     ),
-    [browse, cwd, device, onSettings, pickedDevice, projectId, remoteName, settings],
+    [aiDevice, browse, cwd, onSettings, pickedAiDevice, projectId, remoteName, settings, workspaceDevice],
   );
 
   return (
@@ -199,7 +247,7 @@ export function DraftChat({ projectId, agent }: { projectId: string | null; agen
             <span className="inline-flex flex-wrap items-center justify-center gap-1.5">
               <FolderGit2 className="size-4" />
               {t("chat.inProject")} <span className="font-medium text-foreground">{project.name}</span>
-              <DeviceBadge device={device} />
+              <DeviceBadge device={workspaceDevice} />
             </span>
           ) : (
             t("chat.draftHint")
@@ -207,13 +255,33 @@ export function DraftChat({ projectId, agent }: { projectId: string | null; agen
         </p>
         {projectId && <DraftContextPreview projectId={projectId} />}
       </div>
-      {device === null && <AgentAccessNotice agent={settings.agent} />}
+      {isCrossDevice && (
+        <div className="mx-auto mb-2 flex w-full max-w-3xl items-center gap-2 rounded-lg border bg-card px-3 py-2 text-xs">
+          {crossCheck.ok ? (
+            <>
+              <ArrowRightLeft className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="text-muted-foreground">
+                {t("chat.crossDeviceSummary", {
+                  ai: deviceNameOf(aiDevice),
+                  workspace: deviceNameOf(workspaceDevice),
+                })}
+              </span>
+            </>
+          ) : (
+            <>
+              <AlertTriangle className="size-3.5 shrink-0 text-warn" aria-hidden />
+              <span className="text-warn">{crossCheck.reason}</span>
+            </>
+          )}
+        </div>
+      )}
+      {aiDevice === null && <AgentAccessNotice agent={settings.agent} />}
       <Composer
         threadId={null}
         projectId={projectId}
         slashAgent={settings.agent}
         slashCwd={project ? project.path : cwd || null}
-        slashDevice={device}
+        slashDevice={aiDevice}
         submit={submit}
         toolbar={toolbar}
         placeholder={t("chat.draftPlaceholder")}

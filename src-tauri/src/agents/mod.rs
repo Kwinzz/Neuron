@@ -45,6 +45,8 @@ pub struct SessionSpec {
     pub append_system_prompt: Option<String>,
     /// Neuron's memory MCP server, offered to the agent for this session (Phase 4).
     pub mcp: Option<crate::memory::mcp::McpLaunch>,
+    /// Neuron's cross-device workspace MCP server (when acting on another paired device).
+    pub remote_mcp: Option<crate::remote::mcp::RemoteMcpLaunch>,
     /// Generic CLI to run (AgentKind::Generic), resolved from Paramètres by the chat's model id.
     pub generic: Option<crate::app_settings::GenericCliProfile>,
 }

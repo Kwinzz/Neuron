@@ -6,8 +6,11 @@ import { create } from "zustand";
 import type { AccessLevel } from "@/bindings/AccessLevel";
 import type { NearbyDevice } from "@/bindings/NearbyDevice";
 import type { PairingCode } from "@/bindings/PairingCode";
+import type { RemoteCapabilities } from "@/bindings/RemoteCapabilities";
 import type { RemoteDevices } from "@/bindings/RemoteDevices";
 import type { RemoteStatus } from "@/bindings/RemoteStatus";
+import type { WorkspaceGrant } from "@/bindings/WorkspaceGrant";
+import type { WorkspaceScope } from "@/bindings/WorkspaceScope";
 import { setConnectedHosts } from "@/lib/deviceRouting";
 import { isTauri, remote } from "@/lib/ipc";
 import { keepIfSame, sameValue } from "@/lib/sameValue";
@@ -17,18 +20,23 @@ import { useNav } from "@/stores/nav";
 interface DevicesState {
   status: RemoteStatus | null;
   devices: RemoteDevices | null;
+  grants: WorkspaceGrant[];
+  /** Connected host nodeId → advertised capabilities (`null` = older Neuron build without cross-device support). */
+  capabilities: Record<string, RemoteCapabilities | null>;
   nearby: NearbyDevice[];
   loaded: boolean;
   load: () => Promise<void>;
   scanNearby: () => Promise<NearbyDevice[]>;
   setEnabled: (enabled: boolean) => Promise<RemoteStatus>;
   setInternet: (enabled: boolean) => Promise<RemoteStatus>;
+  setTools: (enabled: boolean, scope: WorkspaceScope) => Promise<RemoteStatus>;
   setDeviceName: (name: string) => Promise<RemoteStatus>;
   startPairing: () => Promise<PairingCode>;
   cancelPairing: () => Promise<void>;
   pair: (nodeId: string, code: string) => Promise<string>;
   pairInvite: (invite: string) => Promise<string>;
   setLevel: (nodeId: string, level: AccessLevel) => Promise<void>;
+  revokeGrant: (grantId: string) => Promise<void>;
   revoke: (nodeId: string) => Promise<void>;
   forget: (nodeId: string) => Promise<void>;
 }
@@ -39,6 +47,8 @@ let loadSeq = 0;
 export const useDevices = create<DevicesState>((set, get) => ({
   status: null,
   devices: null,
+  grants: [],
+  capabilities: {},
   nearby: [],
   loaded: false,
 
@@ -48,13 +58,18 @@ export const useDevices = create<DevicesState>((set, get) => ({
       return;
     }
     const seq = ++loadSeq;
-    const [status, devices] = await Promise.all([remote.status(), remote.devices()]);
+    const [status, devices, grants] = await Promise.all([
+      remote.status(),
+      remote.devices(),
+      remote.listGrants().catch(() => [] as WorkspaceGrant[]),
+    ]);
     if (seq !== loadSeq) return;
 
     const prev = get();
     set({
       status: keepIfSame(prev.status, status),
       devices: keepIfSame(prev.devices, devices),
+      grants: keepIfSame(prev.grants, grants),
       loaded: true,
     });
 
@@ -64,6 +79,27 @@ export const useDevices = create<DevicesState>((set, get) => ({
       .sort();
 
     setConnectedHosts(nextConnected);
+
+    // Fetch capabilities of every connected host (non-blocking for initial load).
+    if (nextConnected.length > 0) {
+      void Promise.all(
+        nextConnected.map(async (id): Promise<[string, RemoteCapabilities | null]> => {
+          try {
+            return [id, await remote.hostCapabilities(id)];
+          } catch {
+            return [id, null];
+          }
+        }),
+      ).then((entries) => {
+        if (seq !== loadSeq) return;
+        const nextCaps: Record<string, RemoteCapabilities | null> = {};
+        for (const [id, caps] of entries) nextCaps[id] = caps;
+        set((cur) => ({ capabilities: keepIfSame(cur.capabilities, nextCaps) }));
+      });
+    } else if (Object.keys(prev.capabilities).length > 0) {
+      set({ capabilities: {} });
+    }
+
     if (!sameValue(prevConnectedHosts, nextConnected)) {
       prevConnectedHosts = nextConnected;
       void useNav.getState().load();
@@ -86,6 +122,12 @@ export const useDevices = create<DevicesState>((set, get) => ({
 
   setInternet: async (enabled) => {
     const next = await remote.setInternet(enabled);
+    await get().load();
+    return next;
+  },
+
+  setTools: async (enabled, scope) => {
+    const next = await remote.setTools(enabled, scope);
     await get().load();
     return next;
   },
@@ -121,6 +163,11 @@ export const useDevices = create<DevicesState>((set, get) => ({
 
   setLevel: async (nodeId, level) => {
     await remote.setLevel(nodeId, level);
+    await get().load();
+  },
+
+  revokeGrant: async (grantId) => {
+    await remote.revokeGrant(grantId);
     await get().load();
   },
 

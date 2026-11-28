@@ -23,8 +23,8 @@ use crate::error::{AppError, AppResult, IpcError};
 use crate::remote::dispatch::{arg, json};
 use crate::state::Shared;
 
-/// Longest request or response accepted (a status, a list of devices: a few KB).
-const MAX_LINE: u64 = 1024 * 1024;
+/// Longest request or response accepted (workspace tool calls may carry file contents / command output).
+const MAX_LINE: u64 = 8 * 1024 * 1024;
 /// A request that takes longer is given up by the client.
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -91,8 +91,17 @@ pub async fn dispatch(ctl: &Control, method: &str, args: Value) -> AppResult<Val
         "remote_set_level" => {
             json(rc::remote_set_level_inner(state, arg(&args, "nodeId")?, arg(&args, "level")?).await?)
         }
+        "remote_set_tools" => {
+            json(rc::remote_set_tools_inner(state, arg(&args, "enabled")?, arg(&args, "scope")?).await?)
+        }
         "remote_revoke" => json(rc::remote_revoke_inner(state, arg(&args, "nodeId")?).await?),
         "remote_forget" => json(rc::remote_forget_inner(state, arg(&args, "nodeId")?).await?),
+        "remote_workspace_op" => {
+            let thread_id: String = arg(&args, "threadId")?;
+            let op: crate::remote::workspace::WorkspaceOp = arg(&args, "op")?;
+            let res = rc::execute_remote_workspace_op(state, &thread_id, op).await?;
+            json(res)
+        }
         "agent_access" => {
             let refresh: Option<bool> = arg(&args, "refresh")?;
             json(crate::agents::access::list(refresh.unwrap_or(false)).await)
@@ -149,12 +158,17 @@ async fn exchange<S: AsyncRead + AsyncWrite + Unpin>(stream: S, method: &str, ar
     }
 }
 
-/// Calls `method` on the instance using `data_dir`. [`AppError::NotRunning`] when none answers.
-pub async fn request(data_dir: &Path, method: &str, args: Value) -> AppResult<Value> {
+/// Calls `method` on the instance using `data_dir` with a custom timeout. [`AppError::NotRunning`] when none answers.
+pub async fn request_with_timeout(data_dir: &Path, method: &str, args: Value, timeout: Duration) -> AppResult<Value> {
     let stream = transport::connect(data_dir).await?;
-    tokio::time::timeout(CLIENT_TIMEOUT, exchange(stream, method, args))
+    tokio::time::timeout(timeout, exchange(stream, method, args))
         .await
         .map_err(|_| AppError::Other(crate::tr!("Neuron ne répond pas", "Neuron is not answering")))?
+}
+
+/// Calls `method` on the instance using `data_dir`. [`AppError::NotRunning`] when none answers.
+pub async fn request(data_dir: &Path, method: &str, args: Value) -> AppResult<Value> {
+    request_with_timeout(data_dir, method, args, CLIENT_TIMEOUT).await
 }
 
 /// Same as [`request`], deserialized.

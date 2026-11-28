@@ -59,6 +59,12 @@ struct ActiveSession {
     turn_started: Option<Instant>,
     /// Last time the session became idle (idle-shutdown reaper).
     idle_since: Instant,
+    /// Cross-device workspace target when this session operates on another paired device.
+    workspace: Option<crate::db::threads::WorkspaceRuntime>,
+    /// Current permission mode (kept in sync for remote MCP `read_only` enforcement).
+    permission_mode: String,
+    /// Unified diffs returned by remote `Write`/`Edit` tool calls, drained when `ToolCallResult` arrives.
+    remote_changes: Vec<crate::agents::file_changes::FileChange>,
 }
 
 pub struct AgentRegistry {
@@ -200,13 +206,17 @@ fn project_root(runtime: &ThreadRuntime) -> Option<&std::path::Path> {
 }
 
 impl AgentRegistry {
-    /// What the agent is told about Neuron (memory, project context). None for generic CLIs.
+    /// What the agent is told about Neuron (memory, project context, remote workspace). None for generic CLIs.
     fn intro(&self, runtime: &ThreadRuntime) -> Option<String> {
         if runtime.agent == AgentKind::Generic {
             return None;
         }
         let memory_file = self.mcp.as_ref().map(|(_, paths)| paths.file_path.as_path());
-        Some(crate::context::neuron_intro(memory_file, project_root(runtime)))
+        Some(crate::context::neuron_intro(
+            memory_file,
+            project_root(runtime),
+            runtime.workspace.as_ref().map(|w| &w.target),
+        ))
     }
 
     pub fn new(mcp: Option<(PathBuf, crate::memory::MemoryPaths)>) -> Self {
@@ -239,6 +249,37 @@ impl AgentRegistry {
 
     pub fn running_ids(&self) -> Vec<String> {
         self.lock().keys().cloned().collect()
+    }
+
+    /// Active cross-device workspace target + permission mode for a running thread (used by `control.rs`).
+    pub fn active_workspace(&self, thread_id: &str) -> Option<(crate::db::threads::WorkspaceRuntime, String)> {
+        self.lock().get(thread_id).and_then(|s| s.workspace.clone().map(|ws| (ws, s.permission_mode.clone())))
+    }
+
+    /// Records a diff produced on a remote target device so the pump attaches it to the matching `ToolCallResult`.
+    pub fn push_remote_change(&self, thread_id: &str, change: crate::agents::file_changes::FileChange) {
+        if let Some(s) = self.lock().get_mut(thread_id) {
+            s.remote_changes.push(change);
+        }
+    }
+
+    fn take_remote_changes(
+        &self,
+        thread_id: &str,
+        hint_path: Option<&str>,
+    ) -> Vec<crate::agents::file_changes::FileChange> {
+        let mut sessions = self.lock();
+        let Some(s) = sessions.get_mut(thread_id) else { return Vec::new() };
+        if s.remote_changes.is_empty() {
+            return Vec::new();
+        }
+        if let Some(hint) = hint_path {
+            let norm = hint.replace('\\', "/");
+            if let Some(pos) = s.remote_changes.iter().position(|c| c.path == norm || norm.ends_with(&c.path)) {
+                return vec![s.remote_changes.remove(pos)];
+            }
+        }
+        vec![s.remote_changes.remove(0)]
     }
 
     /// Send a user turn, spawning (or resuming) the session if needed.
@@ -408,9 +449,24 @@ impl AgentRegistry {
         let adapter = self.adapters.get(&runtime.agent).cloned().ok_or_else(|| {
             AppError::Invalid(crate::tr!("cet agent n'est pas encore disponible", "this agent is not available yet"))
         })?;
-        let cwd = runtime.cwd.clone().map(PathBuf::from).ok_or_else(|| {
+        let mut cwd = runtime.cwd.clone().map(PathBuf::from).ok_or_else(|| {
             AppError::Invalid(crate::tr!("aucun dossier de travail pour ce thread", "no working folder for this chat"))
         })?;
+        // Cross-device workspace: always isolate the CLI process in an empty local scratch folder.
+        let remote_mcp = if runtime.workspace.is_some() {
+            let scratch = state.paths.data_dir.join("remote-scratch").join(&runtime.id);
+            std::fs::create_dir_all(&scratch)?;
+            cwd = scratch;
+            let exe = self
+                .mcp
+                .as_ref()
+                .map(|(exe, _)| exe.clone())
+                .or_else(|| crate::util::neuron_exe().ok())
+                .ok_or_else(|| AppError::Other("neuron executable path unavailable".into()))?;
+            Some(crate::remote::mcp::RemoteMcpLaunch::new(exe, &state.paths.data_dir, &runtime.id))
+        } else {
+            None
+        };
         // Generic CLIs: the chat's model is the profile id, resolved from Paramètres at each spawn.
         let generic = if runtime.agent == AgentKind::Generic {
             let wanted = runtime.model.clone().unwrap_or_default();
@@ -448,6 +504,7 @@ impl AgentRegistry {
                     )
                 })
                 .filter(|_| runtime.agent != AgentKind::Generic),
+            remote_mcp,
             generic,
         };
         let handle = adapter.start(&spec)?;
@@ -471,6 +528,9 @@ impl AgentRegistry {
                 busy: false,
                 turn_started: None,
                 idle_since: Instant::now(),
+                workspace: runtime.workspace.clone(),
+                permission_mode: runtime.permission_mode.clone(),
+                remote_changes: Vec::new(),
             },
         );
         tracing::info!(thread = %runtime.id, pid = ?handle.pid, resume = spec.resume.is_some(), "agent session started");
@@ -539,9 +599,17 @@ impl AgentRegistry {
         if agent != AgentKind::ClaudeCode {
             return false;
         }
-        let sessions = self.lock();
-        match sessions.get(thread_id) {
-            Some(s) if !s.stale => s.commands.send(SessionCommand::SetMode(mode.to_string())).is_ok(),
+        let mut sessions = self.lock();
+        match sessions.get_mut(thread_id) {
+            // Cross-device chats compute `--allowedTools` from permission_mode at spawn: restart cleanly on mode switch.
+            Some(s)
+                if !s.stale
+                    && s.workspace.is_none()
+                    && s.commands.send(SessionCommand::SetMode(mode.to_string())).is_ok() =>
+            {
+                s.permission_mode = mode.to_string();
+                true
+            }
             _ => false,
         }
     }
@@ -749,6 +817,8 @@ impl AgentRegistry {
         let mut last_text = String::new();
         // Before/after snapshots of the files edited by tool calls → diffs shown in the chat.
         let mut files = crate::agents::file_changes::FileTracker::new(rt.cwd.as_deref().map(PathBuf::from));
+        // Path hints of in-flight remote write/edit tool calls so returned remote FileChanges attach accurately.
+        let mut remote_edit_tools: HashMap<String, Option<String>> = HashMap::new();
 
         macro_rules! persist {
             ($body:expr) => {{
@@ -794,6 +864,9 @@ impl AgentRegistry {
                     }
                 }
                 AdapterEvent::ModeChanged(mode) => {
+                    if let Some(s) = self.lock().get_mut(&id) {
+                        s.permission_mode = mode.clone();
+                    }
                     let (tid, m) = (id.clone(), mode.clone());
                     persist!(move |c| threads::set_permission_mode(c, &tid, &m));
                     emit(sink, &id, AgentEvent::PermissionModeChanged { mode });
@@ -826,6 +899,11 @@ impl AgentRegistry {
                 AdapterEvent::ToolCallStart { id: tool_id, name, input, parent_id } => {
                     // First thing: the CLI writes the file right after announcing the call.
                     files.start(&tool_id, &name, &input).await;
+                    let base = name.rsplit("__").next().unwrap_or(&name);
+                    if matches!(base, "remote_write" | "remote_edit") {
+                        let path = input.get("path").and_then(Value::as_str).map(str::to_string);
+                        remote_edit_tools.insert(tool_id.clone(), path);
+                    }
                     // A shell command that starts another agent CLI: a sub-agent of this chat.
                     let launched = subagents::is_shell_tool(&name)
                         .then(|| subagents::shell_command(&input))
@@ -902,7 +980,12 @@ impl AgentRegistry {
                         emit(sink, &id, event);
                     }
                     let status = if is_error { ToolStatus::Error } else { ToolStatus::Ok };
-                    let changes = files.finish(&tool_id).await;
+                    let mut changes = files.finish(&tool_id).await;
+                    if let Some(path_hint) = remote_edit_tools.remove(&tool_id) {
+                        if !is_error {
+                            changes.extend(self.take_remote_changes(&id, path_hint.as_deref()));
+                        }
+                    }
                     {
                         let (tool, out, ch) = (tool_id.clone(), output.clone(), changes.clone());
                         persist!(move |c| chat::finish_tool_call(c, &tool, &out, status, &ch, now_ms()));
@@ -1207,6 +1290,9 @@ mod tests {
                 busy: true,
                 turn_started: None,
                 idle_since: Instant::now(),
+                workspace: None,
+                permission_mode: "manual".into(),
+                remote_changes: Vec::new(),
             },
         );
         // Another card still pending: the chat keeps waiting.

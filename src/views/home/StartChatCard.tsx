@@ -1,6 +1,7 @@
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUp, ArrowUpRight, Folder, FolderPlus, Loader2, MessageSquarePlus } from "lucide-react";
+import { AlertTriangle, ArrowUp, ArrowUpRight, Folder, FolderPlus, Loader2, MessageSquarePlus } from "lucide-react";
 import type { ProjectSummary } from "@/bindings/ProjectSummary";
+import type { RemoteHost } from "@/bindings/RemoteHost";
 import type { ThreadSummary } from "@/bindings/ThreadSummary";
 import { ChatSettingsBar } from "@/components/chat/ChatSettingsBar";
 import { DevicePicker } from "@/components/chat/DevicePicker";
@@ -12,10 +13,12 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { t } from "@/i18n";
 import { readChatDefaults, saveChatDefaults } from "@/lib/chatDefaults";
+import { startChatWithDevices, validateCrossDevice } from "@/lib/crossDevice";
 import { deviceOfProject } from "@/lib/deviceRouting";
-import { ipc, ipcErrorMessage } from "@/lib/ipc";
+import { ipcErrorMessage } from "@/lib/ipc";
 import type { ChatSettings } from "@/lib/models";
 import { useDashboard } from "@/stores/dashboard";
+import { useDevices } from "@/stores/devices";
 import { useLive } from "@/stores/live";
 import { findModel, useDeviceProviders, useModels } from "@/stores/models";
 import { useNav } from "@/stores/nav";
@@ -27,6 +30,7 @@ import { HomeProjectPicker } from "./HomeProjectPicker";
 const MAX_RECENT_PROJECTS = 6;
 const EMPTY_PROJECTS: readonly ProjectSummary[] = [];
 const EMPTY_CHATS: readonly ThreadSummary[] = [];
+const EMPTY_HOSTS: readonly RemoteHost[] = [];
 
 /**
  * Action-first top card on Accueil: compact prompt input (same agent/model/effort/permissions flow as DraftChat
@@ -37,6 +41,8 @@ export function StartChatCard() {
   const navChats = useNav((s) => s.chats);
   const dashboardProjects = useDashboard((s) => s.snapshot?.projects);
   const dashboardRecent = useDashboard((s) => s.snapshot?.recentThreads);
+  const hosts = useDevices((s) => s.devices?.hosts) ?? EMPTY_HOSTS;
+  const capabilities = useDevices((s) => s.capabilities);
 
   const projects = navProjects.length > 0 ? navProjects : (dashboardProjects ?? EMPTY_PROJECTS);
   const chats = navChats.length > 0 ? navChats : (dashboardRecent ?? EMPTY_CHATS);
@@ -44,6 +50,7 @@ export function StartChatCard() {
   const [text, setText] = useState("");
   const [projectId, setProjectId] = useState<string | null>(null);
   const [pickedDevice, setPickedDevice] = useState<string | null>(null);
+  const [pickedAiDevice, setPickedAiDevice] = useState<string | null | undefined>(undefined);
   const [settings, setSettings] = useState<ChatSettings>(readChatDefaults);
   const [sending, setSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -53,23 +60,34 @@ export function StartChatCard() {
     [projects, projectId],
   );
   const resolvedProjectId = project?.id ?? null;
-  const device = resolvedProjectId ? deviceOfProject(resolvedProjectId) : pickedDevice;
+  const workspaceDevice = resolvedProjectId ? deviceOfProject(resolvedProjectId) : pickedDevice;
+  const aiDevice = pickedAiDevice === undefined ? workspaceDevice : pickedAiDevice;
 
-  // Keep the chosen model valid when switching to a project on another device.
-  const deviceProviders = useDeviceProviders(device);
-  const providersLoaded = useModels((s) => (device ? Boolean(s.remoteLoaded[device]) : s.loaded));
+  useEffect(() => {
+    setPickedAiDevice(undefined);
+  }, [resolvedProjectId]);
+
+  const deviceNameOf = useCallback(
+    (id: string | null) =>
+      id ? (hosts.find((h) => h.nodeId === id)?.name ?? t("shell.unknownDevice")) : t("chat.thisPc"),
+    [hosts],
+  );
+
+  // Keep the chosen model valid when switching the AI device.
+  const deviceProviders = useDeviceProviders(aiDevice);
+  const providersLoaded = useModels((s) => (aiDevice ? Boolean(s.remoteLoaded[aiDevice]) : s.loaded));
   const lastCheckedDeviceRef = useRef<string | null>(null);
   useEffect(() => {
-    if (lastCheckedDeviceRef.current === device) return;
+    if (lastCheckedDeviceRef.current === aiDevice) return;
     if (!providersLoaded) return;
-    lastCheckedDeviceRef.current = device;
+    lastCheckedDeviceRef.current = aiDevice;
     if (deviceProviders.length === 0) return;
     setSettings((cur) => {
       if (cur.model === null) return cur;
       if (findModel(deviceProviders, cur.agent, cur.model)) return cur;
       return { ...cur, model: null, effort: null };
     });
-  }, [device, deviceProviders, providersLoaded]);
+  }, [aiDevice, deviceProviders, providersLoaded]);
 
   // Grow textarea with content up to 160 px (JS height: WebKitGTK has no field-sizing).
   useEffect(() => {
@@ -83,9 +101,10 @@ export function StartChatCard() {
     if (projects.length === 0) return EMPTY_PROJECTS;
     const latestChatByProject = new Map<string, number>();
     for (const c of chats) {
-      if (!c.projectId) continue;
-      const prev = latestChatByProject.get(c.projectId) ?? 0;
-      if (c.updatedAt > prev) latestChatByProject.set(c.projectId, c.updatedAt);
+      const pid = c.projectId ?? c.workspace?.projectId ?? null;
+      if (!pid) continue;
+      const prev = latestChatByProject.get(pid) ?? 0;
+      if (c.updatedAt > prev) latestChatByProject.set(pid, c.updatedAt);
     }
     return [...projects]
       .sort((a, b) => {
@@ -101,15 +120,20 @@ export function StartChatCard() {
     saveChatDefaults(next);
   }, []);
 
-  const canSend = text.trim().length > 0 && !sending;
+  const crossCheck = useMemo(
+    () => validateCrossDevice(settings.agent, aiDevice, workspaceDevice, capabilities, (id) => deviceNameOf(id)),
+    [settings.agent, aiDevice, workspaceDevice, capabilities, deviceNameOf],
+  );
+
+  const canSend = text.trim().length > 0 && !sending && crossCheck.ok;
 
   const submit = useCallback(async () => {
     const prompt = text.trim();
-    if (!prompt || sending) return;
+    if (!prompt || sending || !crossCheck.ok) return;
     setSending(true);
     try {
-      const chat = await ipc.createThread(
-        {
+      const chat = await startChatWithDevices({
+        input: {
           agent: settings.agent,
           cwd: null,
           model: settings.model,
@@ -120,8 +144,10 @@ export function StartChatCard() {
           prompt,
           attachments: [],
         },
-        device,
-      );
+        aiDevice,
+        workspaceDevice,
+        project,
+      });
       setText("");
       useLive.getState().hydrate([chat]);
       useUi.getState().focusThread(chat.id);
@@ -132,7 +158,7 @@ export function StartChatCard() {
     } finally {
       setSending(false);
     }
-  }, [device, resolvedProjectId, sending, settings, text]);
+  }, [aiDevice, crossCheck.ok, project, resolvedProjectId, sending, settings, text, workspaceDevice]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return;
@@ -193,8 +219,15 @@ export function StartChatCard() {
               onChange={setProjectId}
               disabled={sending}
             />
-            <ChatSettingsBar value={settings} onChange={onSettings} device={device} disabled={sending} />
-            {!resolvedProjectId && (
+            <ChatSettingsBar value={settings} onChange={onSettings} device={aiDevice} disabled={sending} />
+            {resolvedProjectId ? (
+              <DevicePicker
+                labelMode="ai"
+                value={aiDevice}
+                onChange={setPickedAiDevice}
+                disabled={sending}
+              />
+            ) : (
               <DevicePicker value={pickedDevice} onChange={setPickedDevice} disabled={sending} />
             )}
             <div className="ml-auto flex items-center">
@@ -215,6 +248,12 @@ export function StartChatCard() {
             </div>
           </div>
         </div>
+        {!crossCheck.ok && crossCheck.reason && (
+          <div className="flex items-center gap-2 text-xs text-warn">
+            <AlertTriangle className="size-3.5 shrink-0" aria-hidden />
+            <span>{crossCheck.reason}</span>
+          </div>
+        )}
 
         <Separator />
 

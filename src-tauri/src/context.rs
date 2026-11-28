@@ -345,7 +345,11 @@ pub fn summary_reminder() -> &'static str {
     )
 }
 
-pub fn neuron_intro(memory_file: Option<&Path>, project: Option<&Path>) -> String {
+pub fn neuron_intro(
+    memory_file: Option<&Path>,
+    project: Option<&Path>,
+    remote_workspace: Option<&crate::db::threads::WorkspaceTarget>,
+) -> String {
     let mut md = crate::tr!(
         "# Neuron\n\
          Tu es lancé par **Neuron**, l'application de bureau de l'utilisateur qui pilote ses agents IA (Claude Code, \
@@ -409,6 +413,34 @@ pub fn neuron_intro(memory_file: Option<&Path>, project: Option<&Path>) -> Strin
              architecture, decisions, conventions, useful commands. Use the \
              `neuron_project_context` tool (or your file tools). Read it before changing it, keep what is still \
              true and stay concise.\n"
+        ));
+    }
+    if let Some(ws) = remote_workspace {
+        let device = if ws.device_name.is_empty() { ws.device_id.as_str() } else { ws.device_name.as_str() };
+        let os_note = match ws.os.as_deref() {
+            Some("windows") => crate::tr!("Windows (PowerShell)", "Windows (PowerShell)"),
+            Some("macos") => crate::tr!("macOS (sh)", "macOS (sh)"),
+            Some("linux") => crate::tr!("Linux (sh)", "Linux (sh)"),
+            _ => crate::tr!("système distant", "remote OS"),
+        };
+        let cwd = &ws.cwd;
+        md.push_str(&crate::tr!(
+            "\n## Espace de travail distant (appareil cible : {device})\n\
+             Ce chat utilise l'IA sur cet appareil pour travailler sur **un autre appareil** : **{device}** \
+             ({os_note}), dans le dossier `{cwd}`.\n\
+             Utilise **exclusivement** les outils MCP `remote_read`, `remote_write`, `remote_edit`, `remote_search` \
+             et `remote_run` pour lire/modifier des fichiers et lancer des commandes sur **{device}**. N'utilise \
+             **jamais** d'outils locaux de fichiers ou de terminal : le dossier local de ce processus est vide.\n\
+             Les chemins relatifs sont résolus depuis `{cwd}` sur **{device}**. Pour mettre à jour `{CONTEXT_REL}` \
+             sur le projet distant, utilise `remote_read` / `remote_edit` / `remote_write`.\n",
+            "\n## Remote workspace (target device: {device})\n\
+             This chat uses the AI on this device to work on **another device**: **{device}** \
+             ({os_note}), in folder `{cwd}`.\n\
+             Use **exclusively** the MCP tools `remote_read`, `remote_write`, `remote_edit`, `remote_search` \
+             and `remote_run` to read/edit files and run commands on **{device}**. **Never** use local file or \
+             shell tools: this process's local directory is an empty scratch folder.\n\
+             Relative paths resolve from `{cwd}` on **{device}**. To update `{CONTEXT_REL}` on the remote project, \
+             use `remote_read` / `remote_edit` / `remote_write`.\n"
         ));
     }
     md

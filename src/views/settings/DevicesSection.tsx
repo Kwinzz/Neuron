@@ -8,6 +8,7 @@ import { useDevices } from "@/stores/devices";
 import { AddDeviceDialog } from "./AddDeviceDialog";
 import { DeviceAccessCard } from "./DeviceAccessCard";
 import { DeviceClientsCard } from "./DeviceClientsCard";
+import { DeviceGrantsCard } from "./DeviceGrantsCard";
 import { DeviceHostsCard } from "./DeviceHostsCard";
 import { DevicePairingCard } from "./DevicePairingCard";
 import { SettingsSkeleton } from "./SettingsSkeleton";
@@ -64,6 +65,7 @@ export function DevicesSection() {
         <DeviceAccessCard />
         {enabled && <DevicePairingCard />}
         <DeviceClientsCard />
+        <DeviceGrantsCard />
         <DeviceHostsCard onAddDevice={() => setAddOpen(true)} />
       </div>
 

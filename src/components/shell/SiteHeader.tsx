@@ -12,8 +12,16 @@ import { WindowControls } from "./WindowControls";
 
 function useViewTitle(view: View): { section: string; title: string; projectId: string | null } {
   const chatTitle = useLive((s) => (view.kind === "thread" ? s.threads[view.id]?.title : undefined));
-  const threadProjectId = useLive((s) => (view.kind === "thread" ? (s.threads[view.id]?.projectId ?? null) : null));
-  const threadProjectName = useLive((s) => (view.kind === "thread" ? s.threads[view.id]?.projectName : undefined));
+  const threadProjectId = useLive((s) =>
+    view.kind === "thread"
+      ? (s.threads[view.id]?.projectId ?? s.threads[view.id]?.workspace?.projectId ?? null)
+      : null,
+  );
+  const threadProjectName = useLive((s) =>
+    view.kind === "thread"
+      ? (s.threads[view.id]?.projectName ?? s.threads[view.id]?.workspace?.projectName ?? undefined)
+      : undefined,
+  );
   const targetProjectId =
     view.kind === "thread" ? threadProjectId : view.kind === "draft" ? view.projectId : null;
   const navProjectName = useNav((s) =>

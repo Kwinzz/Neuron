@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import { cn } from "cn";
-import { MoreHorizontal, Pin } from "lucide-react";
+import { ArrowRightLeft, MoreHorizontal, Pin } from "lucide-react";
 import type { ThreadSummary } from "@/bindings/ThreadSummary";
 import { AgentLogo } from "@/components/ui/AgentLogo";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
@@ -24,7 +24,9 @@ import {
 import { StatusDot } from "@/components/ui/StatusDot";
 import { t } from "@/i18n";
 import { renameChat } from "@/lib/chatActions";
+import { deviceOfThread } from "@/lib/deviceRouting";
 import { STATUS } from "@/lib/status";
+import { useDevices } from "@/stores/devices";
 import { useLive } from "@/stores/live";
 import { useUi } from "@/stores/ui";
 import { ChatMenuItems } from "./ChatMenuItems";
@@ -89,7 +91,20 @@ export const ChatRow = memo(function ChatRow({
     }
   }, [editing]);
 
+  const workspace = useLive((s) => s.threads[chat.id]?.workspace ?? chat.workspace);
+  const aiDeviceId = deviceOfThread(chat.id);
+  const aiDeviceName = useDevices((s) =>
+    aiDeviceId ? (s.devices?.hosts.find((h) => h.nodeId === aiDeviceId)?.name ?? t("shell.unknownDevice")) : t("chat.thisPc"),
+  );
+  const ownNodeId = useDevices((s) => s.status?.nodeId ?? null);
+  const crossDeviceTitle = workspace
+    ? t("chat.crossDeviceSummary", {
+        ai: aiDeviceName,
+        workspace: workspace.deviceId === ownNodeId ? t("chat.thisPc") : workspace.deviceName || t("shell.unknownDevice"),
+      })
+    : null;
   const label = title || t("common.untitledChat");
+  const tooltipLabel = crossDeviceTitle ? `${label} · ${crossDeviceTitle}` : label;
   const working = STATUS[status].active;
   const showPin = pinned && !archived;
 
@@ -219,9 +234,15 @@ export const ChatRow = memo(function ChatRow({
               onClick={open}
               onDoubleClick={onRowDoubleClick}
               onKeyDown={onRowKeyDown}
-              title={label}
+              title={tooltipLabel}
             >
               <span className="min-w-0 flex-1 truncate">{label}</span>
+              {workspace && (
+                <ArrowRightLeft
+                  className="size-3! shrink-0 text-muted-foreground! group-focus-within/menu-sub-item:hidden group-hover/menu-sub-item:hidden"
+                  aria-hidden
+                />
+              )}
               {showPin && (
                 <>
                   <Pin
@@ -273,7 +294,7 @@ export const ChatRow = memo(function ChatRow({
             onClick={open}
             onDoubleClick={onRowDoubleClick}
             onKeyDown={onRowKeyDown}
-            tooltip={label}
+            tooltip={tooltipLabel}
             className={cn(
               compact && "h-7",
               showPin && working && "pr-11",
@@ -282,6 +303,7 @@ export const ChatRow = memo(function ChatRow({
           >
             <AgentLogo agent={chat.agent} />
             <span className="min-w-0 flex-1 truncate">{label}</span>
+            {workspace && <ArrowRightLeft className="size-3 shrink-0 text-muted-foreground" aria-hidden />}
             {showPin && <span className="sr-only">{t("chat.pinned")}</span>}
           </SidebarMenuButton>
           {(showPin || working) && (

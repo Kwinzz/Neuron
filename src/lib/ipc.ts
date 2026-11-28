@@ -46,9 +46,12 @@ import type { UsageReport } from "@/bindings/UsageReport";
 import type { AccessLevel } from "@/bindings/AccessLevel";
 import type { NearbyDevice } from "@/bindings/NearbyDevice";
 import type { PairingCode } from "@/bindings/PairingCode";
+import type { RemoteCapabilities } from "@/bindings/RemoteCapabilities";
 import type { RemoteDevices } from "@/bindings/RemoteDevices";
 import type { RemoteEventPayload } from "@/bindings/RemoteEventPayload";
 import type { RemoteStatus } from "@/bindings/RemoteStatus";
+import type { WorkspaceGrant } from "@/bindings/WorkspaceGrant";
+import type { WorkspaceScope } from "@/bindings/WorkspaceScope";
 import type { UpdateInfo } from "@/bindings/UpdateInfo";
 import type { UpdateProgress } from "@/bindings/UpdateProgress";
 import type { UpdateResult } from "@/bindings/UpdateResult";
@@ -508,6 +511,20 @@ export const remote = {
   pairInvite: (invite: string) => invoke<string>("remote_pair_invite", { invite }),
   devices: () => invoke<RemoteDevices>("remote_devices"),
   setLevel: (nodeId: string, level: AccessLevel) => invoke<void>("remote_set_level", { nodeId, level }),
+  /** Enable or disable remote workspace tool execution (files & shell) for paired Full peers on this device. */
+  setTools: (enabled: boolean, scope: WorkspaceScope) => invoke<RemoteStatus>("remote_set_tools", { enabled, scope }),
+  /** Active per-chat workspace grants issued by this device to paired AI hosts. */
+  listGrants: () => invoke<WorkspaceGrant[]>("remote_list_grants"),
+  /** Issue a scoped grant letting a paired AI host execute workspace tools in `rootCwd` on this device. */
+  createGrant: (peerNodeId: string, rootCwd: string, scope: WorkspaceScope | null = null) =>
+    invoke<WorkspaceGrant>("remote_create_grant", { peerNodeId, rootCwd, scope }),
+  /** Bind a workspace grant to the remote thread id once created on the AI host. */
+  bindGrantThread: (grantId: string, threadId: string) =>
+    invoke<void>("remote_bind_grant_thread", { grantId, threadId }),
+  /** Revoke an active workspace grant immediately. */
+  revokeGrant: (grantId: string) => invoke<void>("remote_revoke_grant", { grantId }),
+  /** Capabilities advertised by a connected paired host (null when the host is an older version). */
+  hostCapabilities: (device: string) => invoke<RemoteCapabilities | null>("remote_host_capabilities", { device }),
   /** A device that controls this one loses access right away. */
   revoke: (nodeId: string) => invoke<void>("remote_revoke", { nodeId }),
   /** Stop controlling a device. */

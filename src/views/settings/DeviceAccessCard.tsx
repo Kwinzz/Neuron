@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { MonitorSmartphone } from "lucide-react";
+import type { WorkspaceScope } from "@/bindings/WorkspaceScope";
 import {
   Card,
   CardContent,
@@ -8,6 +9,13 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { t } from "@/i18n";
 import { ipcErrorMessage, isTauri } from "@/lib/ipc";
@@ -16,11 +24,17 @@ import { toast } from "@/stores/toast";
 import { SettingRow } from "./SettingRow";
 import { SettingSwitch } from "./SettingSwitch";
 
+function isWorkspaceScope(value: string): value is WorkspaceScope {
+  return value === "project_only" || value === "full";
+}
+
 export function DeviceAccessCard() {
   const status = useDevices((s) => s.status);
   const tauri = isTauri();
   const enabled = status?.settings.enabled ?? false;
   const internet = status?.settings.internet ?? false;
+  const allowRemoteTools = status?.settings.allowRemoteTools ?? false;
+  const remoteToolsScope: WorkspaceScope = status?.settings.remoteToolsScope ?? "project_only";
   const savedName = status?.settings.deviceName ?? "";
   const nodeId = status?.nodeId ?? null;
   const port = status?.port ?? null;
@@ -28,6 +42,7 @@ export function DeviceAccessCard() {
   const [nameDraft, setNameDraft] = useState(savedName);
   const [savingEnabled, setSavingEnabled] = useState(false);
   const [savingInternet, setSavingInternet] = useState(false);
+  const [savingTools, setSavingTools] = useState(false);
   const [savingName, setSavingName] = useState(false);
   const skipBlurRef = useRef(false);
 
@@ -64,6 +79,22 @@ export function DeviceAccessCard() {
       });
     } finally {
       setSavingInternet(false);
+    }
+  };
+
+  const handleUpdateTools = async (nextEnabled: boolean, nextScope: WorkspaceScope) => {
+    if (!tauri || savingTools) return;
+    setSavingTools(true);
+    try {
+      await useDevices.getState().setTools(nextEnabled, nextScope);
+    } catch (err: unknown) {
+      toast({
+        tone: "danger",
+        title: t("settings.devicesUpdateFailed"),
+        description: ipcErrorMessage(err),
+      });
+    } finally {
+      setSavingTools(false);
     }
   };
 
@@ -150,6 +181,72 @@ export function DeviceAccessCard() {
             />
           }
         />
+
+        <Separator />
+
+        <SettingRow
+          id="devices-allow-tools"
+          label={t("settings.devicesAllowTools")}
+          description={t("settings.devicesAllowToolsDescription")}
+          disabled={!tauri}
+          control={
+            <SettingSwitch
+              id="devices-allow-tools"
+              checked={allowRemoteTools}
+              disabled={!tauri || savingTools}
+              onCheckedChange={(checked) => void handleUpdateTools(checked, remoteToolsScope)}
+              aria-describedby="devices-allow-tools-desc"
+            />
+          }
+        />
+
+        {allowRemoteTools && (
+          <div className="flex min-w-0 flex-col gap-2 rounded-lg border bg-muted/20 p-3">
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+              <Label htmlFor="devices-tools-scope" className="text-xs font-medium text-foreground">
+                {t("settings.devicesToolsScopeLabel")}
+              </Label>
+              <Select
+                value={remoteToolsScope}
+                disabled={!tauri || savingTools}
+                onValueChange={(value) => {
+                  if (isWorkspaceScope(value) && value !== remoteToolsScope) {
+                    void handleUpdateTools(allowRemoteTools, value);
+                  }
+                }}
+              >
+                <SelectTrigger id="devices-tools-scope" size="sm" className="min-w-48">
+                  <SelectValue>
+                    {t(
+                      remoteToolsScope === "full"
+                        ? "settings.devicesToolsScopeFull"
+                        : "settings.devicesToolsScopeProjects",
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent align="end" className="w-64">
+                  <SelectItem value="project_only" className="py-1.5">
+                    <div className="flex flex-col text-left">
+                      <span className="font-medium">{t("settings.devicesToolsScopeProjects")}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {t("settings.devicesToolsScopeProjectsDesc")}
+                      </span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="full" className="py-1.5">
+                    <div className="flex flex-col text-left">
+                      <span className="font-medium">{t("settings.devicesToolsScopeFull")}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {t("settings.devicesToolsScopeFullDesc")}
+                      </span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground">{t("settings.devicesToolsNote")}</p>
+          </div>
+        )}
 
         <Separator />
 

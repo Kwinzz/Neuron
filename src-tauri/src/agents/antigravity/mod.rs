@@ -103,6 +103,7 @@ mod tests {
             resume: Some("conv-1".into()),
             append_system_prompt: None,
             mcp: None,
+            remote_mcp: None,
             generic: None,
         };
         let args = build_args(&spec);

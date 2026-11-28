@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Laptop, Plus, Radio, Zap } from "lucide-react";
+import { Laptop, Plus, Radio, Wrench, Zap } from "lucide-react";
 import type { RemoteHost } from "@/bindings/RemoteHost";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,6 +26,7 @@ interface DeviceHostsCardProps {
 
 export function DeviceHostsCard({ onAddDevice }: DeviceHostsCardProps) {
   const devices = useDevices((s) => s.devices);
+  const capabilities = useDevices((s) => s.capabilities);
   const hosts = devices?.hosts ?? EMPTY_HOSTS;
   const tauri = isTauri();
 
@@ -102,6 +104,12 @@ export function DeviceHostsCard({ onAddDevice }: DeviceHostsCardProps) {
                             </span>
                           </span>
                         </span>
+                      )}
+                      {host.connected && capabilities[host.nodeId]?.workspaceTools && (
+                        <Badge variant="outline" className="h-5 gap-1 px-1.5 text-[11px] font-normal text-muted-foreground">
+                          <Wrench className="size-3 shrink-0" aria-hidden />
+                          <span>{t("settings.devicesHostToolsReady")}</span>
+                        </Badge>
                       )}
                     </div>
                   </div>

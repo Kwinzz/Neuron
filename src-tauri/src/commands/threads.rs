@@ -20,6 +20,21 @@ const PERMISSION_MODES: &[&str] = &["manual", "acceptEdits", "auto", "plan", "by
 const DEFAULT_SEARCH_LIMIT: u32 = 30;
 const MAX_SEARCH_LIMIT: u32 = 100;
 
+/// Cross-device workspace requested when creating a thread (AI runs here, files & shell run on `device_id`).
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct NewWorkspaceInput {
+    pub device_id: String,
+    pub device_name: String,
+    pub cwd: String,
+    pub project_id: Option<String>,
+    pub project_name: Option<String>,
+    /// Grant id issued by the target device (used when targeting a client over reverse bi-stream).
+    pub grant_id: Option<String>,
+    pub os: Option<String>,
+}
+
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -38,6 +53,9 @@ pub struct NewThreadInput {
     /// Files attached to the first message (from `import_attachments` / `paste_attachment`).
     #[serde(default)]
     pub attachments: Vec<crate::attachments::Attachment>,
+    /// Remote device workspace target when this chat's AI operates on another paired device.
+    #[serde(default)]
+    pub workspace: Option<NewWorkspaceInput>,
 }
 
 pub(crate) async fn create_thread_inner(state: &Shared, input: NewThreadInput) -> AppResult<ThreadSummary> {
@@ -47,32 +65,85 @@ pub(crate) async fn create_thread_inner(state: &Shared, input: NewThreadInput) -
             "this agent comes in a later phase"
         )));
     }
-    let cwd = resolve_cwd(state, input.cwd.as_deref(), input.project_id.as_deref()).await?;
+    let id = uuid::Uuid::new_v4().to_string();
     let mode = input.permission_mode.clone().unwrap_or_else(|| "manual".into());
     validate_settings(&mode, input.effort.as_deref())?;
 
     let app_settings = state.db.call(|c| crate::app_settings::load(c)).await?;
     let ctx_opts = app_settings.context.clone();
-    // Project chats get the project context (context.md + git + recent files), frozen with the chat.
-    let context = match input.project_id.clone() {
-        Some(project_id) => {
-            let project = state.db.call(move |c| projects::get(c, &project_id)).await?;
-            match project {
-                // Missing folder (moved project, demo data): no context rather than failing the chat.
-                Some(p) if std::path::Path::new(&p.path).is_dir() => Some({
-                    let opts = ctx_opts.clone();
-                    tokio::task::spawn_blocking(move || {
-                        let root = std::path::PathBuf::from(&p.path);
-                        crate::context::ensure_context_file(&root, &p.name)?;
-                        crate::context::build(&root, &p.name, now_ms(), &opts)
-                    })
-                    .await??
-                }),
-                _ => None,
-            }
+
+    let (cwd, project_id_for_db, workspace_runtime, project_context) = if let Some(ws) = input.workspace.clone() {
+        if !matches!(input.agent, AgentKind::ClaudeCode | AgentKind::Codex) {
+            return Err(AppError::Invalid(crate::tr!(
+                "l'exécution sur un autre appareil est disponible avec Claude Code et Codex",
+                "cross-device workspace execution is available with Claude Code and Codex"
+            )));
         }
-        None => None,
+        if ws.device_id.trim().is_empty() || ws.cwd.trim().is_empty() {
+            return Err(AppError::Invalid(crate::tr!(
+                "appareil ou dossier cible manquant",
+                "missing target device or folder"
+            )));
+        }
+        let scratch = state.paths.data_dir.join("remote-scratch").join(&id);
+        std::fs::create_dir_all(&scratch)?;
+        let ws_runtime = threads::WorkspaceRuntime {
+            target: threads::WorkspaceTarget {
+                device_id: ws.device_id.clone(),
+                device_name: ws.device_name.clone(),
+                cwd: ws.cwd.clone(),
+                project_id: ws.project_id.clone(),
+                project_name: ws.project_name.clone(),
+                os: ws.os.clone(),
+            },
+            grant_id: ws.grant_id.clone(),
+        };
+        // Pull project context (.neuron/context.md + git + recent files) from the target device.
+        let remote_ctx = if let Ok(node) = state.remote.ensure(state).await {
+            let req = crate::remote::protocol::RpcRequest {
+                method: "workspace_context".into(),
+                args: serde_json::json!({
+                    "rootCwd": ws.cwd,
+                    "grantId": ws.grant_id,
+                    "projectName": ws.project_name,
+                }),
+            };
+            match node.call_peer(&ws.device_id, req, Duration::from_secs(15)).await {
+                Ok(val) => serde_json::from_value::<Option<crate::context::ContextBundle>>(val).ok().flatten(),
+                Err(err) => {
+                    tracing::warn!(%err, device = %ws.device_id, "remote workspace context unavailable");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        (scratch.display().to_string(), None, Some(ws_runtime), remote_ctx)
+    } else {
+        let cwd = resolve_cwd(state, input.cwd.as_deref(), input.project_id.as_deref()).await?;
+        // Project chats get the project context (context.md + git + recent files), frozen with the chat.
+        let context = match input.project_id.clone() {
+            Some(project_id) => {
+                let project = state.db.call(move |c| projects::get(c, &project_id)).await?;
+                match project {
+                    // Missing folder (moved project, demo data): no context rather than failing the chat.
+                    Some(p) if std::path::Path::new(&p.path).is_dir() => Some({
+                        let opts = ctx_opts.clone();
+                        tokio::task::spawn_blocking(move || {
+                            let root = std::path::PathBuf::from(&p.path);
+                            crate::context::ensure_context_file(&root, &p.name)?;
+                            crate::context::build(&root, &p.name, now_ms(), &opts)
+                        })
+                        .await??
+                    }),
+                    _ => None,
+                }
+            }
+            None => None,
+        };
+        (cwd, input.project_id.clone(), None, context)
     };
+
     // Global memory goes into every new chat (project or not).
     let memory_file = state.paths.memory_file.clone();
     let memory_items = state
@@ -83,11 +154,10 @@ pub(crate) async fn create_thread_inner(state: &Shared, input: NewThreadInput) -
         })
         .await?;
     let memory_section = crate::memory::context_section(&memory_items).filter(|_| ctx_opts.inject_memory);
-    let context = crate::context::with_memory(context, memory_section);
+    let context = crate::context::with_memory(project_context, memory_section);
 
-    let id = uuid::Uuid::new_v4().to_string();
     let summary = {
-        let (id, input, cwd, mode) = (id.clone(), input.clone(), cwd.clone(), mode.clone());
+        let (id, input, cwd, mode, ws) = (id.clone(), input.clone(), cwd.clone(), mode.clone(), workspace_runtime);
         state
             .db
             .call(move |c| {
@@ -97,19 +167,20 @@ pub(crate) async fn create_thread_inner(state: &Shared, input: NewThreadInput) -
                     &NewThread {
                         id: &id,
                         agent: input.agent,
-                        project_id: input.project_id.as_deref(),
+                        project_id: project_id_for_db.as_deref(),
                         model,
                         title: input.title.as_deref().map(str::trim).unwrap_or(""),
                         cwd: &cwd,
                         permission_mode: &mode,
                         effort: input.effort.as_deref().filter(|e| !e.is_empty()),
                         context: context.as_ref(),
+                        workspace: ws.as_ref(),
                         now: now_ms(),
                     },
                 )?;
-                if let Some(project) = input.project_id.as_deref() {
+                if let Some(project) = project_id_for_db.as_deref() {
                     projects::touch(c, project, now_ms())?;
-                } else {
+                } else if ws.is_none() {
                     settings::set(c, settings::LAST_CWD, &Value::String(cwd.clone()))?;
                 }
                 threads::get(c, &id)?.ok_or_else(|| AppError::NotFound(id.clone()))
@@ -276,7 +347,14 @@ pub async fn rename_thread(state: State<'_, Shared>, thread_id: String, title: S
 
 pub(crate) async fn delete_thread_inner(state: &AppState, thread_id: String) -> AppResult<()> {
     state.agents.shutdown(&thread_id);
-    state.db.call(move |c| threads::soft_delete(c, &thread_id, now_ms())).await
+    state
+        .db
+        .call(move |c| {
+            let now = now_ms();
+            let _ = crate::db::remote::revoke_grants_for_thread(c, &thread_id, now);
+            threads::soft_delete(c, &thread_id, now)
+        })
+        .await
 }
 
 #[tauri::command]

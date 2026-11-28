@@ -1,5 +1,7 @@
 //! Remote devices: settings, pairing, paired devices and calls to a paired host (see `crate::remote`).
 
+use std::time::Duration;
+
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -7,13 +9,16 @@ use tauri::State;
 use ts_rs::TS;
 
 use crate::attachments::{self, Attachment, SharedFile};
-use crate::db::remote::{self as store, AccessLevel, RemoteClient, RemoteHost};
+use crate::db::remote::{self as store, AccessLevel, RemoteClient, RemoteHost, WorkspaceGrant, WorkspaceScope};
 use crate::error::{AppError, AppResult};
+use crate::events;
 use crate::remote::node::NearbyDevice;
 use crate::remote::pairing::PairingCode;
 use crate::remote::protocol::RpcRequest;
-use crate::remote::{self, RemoteSettings};
+use crate::remote::workspace::{RemoteCapabilities, WorkspaceOp, WorkspaceOpResult};
+use crate::remote::{self, REMOTE_STATUS_CHANNEL, RemoteSettings};
 use crate::state::{AppState, Shared};
+use crate::util::now_ms;
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -216,7 +221,13 @@ pub async fn remote_set_level(state: State<'_, Shared>, node_id: String, level: 
 
 pub async fn remote_revoke_inner(state: &Shared, node_id: String) -> AppResult<()> {
     let id = node_id.clone();
-    state.db.call(move |c| store::delete_client(c, &id)).await?;
+    state
+        .db
+        .call(move |c| {
+            store::revoke_grants_for_peer(c, &id, now_ms())?;
+            store::delete_client(c, &id)
+        })
+        .await?;
     if let Some(node) = state.remote.node().await {
         node.drop_client(&node_id);
     }
@@ -231,12 +242,152 @@ pub async fn remote_revoke(state: State<'_, Shared>, node_id: String) -> AppResu
 
 pub async fn remote_forget_inner(state: &Shared, node_id: String) -> AppResult<()> {
     let id = node_id.clone();
-    state.db.call(move |c| store::delete_host(c, &id)).await?;
+    state
+        .db
+        .call(move |c| {
+            store::revoke_grants_for_peer(c, &id, now_ms())?;
+            store::delete_host(c, &id)
+        })
+        .await?;
     if let Some(node) = state.remote.node().await {
         node.drop_host(&node_id);
     }
     state.remote.sync(state).await?;
     Ok(())
+}
+
+/// Enable/disable remote workspace tool execution (files & shell) for paired `Full` clients on this device.
+pub async fn remote_set_tools_inner(state: &Shared, enabled: bool, scope: WorkspaceScope) -> AppResult<RemoteStatus> {
+    state
+        .db
+        .call(move |c| {
+            let mut settings = remote::load_settings(c)?;
+            settings.allow_remote_tools = enabled;
+            settings.remote_tools_scope = scope;
+            remote::save_settings(c, &settings)
+        })
+        .await?;
+    events::emit_local(state.events.as_ref(), REMOTE_STATUS_CHANNEL, &());
+    status(state).await
+}
+
+#[tauri::command]
+pub async fn remote_set_tools(
+    state: State<'_, Shared>,
+    enabled: bool,
+    scope: WorkspaceScope,
+) -> AppResult<RemoteStatus> {
+    remote_set_tools_inner(&state, enabled, scope).await
+}
+
+/// Active per-chat workspace grants issued by this device to paired AI hosts.
+pub async fn remote_list_grants_inner(state: &Shared) -> AppResult<Vec<WorkspaceGrant>> {
+    state.db.call(|c| store::list_active_grants(c)).await
+}
+
+#[tauri::command]
+pub async fn remote_list_grants(state: State<'_, Shared>) -> AppResult<Vec<WorkspaceGrant>> {
+    remote_list_grants_inner(&state).await
+}
+
+/// Issue a scoped grant letting a paired AI host execute workspace tools in `root_cwd` on this device.
+pub async fn remote_create_grant_inner(
+    state: &Shared,
+    peer_node_id: String,
+    root_cwd: String,
+    scope: Option<WorkspaceScope>,
+) -> AppResult<WorkspaceGrant> {
+    if !std::path::Path::new(&root_cwd).is_dir() {
+        return Err(AppError::NotFound(crate::tr!("dossier introuvable : {root_cwd}", "folder not found: {root_cwd}")));
+    }
+    let probe = peer_node_id.clone();
+    let host = state
+        .db
+        .call(move |c| Ok(store::list_hosts(c)?.into_iter().find(|h| h.node_id == probe)))
+        .await?
+        .ok_or_else(|| AppError::NotFound(crate::tr!("appareil non appairé", "device not paired")))?;
+    let grant_id = uuid::Uuid::new_v4().to_string();
+    let scope = scope.unwrap_or(WorkspaceScope::ProjectOnly);
+    let grant = state
+        .db
+        .call(move |c| store::create_grant(c, &grant_id, &host.node_id, &host.name, &root_cwd, scope, now_ms()))
+        .await?;
+    events::emit_local(state.events.as_ref(), REMOTE_STATUS_CHANNEL, &());
+    Ok(grant)
+}
+
+#[tauri::command]
+pub async fn remote_create_grant(
+    state: State<'_, Shared>,
+    peer_node_id: String,
+    root_cwd: String,
+    scope: Option<WorkspaceScope>,
+) -> AppResult<WorkspaceGrant> {
+    remote_create_grant_inner(&state, peer_node_id, root_cwd, scope).await
+}
+
+/// Associate an existing grant with the remote thread id created on the AI host.
+#[tauri::command]
+pub async fn remote_bind_grant_thread(state: State<'_, Shared>, grant_id: String, thread_id: String) -> AppResult<()> {
+    state.db.call(move |c| store::bind_grant_thread(c, &grant_id, &thread_id)).await?;
+    events::emit_local(state.events.as_ref(), REMOTE_STATUS_CHANNEL, &());
+    Ok(())
+}
+
+/// Revoke an active workspace grant right away.
+pub async fn remote_revoke_grant_inner(state: &Shared, grant_id: String) -> AppResult<()> {
+    state.db.call(move |c| store::revoke_grant(c, &grant_id, now_ms())).await?;
+    events::emit_local(state.events.as_ref(), REMOTE_STATUS_CHANNEL, &());
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn remote_revoke_grant(state: State<'_, Shared>, grant_id: String) -> AppResult<()> {
+    remote_revoke_grant_inner(&state, grant_id).await
+}
+
+/// Capabilities advertised by a connected paired host (`None` for hosts older than v0.2.6).
+#[tauri::command]
+pub async fn remote_host_capabilities(
+    state: State<'_, Shared>,
+    device: String,
+) -> AppResult<Option<RemoteCapabilities>> {
+    let node = host_node(&state, &device).await?;
+    match node.call(&device, RpcRequest { method: "remote_capabilities".into(), args: Value::Null }).await {
+        Ok(val) => Ok(serde_json::from_value(val).ok()),
+        Err(_) => Ok(None),
+    }
+}
+
+/// Relay one workspace operation from `neuron --mcp-remote` (over `control.rs`) to the chat's target device.
+pub async fn execute_remote_workspace_op(state: &Shared, thread_id: &str, op: WorkspaceOp) -> AppResult<Value> {
+    let (ws, permission_mode) = state.agents.active_workspace(thread_id).ok_or_else(|| {
+        AppError::Invalid(crate::tr!(
+            "aucune session distante active pour ce chat",
+            "no active cross-device session for this chat"
+        ))
+    })?;
+    let read_only = permission_mode == "plan";
+    let timeout = match &op {
+        WorkspaceOp::Run { timeout_secs, .. } => Duration::from_secs(timeout_secs.unwrap_or(60).clamp(1, 300) + 15),
+        _ => Duration::from_secs(90),
+    };
+    let node = state.remote.ensure(state).await?;
+    let req = RpcRequest {
+        method: "workspace_op".into(),
+        args: json!({
+            "rootCwd": ws.target.cwd,
+            "grantId": ws.grant_id,
+            "readOnly": read_only,
+            "op": op,
+        }),
+    };
+    let value = node.call_peer(&ws.target.device_id, req, timeout).await?;
+    let result: WorkspaceOpResult = serde_json::from_value(value)?;
+    if let Some(change) = result.change {
+        state.agents.push_remote_change(thread_id, change);
+    }
+    Ok(json!({ "text": result.text, "isError": result.is_error }))
 }
 
 /// This device stops controlling a host.

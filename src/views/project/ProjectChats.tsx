@@ -25,7 +25,7 @@ export function ProjectChats({ projectId }: ProjectChatsProps) {
   const projectChats = useMemo(
     () =>
       chats
-        .filter((chat) => chat.projectId === projectId)
+        .filter((chat) => (chat.projectId ?? chat.workspace?.projectId) === projectId)
         .sort((a, b) => b.updatedAt - a.updatedAt),
     [chats, projectId],
   );

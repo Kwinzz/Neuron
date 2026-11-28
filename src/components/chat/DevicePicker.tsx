@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { ChevronDown, Monitor } from "lucide-react";
+import { ChevronDown, Cpu, Monitor } from "lucide-react";
 import type { RemoteHost } from "@/bindings/RemoteHost";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,13 +21,16 @@ interface DevicePickerProps {
   value: string | null;
   onChange: (device: string | null) => void;
   disabled?: boolean;
+  /** `"run"` = default single picker, `"ai"` = AI host picker, `"workspace"` = files/terminal device picker. */
+  labelMode?: "run" | "ai" | "workspace";
 }
 
-/** Pick which device a new chat runs on (this PC or a paired host). Hidden when no host is paired. */
+/** Pick which device runs a chat or its AI/workspace (this PC or a paired host). Hidden when no host is paired. */
 export const DevicePicker = memo(function DevicePicker({
   value,
   onChange,
   disabled,
+  labelMode = "run",
 }: DevicePickerProps) {
   const hosts = useDevices((s) => s.devices?.hosts) ?? EMPTY_HOSTS;
 
@@ -35,6 +38,15 @@ export const DevicePicker = memo(function DevicePicker({
 
   const selectedHost = value ? hosts.find((h) => h.nodeId === value) : undefined;
   const currentName = value ? (selectedHost?.name ?? t("shell.unknownDevice")) : t("chat.thisPc");
+  const Icon = labelMode === "ai" ? Cpu : Monitor;
+  const labelKey =
+    labelMode === "ai"
+      ? "chat.aiDeviceLabel"
+      : labelMode === "workspace"
+        ? "chat.workspaceDeviceLabel"
+        : "chat.runOnLabel";
+  const buttonKey =
+    labelMode === "ai" ? "chat.aiOn" : labelMode === "workspace" ? "chat.workspaceOn" : "chat.runOn";
 
   return (
     <DropdownMenu>
@@ -44,16 +56,16 @@ export const DevicePicker = memo(function DevicePicker({
           size="sm"
           disabled={disabled}
           className="h-7 max-w-56 gap-1.5 px-2 text-xs font-normal text-muted-foreground transition-colors duration-150 hover:text-foreground [&>svg:last-child]:transition-transform [&>svg:last-child]:duration-150 data-[state=open]:[&>svg:last-child]:rotate-180"
-          aria-label={t("chat.runOnLabel")}
+          aria-label={t(labelKey)}
         >
-          <Monitor className="size-3.5 shrink-0" aria-hidden />
-          <span className="truncate">{t("chat.runOn", { device: currentName })}</span>
+          <Icon className="size-3.5 shrink-0" aria-hidden />
+          <span className="truncate">{t(buttonKey, { device: currentName })}</span>
           <ChevronDown className="size-3.5 shrink-0 opacity-60" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
         <DropdownMenuLabel className="text-xs text-muted-foreground">
-          {t("chat.runOnLabel")}
+          {t(labelKey)}
         </DropdownMenuLabel>
         <DropdownMenuRadioGroup
           value={value ?? LOCAL_VALUE}

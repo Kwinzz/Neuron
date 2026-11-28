@@ -36,10 +36,15 @@ impl Default for CodexAdapter {
 /// Arguments for one turn.
 pub fn turn_args(spec: &SessionSpec, thread: Option<&str>, turn: &crate::agents::UserTurn) -> Vec<String> {
     let mut args: Vec<String> = ["exec", "--json", "--skip-git-repo-check"].iter().map(|s| s.to_string()).collect();
-    match spec.permission_mode.as_str() {
-        "plan" => args.extend(["--sandbox".into(), "read-only".into()]),
-        "bypassPermissions" => args.push("--dangerously-bypass-approvals-and-sandbox".into()),
-        _ => args.extend(["--sandbox".into(), "workspace-write".into()]),
+    if spec.remote_mcp.is_some() {
+        // Cross-device workspace: keep the AI host strictly read-only so Codex never modifies local files.
+        args.extend(["--sandbox".into(), "read-only".into()]);
+    } else {
+        match spec.permission_mode.as_str() {
+            "plan" => args.extend(["--sandbox".into(), "read-only".into()]),
+            "bypassPermissions" => args.push("--dangerously-bypass-approvals-and-sandbox".into()),
+            _ => args.extend(["--sandbox".into(), "workspace-write".into()]),
+        }
     }
     if let Some(model) = spec.model.as_deref().filter(|m| !m.trim().is_empty()) {
         args.extend(["-m".into(), model.trim().into()]);
@@ -47,14 +52,23 @@ pub fn turn_args(spec: &SessionSpec, thread: Option<&str>, turn: &crate::agents:
     if let Some(effort) = spec.effort.as_deref().filter(|e| EFFORT_LEVELS.contains(e)) {
         args.extend(["-c".into(), format!("model_reasoning_effort=\"{effort}\"")]);
     }
+    let lit = |s: &str| format!("'{}'", s.replace('\'', ""));
     if let Some(mcp) = &spec.mcp {
         use crate::memory::mcp::SERVER_NAME;
         // TOML literal strings ('…'): Windows paths keep their backslashes.
-        let lit = |s: &str| format!("'{}'", s.replace('\'', ""));
         let list = mcp.args.iter().map(|a| lit(a)).collect::<Vec<_>>().join(",");
         args.extend([
             "-c".into(),
             format!("mcp_servers.{SERVER_NAME}.command={}", lit(&mcp.command.display().to_string())),
+        ]);
+        args.extend(["-c".into(), format!("mcp_servers.{SERVER_NAME}.args=[{list}]")]);
+    }
+    if let Some(remote_mcp) = &spec.remote_mcp {
+        use crate::remote::mcp::SERVER_NAME;
+        let list = remote_mcp.args.iter().map(|a| lit(a)).collect::<Vec<_>>().join(",");
+        args.extend([
+            "-c".into(),
+            format!("mcp_servers.{SERVER_NAME}.command={}", lit(&remote_mcp.command.display().to_string())),
         ]);
         args.extend(["-c".into(), format!("mcp_servers.{SERVER_NAME}.args=[{list}]")]);
     }
@@ -255,6 +269,7 @@ mod tests {
             resume: None,
             append_system_prompt: None,
             mcp: None,
+            remote_mcp: None,
             generic: None,
         }
     }
@@ -293,5 +308,16 @@ mod tests {
         let prompt = with.last().unwrap();
         assert!(prompt.starts_with("regarde") && prompt.contains("C:/n/b.pdf") && !prompt.contains("a.png"));
         assert!(bypass.contains("--dangerously-bypass-approvals-and-sandbox") && !bypass.contains("--sandbox"));
+
+        let mut remote = spec("bypassPermissions");
+        remote.remote_mcp = Some(crate::remote::mcp::RemoteMcpLaunch::new(
+            PathBuf::from("neuron"),
+            std::path::Path::new("/data"),
+            "th-2",
+        ));
+        let remote_args = turn_args(&remote, None, &"hello".into()).join(" ");
+        assert!(remote_args.contains("--sandbox read-only"));
+        assert!(!remote_args.contains("--dangerously-bypass-approvals-and-sandbox"));
+        assert!(remote_args.contains("mcp_servers.neuron_remote.command="));
     }
 }

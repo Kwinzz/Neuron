@@ -67,16 +67,52 @@ pub fn build_args(spec: &SessionSpec) -> Vec<String> {
     if let Some(extra) = spec.append_system_prompt.as_deref().filter(|s| !s.trim().is_empty()) {
         args.extend(["--append-system-prompt".into(), extra.into()]);
     }
+    let mut mcp_servers = serde_json::Map::new();
+    let mut allowed: Vec<String> = Vec::new();
     if let Some(mcp) = &spec.mcp {
         use crate::memory::mcp::{SERVER_NAME, TOOL_NAMES};
-        let config = json!({ "mcpServers": { SERVER_NAME: {
-            "type": "stdio",
-            "command": mcp.command.display().to_string(),
-            "args": mcp.args,
-        }}});
+        mcp_servers.insert(
+            SERVER_NAME.into(),
+            json!({
+                "type": "stdio",
+                "command": mcp.command.display().to_string(),
+                "args": mcp.args,
+            }),
+        );
+        allowed.extend(TOOL_NAMES.iter().map(|t| format!("mcp__{SERVER_NAME}__{t}")));
+    }
+    if let Some(remote_mcp) = &spec.remote_mcp {
+        use crate::remote::mcp::{ALL_TOOLS, EDIT_TOOLS, READ_ONLY_TOOLS, SERVER_NAME};
+        mcp_servers.insert(
+            SERVER_NAME.into(),
+            json!({
+                "type": "stdio",
+                "command": remote_mcp.command.display().to_string(),
+                "args": remote_mcp.args,
+            }),
+        );
+        // Disable local disk & shell tools so Claude acts exclusively on the target device via MCP.
+        args.push("--disallowedTools=Bash,Read,Edit,Write,Glob,Grep,NotebookEdit,LS".into());
+        match mode {
+            "plan" | "manual" => {
+                allowed.extend(READ_ONLY_TOOLS.iter().map(|t| format!("mcp__{SERVER_NAME}__{t}")));
+            }
+            "acceptEdits" => {
+                allowed.extend(
+                    READ_ONLY_TOOLS.iter().chain(EDIT_TOOLS.iter()).map(|t| format!("mcp__{SERVER_NAME}__{t}")),
+                );
+            }
+            _ => {
+                allowed.extend(ALL_TOOLS.iter().map(|t| format!("mcp__{SERVER_NAME}__{t}")));
+            }
+        }
+    }
+    if !mcp_servers.is_empty() {
+        let config = json!({ "mcpServers": mcp_servers });
         // `=` forms: both options are variadic and must not swallow the next argument.
         args.push(format!("--mcp-config={config}"));
-        let allowed: Vec<String> = TOOL_NAMES.iter().map(|t| format!("mcp__{SERVER_NAME}__{t}")).collect();
+    }
+    if !allowed.is_empty() {
         args.push(format!("--allowedTools={}", allowed.join(",")));
     }
     args
@@ -192,6 +228,7 @@ mod tests {
             resume: Some("abc".into()),
             append_system_prompt: None,
             mcp: None,
+            remote_mcp: None,
             generic: None,
         }
     }
@@ -258,5 +295,32 @@ mod tests {
 
         assert_eq!(encode_command(&SessionCommand::Interrupt).unwrap()["request"]["subtype"], "interrupt");
         assert!(encode_command(&SessionCommand::Shutdown).is_none());
+    }
+
+    #[test]
+    fn remote_mcp_disables_local_tools_and_maps_permissions() {
+        let mut s = spec();
+        s.remote_mcp = Some(crate::remote::mcp::RemoteMcpLaunch::new(
+            PathBuf::from("neuron"),
+            std::path::Path::new("/data"),
+            "th-1",
+        ));
+
+        s.permission_mode = "manual".into();
+        let manual = build_args(&s).join(" ");
+        assert!(manual.contains("--disallowedTools=Bash,Read,Edit,Write,Glob,Grep,NotebookEdit,LS"));
+        assert!(manual.contains("mcp__neuron_remote__remote_read"));
+        assert!(!manual.contains("mcp__neuron_remote__remote_edit"));
+        assert!(!manual.contains("mcp__neuron_remote__remote_run"));
+
+        s.permission_mode = "acceptEdits".into();
+        let edits = build_args(&s).join(" ");
+        assert!(edits.contains("mcp__neuron_remote__remote_edit"));
+        assert!(edits.contains("mcp__neuron_remote__remote_write"));
+        assert!(!edits.contains("mcp__neuron_remote__remote_run"));
+
+        s.permission_mode = "bypassPermissions".into();
+        let bypass = build_args(&s).join(" ");
+        assert!(bypass.contains("mcp__neuron_remote__remote_run"));
     }
 }

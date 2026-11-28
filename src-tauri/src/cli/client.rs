@@ -87,13 +87,18 @@ fn print_remote(status: &RemoteStatus) {
         println!("{}", crate::tr!("Identifiant : {id}", "Id: {id}"));
     }
     let port = status.port.map(|p| crate::tr!(" · port UDP {p}", " · UDP port {p}")).unwrap_or_default();
+    let scope = match s.remote_tools_scope {
+        crate::db::remote::WorkspaceScope::ProjectOnly => crate::tr!("projets", "projects"),
+        crate::db::remote::WorkspaceScope::Full => crate::tr!("complet", "full"),
+    };
     println!(
         "{}",
         crate::tr!(
-            "Accès depuis d'autres appareils : {} · hors réseau local : {}{port}",
-            "Access from other devices: {} · outside the local network: {}{port}",
+            "Accès depuis d'autres appareils : {} · hors réseau local : {} · outils distants : {} ({scope}){port}",
+            "Access from other devices: {} · outside the local network: {} · remote tools: {} ({scope}){port}",
             on_off(s.enabled),
-            on_off(s.internet)
+            on_off(s.internet),
+            on_off(s.allow_remote_tools)
         )
     );
 }
@@ -120,6 +125,11 @@ async fn remote(dir: &Path, cmd: RemoteCmd) -> AppResult<i32> {
         }
         RemoteCmd::Internet(on) => {
             let status: RemoteStatus = control::call(dir, "remote_set_internet", json!({ "enabled": on })).await?;
+            print_remote(&status);
+        }
+        RemoteCmd::Tools { enabled, scope } => {
+            let status: RemoteStatus =
+                control::call(dir, "remote_set_tools", json!({ "enabled": enabled, "scope": scope })).await?;
             print_remote(&status);
         }
         RemoteCmd::Name(name) => {

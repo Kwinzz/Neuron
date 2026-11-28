@@ -23,6 +23,15 @@ const chat: Translation<typeof fr> = {
   thisPc: "This PC",
   runOn: "Run on: {device}",
   runOnLabel: "Run on",
+  aiDeviceLabel: "AI device",
+  aiOn: "AI: {device}",
+  aiDeviceHint: "Choose which device runs the AI agent for this project",
+  workspaceDeviceLabel: "Files device",
+  workspaceOn: "Files: {device}",
+  crossDeviceUnsupportedAgent: "Cross-device execution is available with Claude Code and Codex",
+  crossDeviceToolsDisabled: "Remote tools disabled on {device}",
+  crossDeviceOldHost: "Update {device} for cross-device execution",
+  crossDeviceSummary: "AI on {ai} → files on {workspace}",
 
   // Composer
   messageAria: "Message",

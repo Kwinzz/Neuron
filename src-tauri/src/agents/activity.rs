@@ -24,17 +24,18 @@ fn truncate(text: &str, max: usize) -> String {
 
 /// Returns the status and detail to show while `tool` runs with `input`.
 pub fn tool_activity(tool: &str, input: &Value) -> (ThreadStatus, Option<String>) {
-    let lower = tool.to_ascii_lowercase();
+    let base = tool.rsplit("__").next().unwrap_or(tool);
+    let lower = base.to_ascii_lowercase();
     let path = str_field(
         input,
         &["file_path", "path", "notebook_path", "Path", "TargetFile", "AbsolutePath", "DirectoryPath"],
     )
     .map(file_name);
     match lower.as_str() {
-        "read" | "ls" | "notebookread" | "view_file" | "read_file" | "list_dir" | "view_code_item" => {
+        "read" | "ls" | "notebookread" | "view_file" | "read_file" | "list_dir" | "view_code_item" | "remote_read" => {
             (ThreadStatus::Reading, path)
         }
-        "glob" | "grep" | "grep_search" | "find_by_name" | "codebase_search" => (
+        "glob" | "grep" | "grep_search" | "find_by_name" | "codebase_search" | "remote_search" => (
             ThreadStatus::Reading,
             str_field(input, &["pattern", "query", "Query", "Pattern", "SearchPath"]).map(|p| truncate(p, 48)),
         ),
@@ -50,7 +51,9 @@ pub fn tool_activity(tool: &str, input: &Value) -> (ThreadStatus, Option<String>
         | "write_to_file"
         | "replace_file_content"
         | "multi_replace_file_content"
-        | "edit_file" => (ThreadStatus::Editing, path),
+        | "edit_file"
+        | "remote_write"
+        | "remote_edit" => (ThreadStatus::Editing, path),
         "filechange" => (
             ThreadStatus::Editing,
             input
@@ -60,7 +63,7 @@ pub fn tool_activity(tool: &str, input: &Value) -> (ThreadStatus, Option<String>
                 .and_then(|c| str_field(c, &["path"]))
                 .map(file_name),
         ),
-        "bash" | "powershell" | "shell" | "exec" | "run_command" | "execute_command" => (
+        "bash" | "powershell" | "shell" | "exec" | "run_command" | "execute_command" | "remote_run" => (
             ThreadStatus::Running,
             str_field(input, &["command", "cmd", "CommandLine", "Command"]).map(|c| truncate(c, 60)),
         ),

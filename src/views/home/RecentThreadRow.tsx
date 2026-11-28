@@ -50,7 +50,7 @@ export const RecentThreadRow = memo(function RecentThreadRow({ thread }: RecentT
           <DeviceBadge device={device} compact />
         </div>
         <div className="max-w-[280px] truncate text-xs text-muted-foreground">
-          {th.projectName ?? t("home.noProject")}
+          {th.projectName ?? th.workspace?.projectName ?? t("home.noProject")}
         </div>
       </TableCell>
       <TableCell>

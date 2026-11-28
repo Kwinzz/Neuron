@@ -162,11 +162,14 @@ export const DockCard = memo(function DockCard({ id }: { id: string }) {
         <StatusDot status={thread.status} />
         <span className={cn("shrink-0", TONE_TEXT[meta.tone])}>{meta.label}</span>
         {device && <DeviceBadge device={device} className="max-w-28 text-[11px]" />}
-        {thread.projectName && (
+        {(thread.projectName ?? thread.workspace?.projectName) && (
           <>
             <span aria-hidden>·</span>
-            <span className="min-w-0 truncate" title={thread.projectName}>
-              {thread.projectName}
+            <span
+              className="min-w-0 truncate"
+              title={thread.projectName ?? thread.workspace?.projectName ?? undefined}
+            >
+              {thread.projectName ?? thread.workspace?.projectName}
             </span>
           </>
         )}

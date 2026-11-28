@@ -16,6 +16,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ("0008_claude_turn_costs", include_str!("../../migrations/0008_claude_turn_costs.sql")),
     ("0009_remote_devices", include_str!("../../migrations/0009_remote_devices.sql")),
     ("0010_thread_organization", include_str!("../../migrations/0010_thread_organization.sql")),
+    ("0011_remote_workspace", include_str!("../../migrations/0011_remote_workspace.sql")),
 ];
 
 /// Schema version after all embedded migrations are applied.
@@ -68,6 +69,7 @@ mod tests {
         "prompt_history",
         "remote_clients",
         "remote_hosts",
+        "workspace_grants",
     ];
 
     fn fresh() -> Connection {
@@ -207,7 +209,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(apply(&mut conn).unwrap(), LATEST_VERSION);
-        assert_eq!(LATEST_VERSION, 10);
+        assert_eq!(LATEST_VERSION, 11);
 
         let flags: (Option<i64>, Option<i64>, Option<i64>) = conn
             .query_row("SELECT pinned_at, archived_at, deleted_at FROM threads WHERE id = 't1'", [], |r| {

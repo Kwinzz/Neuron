@@ -49,6 +49,11 @@ pub trait Backend: Send + Sync + 'static {
     fn client_level(&self, client: String) -> BoxFut<Option<AccessLevel>>;
     /// Runs a request of a paired client.
     fn call(&self, client: String, level: AccessLevel, request: RpcRequest) -> BoxFut<AppResult<Value>>;
+    /// Runs a reverse request sent by a paired host over an already-established client → host connection
+    /// (used exclusively for grant-authorized cross-device workspace tools).
+    fn reverse_call(&self, _host: String, _request: RpcRequest) -> BoxFut<AppResult<Value>> {
+        Box::pin(async { Err(AppError::Invalid("reverse call not supported".into())) })
+    }
     /// A client just paired with this device (default level: full).
     fn client_paired(&self, client: String, name: String) -> BoxFut<AppResult<()>>;
     /// This device just paired with a host.
@@ -511,15 +516,29 @@ impl Node {
 
         let weak: Weak<Self> = Arc::downgrade(self);
         let events_conn = conn.clone();
+        let rev_conn = conn.clone();
+        let rev_host = host.to_string();
+        let rev_weak = Arc::downgrade(self);
+        let reverse_task = tokio::spawn(async move {
+            while let Ok((send, recv)) = rev_conn.accept_bi().await {
+                let Some(node) = rev_weak.upgrade() else { break };
+                let peer = rev_host.clone();
+                tokio::spawn(async move { node.answer_reverse(peer, send, recv).await });
+            }
+        });
         let host = host.to_string();
         self.spawn(async move {
             if let Ok(mut recv) = events_conn.accept_uni().await {
                 while let Ok(event) = read_frame::<WireEvent>(&mut recv).await {
-                    let Some(node) = weak.upgrade() else { return };
+                    let Some(node) = weak.upgrade() else {
+                        reverse_task.abort();
+                        return;
+                    };
                     node.backend.host_event(host.clone(), event);
                 }
             }
             let reason = events_conn.closed().await;
+            reverse_task.abort();
             tracing::info!(%reason, host = %host, "remote: host connection ended");
             if let Some(node) = weak.upgrade() {
                 let mut hosts = lock(&node.hosts);
@@ -533,20 +552,66 @@ impl Node {
         Ok(conn)
     }
 
-    /// One request to a paired host.
-    pub async fn call(self: &Arc<Self>, host: &str, request: RpcRequest) -> AppResult<Value> {
-        let conn = self.connect_host(host).await?;
+    async fn answer_reverse(&self, host: String, mut send: SendStream, mut recv: RecvStream) {
+        let Ok(bytes) = recv.read_to_end(MAX_MESSAGE).await else { return };
+        let result = match serde_json::from_slice::<RpcRequest>(&bytes) {
+            Ok(request) => self.backend.reverse_call(host, request).await,
+            Err(err) => Err(AppError::Invalid(format!("bad request: {err}"))),
+        };
+        let response = RpcResponse::from_result(result);
+        if let Ok(bytes) = serde_json::to_vec(&response) {
+            let _ = send.write_all(&bytes).await;
+        }
+        let _ = send.finish();
+    }
+
+    async fn exchange_on(conn: &Connection, request: &RpcRequest, timeout: Duration) -> AppResult<Value> {
         let exchange = async {
             let (mut send, mut recv) = conn.open_bi().await.map_err(net_err)?;
-            send.write_all(&serde_json::to_vec(&request)?).await.map_err(net_err)?;
+            send.write_all(&serde_json::to_vec(request)?).await.map_err(net_err)?;
             send.finish().map_err(net_err)?;
             let bytes = recv.read_to_end(MAX_MESSAGE).await.map_err(net_err)?;
             Ok::<_, AppError>(serde_json::from_slice::<RpcResponse>(&bytes)?)
         };
-        let response = tokio::time::timeout(CALL_TIMEOUT, exchange)
+        let response = tokio::time::timeout(timeout, exchange)
             .await
             .map_err(|_| AppError::Other(crate::tr!("l'appareil n'a pas répondu", "the device did not answer")))??;
         response.into_result()
+    }
+
+    /// One request to a paired host with a custom timeout.
+    pub async fn call_with_timeout(
+        self: &Arc<Self>,
+        host: &str,
+        request: RpcRequest,
+        timeout: Duration,
+    ) -> AppResult<Value> {
+        let conn = self.connect_host(host).await?;
+        Self::exchange_on(&conn, &request, timeout).await
+    }
+
+    /// One request to a paired host (default timeout).
+    pub async fn call(self: &Arc<Self>, host: &str, request: RpcRequest) -> AppResult<Value> {
+        self.call_with_timeout(host, request, CALL_TIMEOUT).await
+    }
+
+    /// Calls a connected peer over whichever live connection exists:
+    /// 1) outbound connection to a paired host, else
+    /// 2) reverse bi-stream on an active inbound connection from a paired client, else
+    /// 3) dials the peer as a paired host (reconnect).
+    pub async fn call_peer(self: &Arc<Self>, peer: &str, request: RpcRequest, timeout: Duration) -> AppResult<Value> {
+        let id = parse_id(peer)?;
+        let outbound = lock(&self.hosts).get(&id).filter(|c| c.close_reason().is_none()).cloned();
+        if let Some(conn) = outbound {
+            return Self::exchange_on(&conn, &request, timeout).await;
+        }
+        let inbound = lock(&self.clients)
+            .get(&id)
+            .and_then(|conns| conns.iter().rev().find(|c| c.close_reason().is_none()).cloned());
+        if let Some(conn) = inbound {
+            return Self::exchange_on(&conn, &request, timeout).await;
+        }
+        self.call_with_timeout(peer, request, timeout).await
     }
 
     /// Closes the connection to a host (forgotten).
@@ -689,6 +754,14 @@ mod tests {
                 Ok(json!({ "client": client, "level": level.as_str(), "method": request.method, "args": request.args }))
             })
         }
+        fn reverse_call(&self, host: String, request: RpcRequest) -> BoxFut<AppResult<Value>> {
+            Box::pin(async move {
+                if request.method != "workspace_op" {
+                    return Err(AppError::Invalid("refused".into()));
+                }
+                Ok(json!({ "reverseHost": host, "args": request.args }))
+            })
+        }
         fn client_paired(&self, client: String, _name: String) -> BoxFut<AppResult<()>> {
             lock(&self.clients).insert(client, AccessLevel::Full);
             Box::pin(async { Ok(()) })
@@ -770,6 +843,23 @@ mod tests {
         host_events.send(event.clone()).unwrap();
         let received = tokio::time::timeout(Duration::from_secs(5), rx.recv()).await.unwrap().unwrap();
         assert_eq!(received, event);
+
+        // Reverse call (host → client) travels over the client's existing inbound connection.
+        let rev = host
+            .call_peer(
+                &client_id,
+                RpcRequest { method: "workspace_op".into(), args: json!({ "grantId": "g1" }) },
+                Duration::from_secs(5),
+            )
+            .await
+            .unwrap();
+        assert_eq!(rev["reverseHost"], host_id);
+        assert_eq!(rev["args"]["grantId"], "g1");
+        assert!(
+            host.call_peer(&client_id, RpcRequest { method: "nope".into(), args: Value::Null }, Duration::from_secs(5))
+                .await
+                .is_err()
+        );
 
         // Revoked: the connection drops and new requests are refused.
         lock(&host_backend.clients).remove(&client_id);

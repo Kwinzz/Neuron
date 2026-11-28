@@ -371,6 +371,7 @@ pub async fn test_profile(profile: GenericCliProfile, cwd: std::path::PathBuf) -
         resume: None,
         append_system_prompt: None,
         mcp: None,
+        remote_mcp: None,
         generic: Some(profile.clone()),
     };
     let handle = GenericAdapter.start(&spec)?;

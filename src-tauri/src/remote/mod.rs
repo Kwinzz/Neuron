@@ -10,10 +10,12 @@
 
 pub mod dispatch;
 pub mod hub;
+pub mod mcp;
 pub mod mdns;
 pub mod node;
 pub mod pairing;
 pub mod protocol;
+pub mod workspace;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -51,11 +53,21 @@ pub struct RemoteSettings {
     pub device_name: String,
     /// Reachable / reaching paired devices outside the local network (public relays + address directory).
     pub internet: bool,
+    /// Paired `Full` clients may run remote workspace tools (files & shell) on this device.
+    pub allow_remote_tools: bool,
+    /// Folder scope for remote workspace tools on this device.
+    pub remote_tools_scope: store::WorkspaceScope,
 }
 
 impl Default for RemoteSettings {
     fn default() -> Self {
-        Self { enabled: false, device_name: default_device_name(), internet: false }
+        Self {
+            enabled: false,
+            device_name: default_device_name(),
+            internet: false,
+            allow_remote_tools: false,
+            remote_tools_scope: store::WorkspaceScope::ProjectOnly,
+        }
     }
 }
 
@@ -244,7 +256,16 @@ impl Backend for AppBackend {
         Box::pin(async move {
             let state = state.ok_or_else(|| AppError::Other("application shutting down".into()))?;
             tracing::info!(client = %client.get(..10).unwrap_or(&client), method = %request.method, "remote call");
-            dispatch::call(&state, level, &request.method, request.args).await
+            dispatch::call(&state, &client, level, &request.method, request.args).await
+        })
+    }
+
+    fn reverse_call(&self, host: String, request: RpcRequest) -> BoxFut<AppResult<Value>> {
+        let state = self.state();
+        Box::pin(async move {
+            let state = state.ok_or_else(|| AppError::Other("application shutting down".into()))?;
+            tracing::info!(host = %host.get(..10).unwrap_or(&host), method = %request.method, "remote reverse call");
+            dispatch::reverse_call(&state, &host, &request.method, request.args).await
         })
     }
 

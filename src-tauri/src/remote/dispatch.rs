@@ -40,7 +40,22 @@ pub fn required_level(method: &str, args: &Value) -> Option<AccessLevel> {
         | "list_memories"
         | "search_memories"
         | "search_messages"
-        | "read_attachment" => Read,
+        | "read_attachment"
+        | "remote_capabilities" => Read,
+        "workspace_context" => {
+            if args.get("grantId").and_then(Value::as_str).is_some() {
+                Read
+            } else {
+                Full
+            }
+        }
+        "workspace_op" => {
+            if args.get("grantId").and_then(Value::as_str).is_some() {
+                Chat
+            } else {
+                Full
+            }
+        }
         "create_thread" => {
             // A folder of the remote device's choosing (not one of its projects) = run an agent anywhere.
             let anywhere = args.pointer("/input/cwd").is_some_and(|v| !v.is_null());
@@ -113,7 +128,7 @@ async fn read_attachment(
 }
 
 /// Runs a remote call with the caller's level.
-pub async fn call(state: &Shared, level: AccessLevel, method: &str, args: Value) -> AppResult<Value> {
+pub async fn call(state: &Shared, client: &str, level: AccessLevel, method: &str, args: Value) -> AppResult<Value> {
     let Some(needed) = required_level(method, &args) else {
         return Err(AppError::Invalid(crate::tr!(
             "« {method} » n'est pas disponible depuis un autre appareil",
@@ -130,6 +145,40 @@ pub async fn call(state: &Shared, level: AccessLevel, method: &str, args: Value)
     }
     let a = &args;
     match method {
+        "remote_capabilities" => {
+            let settings = state.db.call(|c| crate::remote::load_settings(c)).await?;
+            json(crate::remote::workspace::capabilities(&settings))
+        }
+        "workspace_op" => {
+            let grant_id: Option<String> = arg(a, "grantId")?;
+            let read_only: Option<bool> = arg(a, "readOnly")?;
+            let op: crate::remote::workspace::WorkspaceOp = arg(a, "op")?;
+            let res = match grant_id.filter(|g| !g.is_empty()) {
+                Some(gid) => {
+                    crate::remote::workspace::execute_with_grant(state, client, &gid, read_only.unwrap_or(false), op)
+                        .await?
+                }
+                None => {
+                    let root_cwd: String = arg(a, "rootCwd")?;
+                    crate::remote::workspace::execute_as_host(state, &root_cwd, read_only.unwrap_or(false), op).await?
+                }
+            };
+            json(res)
+        }
+        "workspace_context" => {
+            let grant_id: Option<String> = arg(a, "grantId")?;
+            let project_name: Option<String> = arg(a, "projectName")?;
+            let bundle = match grant_id.filter(|g| !g.is_empty()) {
+                Some(gid) => {
+                    crate::remote::workspace::build_context_with_grant(state, client, &gid, project_name).await?
+                }
+                None => {
+                    let root_cwd: String = arg(a, "rootCwd")?;
+                    crate::remote::workspace::build_context_as_host(state, &root_cwd, project_name).await?
+                }
+            };
+            json(bundle)
+        }
         "dashboard_snapshot" => json(dashboard::dashboard_snapshot_inner(state, arg(a, "range")?).await?),
         "usage_report" => json(dashboard::usage_report_inner(state, arg(a, "range")?).await?),
         "refresh_quotas" => json(dashboard::refresh_quotas_inner(state).await?),
@@ -212,6 +261,32 @@ pub async fn call(state: &Shared, level: AccessLevel, method: &str, args: Value)
     }
 }
 
+/// Runs a reverse call initiated by a paired host over an existing client → host connection.
+/// Deny by default: ONLY `workspace_op` and `workspace_context` with a valid active grant for `host` are allowed.
+pub async fn reverse_call(state: &Shared, host: &str, method: &str, args: Value) -> AppResult<Value> {
+    let a = &args;
+    match method {
+        "workspace_op" => {
+            let grant_id: String = arg(a, "grantId")?;
+            let read_only: Option<bool> = arg(a, "readOnly")?;
+            let op: crate::remote::workspace::WorkspaceOp = arg(a, "op")?;
+            json(
+                crate::remote::workspace::execute_with_grant(state, host, &grant_id, read_only.unwrap_or(false), op)
+                    .await?,
+            )
+        }
+        "workspace_context" => {
+            let grant_id: String = arg(a, "grantId")?;
+            let project_name: Option<String> = arg(a, "projectName")?;
+            json(crate::remote::workspace::build_context_with_grant(state, host, &grant_id, project_name).await?)
+        }
+        _ => Err(AppError::Invalid(crate::tr!(
+            "« {method} » refusée sur le canal inversé",
+            "“{method}” refused on reverse channel"
+        ))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,6 +296,11 @@ mod tests {
     #[test]
     fn levels() {
         assert_eq!(required_level("list_threads", &json!({})), Some(Read));
+        assert_eq!(required_level("remote_capabilities", &json!({})), Some(Read));
+        assert_eq!(required_level("workspace_op", &json!({})), Some(Full));
+        assert_eq!(required_level("workspace_op", &json!({"grantId": "g1"})), Some(Chat));
+        assert_eq!(required_level("workspace_context", &json!({})), Some(Full));
+        assert_eq!(required_level("workspace_context", &json!({"grantId": "g1"})), Some(Read));
         assert_eq!(required_level("search_messages", &json!({"query": "rust"})), Some(Read));
         assert_eq!(required_level("send_message", &json!({"threadId": "t"})), Some(Chat));
         assert_eq!(required_level("set_thread_pinned", &json!({"threadId": "t", "pinned": true})), Some(Chat));

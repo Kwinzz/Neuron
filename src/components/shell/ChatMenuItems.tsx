@@ -33,6 +33,7 @@ import { moveChatToProject, setChatArchived, setChatPinned } from "@/lib/chatAct
 import { deviceOfProject, deviceOfThread } from "@/lib/deviceRouting";
 import { openFolder } from "@/lib/openFolder";
 import { useChatDeletion } from "@/stores/chatDeletion";
+import { useDevices } from "@/stores/devices";
 import { useLive } from "@/stores/live";
 import { useNav } from "@/stores/nav";
 
@@ -85,12 +86,22 @@ export interface ChatMenuItemsProps {
 export function ChatMenuItems({ kind, chat, onRename }: ChatMenuItemsProps) {
   const live = useLive((s) => s.threads[chat.id]);
   const projects = useNav((s) => s.projects);
+  const ownNodeId = useDevices((s) => s.status?.nodeId ?? null);
 
   const pinned = (live ? live.pinnedAt : chat.pinnedAt) !== null;
   const archived = (live ? live.archivedAt : chat.archivedAt) !== null;
   const currentProjectId = live ? live.projectId : chat.projectId;
+  const workspace = live ? live.workspace : chat.workspace;
   const cwd = live ? live.cwd : chat.cwd;
   const device = deviceOfThread(chat.id) ?? deviceOfProject(currentProjectId);
+  const localFolderPath =
+    workspace !== null
+      ? workspace.deviceId === ownNodeId
+        ? workspace.cwd
+        : null
+      : !device
+        ? cwd
+        : null;
 
   const sameDeviceProjects = useMemo(
     () => projects.filter((p) => deviceOfProject(p.id) === device),
@@ -116,37 +127,39 @@ export function ChatMenuItems({ kind, chat, onRename }: ChatMenuItemsProps) {
         <span>{t(archived ? "chat.unarchive" : "chat.archive")}</span>
       </M.Item>
 
-      <M.Sub>
-        <M.SubTrigger>
-          <FolderInput />
-          <span>{t("chat.moveToProject")}</span>
-        </M.SubTrigger>
-        <M.Portal>
-          <M.SubContent className="max-h-72 w-52 overflow-y-auto">
-            {sameDeviceProjects.map((project) => (
+      {workspace === null && (
+        <M.Sub>
+          <M.SubTrigger>
+            <FolderInput />
+            <span>{t("chat.moveToProject")}</span>
+          </M.SubTrigger>
+          <M.Portal>
+            <M.SubContent className="max-h-72 w-52 overflow-y-auto">
+              {sameDeviceProjects.map((project) => (
+                <M.Item
+                  key={project.id}
+                  disabled={currentProjectId === project.id}
+                  onSelect={() => void moveChatToProject(chat.id, project.id)}
+                >
+                  <Folder />
+                  <span className="truncate">{project.name}</span>
+                </M.Item>
+              ))}
+              {sameDeviceProjects.length > 0 && <M.Separator />}
               <M.Item
-                key={project.id}
-                disabled={currentProjectId === project.id}
-                onSelect={() => void moveChatToProject(chat.id, project.id)}
+                disabled={currentProjectId === null}
+                onSelect={() => void moveChatToProject(chat.id, null)}
               >
-                <Folder />
-                <span className="truncate">{project.name}</span>
+                <FolderMinus />
+                <span>{t("chat.noProject")}</span>
               </M.Item>
-            ))}
-            {sameDeviceProjects.length > 0 && <M.Separator />}
-            <M.Item
-              disabled={currentProjectId === null}
-              onSelect={() => void moveChatToProject(chat.id, null)}
-            >
-              <FolderMinus />
-              <span>{t("chat.noProject")}</span>
-            </M.Item>
-          </M.SubContent>
-        </M.Portal>
-      </M.Sub>
+            </M.SubContent>
+          </M.Portal>
+        </M.Sub>
+      )}
 
-      {cwd && !device && (
-        <M.Item onSelect={() => void openFolder(cwd)}>
+      {localFolderPath && (
+        <M.Item onSelect={() => void openFolder(localFolderPath)}>
           <FolderOpen />
           <span>{t("common.openFolder")}</span>
         </M.Item>

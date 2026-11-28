@@ -21,6 +21,7 @@ fn spec(model: &str, effort: Option<&str>) -> SessionSpec {
         resume: None,
         append_system_prompt: None,
         mcp: None,
+        remote_mcp: None,
         generic: None,
     }
 }
