@@ -1,5 +1,5 @@
-//! `neuron service install|uninstall|status`: `neuron serve` as a systemd user service (Linux), restarted if it
-//! stops and started at boot without an open session (linger).
+//! `neuron service install|uninstall|restart|status`: `neuron serve` as a systemd user service (Linux), restarted if
+//! it stops and started at boot without an open session (linger).
 
 use std::path::PathBuf;
 use std::process::Command;
@@ -12,6 +12,7 @@ const UNIT: &str = "neuron.service";
 pub enum ServiceCmd {
     Install,
     Uninstall,
+    Restart,
     Status,
 }
 
@@ -29,6 +30,7 @@ pub fn run(cmd: ServiceCmd) -> i32 {
     match cmd {
         ServiceCmd::Install => install(),
         ServiceCmd::Uninstall => uninstall(),
+        ServiceCmd::Restart => restart(),
         ServiceCmd::Status => systemctl(&["status", UNIT, "--no-pager"]).unwrap_or(1),
     }
 }
@@ -128,6 +130,20 @@ fn install() -> i32 {
         )
     );
     0
+}
+
+fn restart() -> i32 {
+    match systemctl(&["restart", UNIT]) {
+        Some(0) => {
+            println!("{}", crate::tr!("✓ Service redémarré.", "✓ Service restarted."));
+            0
+        }
+        Some(code) => code,
+        None => {
+            eprintln!("neuron: {}", crate::tr!("systemctl introuvable", "systemctl not found"));
+            1
+        }
+    }
 }
 
 fn uninstall() -> i32 {
