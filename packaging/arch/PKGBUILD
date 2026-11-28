@@ -1,7 +1,7 @@
 # Neuron — Arch Linux package built from the sources of this repository.
 # From a clone:  cd packaging/arch && makepkg -si
 pkgname=neuron
-pkgver=0.2.6
+pkgver=0.2.7
 pkgrel=1
 pkgdesc="Desktop cockpit for command-line AI agents (Claude Code, Codex, Antigravity)"
 arch=('x86_64' 'aarch64')
