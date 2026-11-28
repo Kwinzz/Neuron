@@ -2,6 +2,7 @@ import {
   type ChangeEvent,
   type ClipboardEvent,
   type KeyboardEvent,
+  type PointerEvent,
   memo,
   useCallback,
   useEffect,
@@ -23,6 +24,12 @@ import { deviceOfThread } from "@/lib/deviceRouting";
 import { fuzzyScore, normalize } from "@/lib/fuzzy";
 import { caretInOpenFence, continueBlock, type TextEdit, toggleWrap } from "@/lib/markdownInput";
 import { draftKey, onComposerFill, useDrafts } from "@/stores/drafts";
+import {
+  COMPOSER_AUTO_MAX_HEIGHT,
+  COMPOSER_MIN_HEIGHT,
+  composerMaxHeight,
+  useLayout,
+} from "@/stores/layout";
 import { useLive } from "@/stores/live";
 import { EMPTY_COMMANDS, slashKey, useSlash } from "@/stores/slash";
 import { AttachmentTray } from "@/components/attachments/AttachmentTray";
@@ -39,7 +46,8 @@ import { useChat } from "@/stores/chat";
 import { NewMessagesPill } from "./NewMessagesPill";
 import { locale, t } from "@/i18n";
 
-const MAX_TEXTAREA_HEIGHT = 10 * 24 + 16;
+/** Pointer travel (px) before a press on the top edge counts as a resize drag. */
+const RESIZE_DRAG_THRESHOLD = 3;
 
 /** ArrayBuffer → base64, in chunks (no stack overflow on large images). */
 function toBase64(buffer: ArrayBuffer): string {
@@ -145,8 +153,11 @@ export const Composer = memo(function Composer({
   /** Files being copied/saved (skeleton tiles; sending waits for them). */
   const [importing, setImporting] = useState(0);
   const [dragging, setDragging] = useState(false);
+  const [resizing, setResizing] = useState(false);
+  const composerHeight = useLayout((s) => s.composerHeight);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const composerAreaRef = useRef<HTMLDivElement>(null);
+  const resizeDragRef = useRef<{ y: number; height: number; moved: boolean } | null>(null);
 
   const device = slashDevice !== undefined ? slashDevice : threadId ? deviceOfThread(threadId) : null;
   const prevDeviceRef = useRef(device);
@@ -238,17 +249,122 @@ export const Composer = memo(function Composer({
     historyIndexRef.current = -1;
   }, [threadId]);
 
+  const syncHeight = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const manual = useLayout.getState().composerHeight;
+    if (manual !== null) {
+      el.style.height = `${Math.min(manual, composerMaxHeight())}px`;
+      return;
+    }
+    const prevScrollTop = el.scrollTop;
+    el.style.height = "auto";
+    const maxAuto = Math.min(COMPOSER_AUTO_MAX_HEIGHT, composerMaxHeight());
+    const next = Math.min(el.scrollHeight, maxAuto);
+    el.style.height = `${next}px`;
+    if (el.scrollHeight > maxAuto) {
+      el.scrollTop = prevScrollTop;
+    }
+  }, []);
+
   useLayoutEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`;
+    syncHeight();
     if (pendingCaretEndRef.current) {
       pendingCaretEndRef.current = false;
       const len = el.value.length;
       el.setSelectionRange(len, len);
     }
-  }, [value]);
+  }, [value, composerHeight, syncHeight]);
+
+  // Recompute height when container width changes (line wrapping) or viewport height shrinks.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    let lastWidth = el.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth !== lastWidth) {
+        lastWidth = el.clientWidth;
+        syncHeight();
+      }
+    });
+    ro.observe(el);
+    window.addEventListener("resize", syncHeight);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", syncHeight);
+    };
+  }, [syncHeight]);
+
+  useEffect(() => {
+    return () => {
+      delete document.documentElement.dataset.composerResizing;
+    };
+  }, []);
+
+  const onResizePointerDown = (e: PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    const el = textareaRef.current;
+    if (!el) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    resizeDragRef.current = {
+      y: e.clientY,
+      height: el.getBoundingClientRect().height,
+      moved: false,
+    };
+  };
+
+  const onResizePointerMove = (e: PointerEvent<HTMLButtonElement>) => {
+    const d = resizeDragRef.current;
+    if (!d) return;
+    const dy = d.y - e.clientY;
+    if (!d.moved && Math.abs(dy) < RESIZE_DRAG_THRESHOLD) return;
+    if (!d.moved) {
+      d.moved = true;
+      setResizing(true);
+      document.documentElement.dataset.composerResizing = "";
+    }
+    useLayout.getState().setComposerHeight(d.height + dy);
+  };
+
+  const onResizePointerUp = (e: PointerEvent<HTMLButtonElement>) => {
+    const d = resizeDragRef.current;
+    resizeDragRef.current = null;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    if (!d || !d.moved) return;
+    setResizing(false);
+    delete document.documentElement.dataset.composerResizing;
+    // Dragging back down to the single-line minimum restores automatic sizing.
+    const current = useLayout.getState().composerHeight;
+    if (current !== null && current <= COMPOSER_MIN_HEIGHT) {
+      useLayout.getState().setComposerHeight(null);
+    }
+    useLayout.getState().saveComposerHeight();
+  };
+
+  const onResizeReset = () => {
+    useLayout.getState().setComposerHeight(null);
+    useLayout.getState().saveComposerHeight();
+  };
+
+  const onResizeKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      const base = useLayout.getState().composerHeight ?? el.getBoundingClientRect().height;
+      const next = base + (e.key === "ArrowUp" ? 24 : -24);
+      useLayout.getState().setComposerHeight(next <= COMPOSER_MIN_HEIGHT ? null : next);
+      useLayout.getState().saveComposerHeight();
+    } else if (e.key === "Home" || e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onResizeReset();
+    }
+  };
 
   const canSend = (value.trim().length > 0 || attachments.length > 0) && importing === 0;
 
@@ -546,6 +662,26 @@ export const Composer = memo(function Composer({
           <InputGroup
             className="rounded-xl bg-card shadow-sm transition-[border-color,box-shadow,background-color] duration-200 ease-snappy dark:bg-card"
           >
+            <button
+              type="button"
+              aria-label={t("chat.resizeComposer")}
+              title={t("chat.resizeComposerHint")}
+              onPointerDown={onResizePointerDown}
+              onPointerMove={onResizePointerMove}
+              onPointerUp={onResizePointerUp}
+              onPointerCancel={onResizePointerUp}
+              onDoubleClick={onResizeReset}
+              onKeyDown={onResizeKeyDown}
+              className="group/resize absolute inset-x-4 -top-1.5 z-10 flex h-3 cursor-ns-resize items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <span
+                aria-hidden
+                className={cn(
+                  "h-1 w-9 rounded-full transition-colors duration-150",
+                  resizing ? "bg-ring" : "bg-muted-foreground/25 group-hover/resize:bg-muted-foreground/60",
+                )}
+              />
+            </button>
             {(attachments.length > 0 || importing > 0) && (
               <InputGroupAddon align="block-start" className="p-0">
                 <AttachmentTray items={attachments} pending={importing} onRemove={removeAttachment} />
@@ -564,7 +700,7 @@ export const Composer = memo(function Composer({
               aria-activedescendant={slashOpen && slashFiltered.length > 0 ? `slash-option-${slashIndex}` : undefined}
               aria-label={t("chat.messageAria")}
               placeholder={placeholder ?? t("chat.composerPlaceholder")}
-              className="min-h-0 max-h-[256px] overflow-y-auto px-3.5 pt-3 text-sm leading-6 field-sizing-fixed"
+              className="min-h-0 max-h-[60vh] flex-none overflow-y-auto px-3.5 pt-3 text-sm leading-6 field-sizing-fixed"
             />
             <InputGroupAddon align="block-end">
               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">

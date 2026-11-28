@@ -46,6 +46,8 @@ const chat: Translation<typeof fr> = {
   dropToAttach: "Drop to attach",
   send: "Send",
   resend: "Resend",
+  resizeComposer: "Resize the message input",
+  resizeComposerHint: "Drag to resize · double-click for automatic height",
   // NewMessagesPill
   newMessages: "New messages",
 
