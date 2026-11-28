@@ -62,15 +62,25 @@ pub fn turn_args(spec: &SessionSpec, thread: Option<&str>, turn: &crate::agents:
             format!("mcp_servers.{SERVER_NAME}.command={}", lit(&mcp.command.display().to_string())),
         ]);
         args.extend(["-c".into(), format!("mcp_servers.{SERVER_NAME}.args=[{list}]")]);
+        args.extend(["-c".into(), format!("mcp_servers.{SERVER_NAME}.default_tools_approval_mode='approve'")]);
     }
     if let Some(remote_mcp) = &spec.remote_mcp {
-        use crate::remote::mcp::SERVER_NAME;
+        use crate::remote::mcp::{READ_ONLY_TOOLS, SERVER_NAME};
         let list = remote_mcp.args.iter().map(|a| lit(a)).collect::<Vec<_>>().join(",");
         args.extend([
             "-c".into(),
             format!("mcp_servers.{SERVER_NAME}.command={}", lit(&remote_mcp.command.display().to_string())),
         ]);
         args.extend(["-c".into(), format!("mcp_servers.{SERVER_NAME}.args=[{list}]")]);
+        // `codex exec` runs non-interactively with approval_policy=never: pre-approve remote workspace tools
+        // (read-only tools only when in Plan mode; the target device enforces read-only as well).
+        if spec.permission_mode == "plan" {
+            for tool in READ_ONLY_TOOLS {
+                args.extend(["-c".into(), format!("mcp_servers.{SERVER_NAME}.tools.{tool}.approval_mode='approve'")]);
+            }
+        } else {
+            args.extend(["-c".into(), format!("mcp_servers.{SERVER_NAME}.default_tools_approval_mode='approve'")]);
+        }
     }
     // `--image=<path>`: the `=` form, because `-i` takes several values and would swallow the prompt.
     args.extend(turn.attachments.iter().filter(|a| a.is_image).map(|a| format!("--image={}", a.path)));
@@ -319,5 +329,12 @@ mod tests {
         assert!(remote_args.contains("--sandbox read-only"));
         assert!(!remote_args.contains("--dangerously-bypass-approvals-and-sandbox"));
         assert!(remote_args.contains("mcp_servers.neuron_remote.command="));
+        assert!(remote_args.contains("mcp_servers.neuron_remote.default_tools_approval_mode='approve'"));
+
+        let mut remote_plan = spec("plan");
+        remote_plan.remote_mcp = remote.remote_mcp.clone();
+        let plan_args = turn_args(&remote_plan, None, &"hello".into()).join(" ");
+        assert!(plan_args.contains("mcp_servers.neuron_remote.tools.remote_read.approval_mode='approve'"));
+        assert!(!plan_args.contains("mcp_servers.neuron_remote.default_tools_approval_mode='approve'"));
     }
 }

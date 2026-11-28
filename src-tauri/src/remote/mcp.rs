@@ -149,6 +149,7 @@ pub fn tool_definitions() -> Value {
         {
             "name": TOOL_READ,
             "description": "Read a UTF-8 file (with line numbers) or list a directory on the target device. Paths are relative to the workspace root unless absolute.",
+            "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -162,6 +163,7 @@ pub fn tool_definitions() -> Value {
         {
             "name": TOOL_WRITE,
             "description": "Create or overwrite a text file on the target device (creates parent directories if needed).",
+            "annotations": { "readOnlyHint": false, "destructiveHint": false, "openWorldHint": false },
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -174,6 +176,7 @@ pub fn tool_definitions() -> Value {
         {
             "name": TOOL_EDIT,
             "description": "Edit a text file on the target device by replacing an exact snippet `old_text` with `new_text`.",
+            "annotations": { "readOnlyHint": false, "destructiveHint": false, "openWorldHint": false },
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -188,6 +191,7 @@ pub fn tool_definitions() -> Value {
         {
             "name": TOOL_SEARCH,
             "description": "Search files on the target device (respects .gitignore). mode='glob' matches paths (*, **, ?); mode='grep' searches text inside files.",
+            "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -203,6 +207,7 @@ pub fn tool_definitions() -> Value {
         {
             "name": TOOL_RUN,
             "description": "Run a shell command on the target device (PowerShell on Windows, sh on Unix) inside the workspace.",
+            "annotations": { "readOnlyHint": false, "destructiveHint": true, "openWorldHint": true },
             "inputSchema": {
                 "type": "object",
                 "properties": {

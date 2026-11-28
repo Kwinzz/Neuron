@@ -10,10 +10,11 @@ import {
 import type { ToolStatus } from "@/bindings/ToolStatus";
 import type { MessageKey } from "@/i18n";
 
-/** Extract the base tool name (handles MCP-prefixed names like `mcp__server__Tool`). */
+/** Extract the base tool name (handles MCP-prefixed names like `mcp__server__Tool` or Codex `server.Tool`). */
 export function baseToolName(name: string): string {
-  const idx = name.lastIndexOf("__");
-  return idx >= 0 ? name.slice(idx + 2) : name;
+  const afterUnderscore = name.lastIndexOf("__") >= 0 ? name.slice(name.lastIndexOf("__") + 2) : name;
+  const dot = afterUnderscore.lastIndexOf(".");
+  return dot >= 0 ? afterUnderscore.slice(dot + 1) : afterUnderscore;
 }
 
 export function toolIcon(name: string): LucideIcon {

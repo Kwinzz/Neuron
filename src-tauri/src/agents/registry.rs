@@ -900,6 +900,7 @@ impl AgentRegistry {
                     // First thing: the CLI writes the file right after announcing the call.
                     files.start(&tool_id, &name, &input).await;
                     let base = name.rsplit("__").next().unwrap_or(&name);
+                    let base = base.rsplit('.').next().unwrap_or(base);
                     if matches!(base, "remote_write" | "remote_edit") {
                         let path = input.get("path").and_then(Value::as_str).map(str::to_string);
                         remote_edit_tools.insert(tool_id.clone(), path);

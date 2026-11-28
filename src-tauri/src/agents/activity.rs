@@ -25,6 +25,7 @@ fn truncate(text: &str, max: usize) -> String {
 /// Returns the status and detail to show while `tool` runs with `input`.
 pub fn tool_activity(tool: &str, input: &Value) -> (ThreadStatus, Option<String>) {
     let base = tool.rsplit("__").next().unwrap_or(tool);
+    let base = base.rsplit('.').next().unwrap_or(base);
     let lower = base.to_ascii_lowercase();
     let path = str_field(
         input,

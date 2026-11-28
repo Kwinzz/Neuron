@@ -160,11 +160,31 @@ impl CodexParser {
                 );
                 let mut out = self.tool(id.clone(), &name, item.get("arguments").cloned().unwrap_or(Value::Null));
                 if completed {
-                    out.push(AdapterEvent::ToolCallResult {
-                        id,
-                        output: item.get("result").map(|r| r.to_string()).unwrap_or_default(),
-                        is_error: failed || item.get("error").is_some_and(|e| !e.is_null()),
-                    });
+                    let err = item.get("error").filter(|e| !e.is_null());
+                    let res = item.get("result").filter(|r| !r.is_null());
+                    let output = if let Some(e) = err {
+                        e.get("message")
+                            .and_then(Value::as_str)
+                            .or_else(|| e.as_str())
+                            .map(str::to_string)
+                            .unwrap_or_else(|| e.to_string())
+                    } else if let Some(r) = res {
+                        r.get("content")
+                            .and_then(Value::as_array)
+                            .map(|blocks| {
+                                blocks
+                                    .iter()
+                                    .filter_map(|b| b.get("text").and_then(Value::as_str))
+                                    .collect::<Vec<_>>()
+                                    .join("\n")
+                            })
+                            .filter(|s| !s.is_empty())
+                            .or_else(|| r.as_str().map(str::to_string))
+                            .unwrap_or_else(|| r.to_string())
+                    } else {
+                        String::new()
+                    };
+                    out.push(AdapterEvent::ToolCallResult { id, output, is_error: failed || err.is_some() });
                 }
                 out
             }
