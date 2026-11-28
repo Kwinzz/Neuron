@@ -48,8 +48,8 @@ export const DeviceBadge = memo(function DeviceBadge({
     <span
       title={title}
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-md border border-border text-xs leading-none text-muted-foreground transition-opacity duration-150",
-        compact ? "px-1 py-0.5" : "max-w-36 px-1.5 py-0.5",
+        "inline-flex items-center gap-1 rounded-md border border-border text-xs leading-none text-muted-foreground transition-opacity duration-150",
+        compact ? "shrink-0 px-1 py-0.5" : "min-w-0 max-w-36 shrink px-1.5 py-0.5",
         !connected && "opacity-60",
         className,
       )}

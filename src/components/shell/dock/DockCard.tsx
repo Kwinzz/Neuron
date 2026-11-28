@@ -174,21 +174,20 @@ export const DockCard = memo(function DockCard({ id }: { id: string }) {
       </div>
 
       <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-        <StatusDot status={thread.status} />
-        <span className={cn("shrink-0", TONE_TEXT[meta.tone])}>{meta.label}</span>
-        {device && <DeviceBadge device={device} className="max-w-28 text-[11px]" />}
-        {(thread.projectName ?? thread.workspace?.projectName) && (
-          <>
-            <span aria-hidden>·</span>
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+          <StatusDot status={thread.status} />
+          <span className={cn("shrink-0", TONE_TEXT[meta.tone])}>{meta.label}</span>
+          {device && <DeviceBadge device={device} className="max-w-24 text-[11px]" />}
+          {(thread.projectName ?? thread.workspace?.projectName) && (
             <span
               className="min-w-0 truncate"
               title={thread.projectName ?? thread.workspace?.projectName ?? undefined}
             >
-              {thread.projectName ?? thread.workspace?.projectName}
+              · {thread.projectName ?? thread.workspace?.projectName}
             </span>
-          </>
-        )}
-        <span className="ml-auto flex shrink-0 items-center gap-1 font-mono text-[11px] tabular-nums">
+          )}
+        </div>
+        <span className="flex shrink-0 items-center gap-1 font-mono text-[11px] tabular-nums">
           {meta.active ? (
             <LiveTimer startedAt={thread.runStartedAt} />
           ) : (
