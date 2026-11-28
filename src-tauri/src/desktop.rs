@@ -215,30 +215,71 @@ pub fn setup(app: &AppHandle, settings: &AppSettings) {
     }
 }
 
-/// Main window: closing it hides it in the tray (when enabled). Quick window: hidden when it loses focus.
+/// What closing a window should do, decided from the window label and the `close_to_tray` setting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CloseAction {
+    /// Hide the main window and keep Neuron running in the system tray.
+    HideToTray,
+    /// Hide the quick prompt without destroying it so the global shortcut can reopen it.
+    HideQuick,
+    /// Quit the whole application (including the hidden quick window and tray icon).
+    ExitApp,
+    /// Unrelated window: leave Tauri's default close behaviour alone.
+    Ignore,
+}
+
+fn close_action(label: &str, close_to_tray: bool) -> CloseAction {
+    match label {
+        MAIN if close_to_tray => CloseAction::HideToTray,
+        MAIN => CloseAction::ExitApp,
+        QUICK => CloseAction::HideQuick,
+        _ => CloseAction::Ignore,
+    }
+}
+
+/// Main window: closing it hides it in the tray (when enabled) or exits the app (including the hidden `quick`
+/// window). Quick window: hidden on blur or close request so the global shortcut can always reopen it.
 pub fn on_window_event(window: &Window, event: &WindowEvent) {
     let app = window.app_handle();
     match (window.label(), event) {
-        (MAIN, WindowEvent::CloseRequested { api, .. }) => {
-            let Some(desktop) = app.try_state::<Desktop>() else { return };
-            if !desktop.close_to_tray.load(Ordering::Relaxed) {
-                return;
-            }
-            api.prevent_close();
-            let _ = window.hide();
-            if !desktop.told_background.swap(true, Ordering::Relaxed) {
-                let app = app.clone();
-                tauri::async_runtime::spawn_blocking(move || {
-                    let _ = crate::notifications::show(
-                        &app,
-                        crate::i18n::pick("Neuron tourne en arrière-plan", "Neuron is running in the background"),
-                        crate::i18n::pick(
-                            "Tes agents continuent. Rouvre Neuron depuis l'icône près de l'horloge, ou fais ta demande avec le raccourci global.",
-                            "Your agents keep going. Reopen Neuron from the icon near the clock, or send a request with the global shortcut.",
-                        ),
-                        None,
-                    );
-                });
+        (label, WindowEvent::CloseRequested { api, .. }) => {
+            let close_to_tray = app.try_state::<Desktop>().is_some_and(|d| d.close_to_tray.load(Ordering::Relaxed));
+            match close_action(label, close_to_tray) {
+                CloseAction::HideToTray => {
+                    api.prevent_close();
+                    let _ = window.hide();
+                    if let Some(desktop) = app.try_state::<Desktop>() {
+                        if !desktop.told_background.swap(true, Ordering::Relaxed) {
+                            let app = app.clone();
+                            tauri::async_runtime::spawn_blocking(move || {
+                                let _ = crate::notifications::show(
+                                    &app,
+                                    crate::i18n::pick(
+                                        "Neuron tourne en arrière-plan",
+                                        "Neuron is running in the background",
+                                    ),
+                                    crate::i18n::pick(
+                                        "Tes agents continuent. Rouvre Neuron depuis l'icône près de l'horloge, ou fais ta demande avec le raccourci global.",
+                                        "Your agents keep going. Reopen Neuron from the icon near the clock, or send a request with the global shortcut.",
+                                    ),
+                                    None,
+                                );
+                            });
+                        }
+                    }
+                }
+                CloseAction::ExitApp => {
+                    // The hidden `quick` window stays alive as a second Tauri window, so letting `main` close on its
+                    // own would leave Neuron stuck in the tray with no main window left to reopen.
+                    api.prevent_close();
+                    let _ = window.hide();
+                    app.exit(0);
+                }
+                CloseAction::HideQuick => {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+                CloseAction::Ignore => {}
             }
         }
         (QUICK, WindowEvent::Focused(false)) => {
@@ -259,5 +300,15 @@ mod tests {
         assert!("Ctrl+Alt+KeyK".parse::<Shortcut>().is_ok());
         assert!("Ctrl+Shift+F1".parse::<Shortcut>().is_ok());
         assert!("pas un raccourci".parse::<Shortcut>().is_err());
+    }
+
+    #[test]
+    fn close_action_respects_close_to_tray_and_protects_quick() {
+        assert_eq!(close_action(MAIN, true), CloseAction::HideToTray);
+        assert_eq!(close_action(MAIN, false), CloseAction::ExitApp);
+        assert_eq!(close_action(QUICK, true), CloseAction::HideQuick);
+        assert_eq!(close_action(QUICK, false), CloseAction::HideQuick);
+        assert_eq!(close_action("other", true), CloseAction::Ignore);
+        assert_eq!(close_action("other", false), CloseAction::Ignore);
     }
 }
