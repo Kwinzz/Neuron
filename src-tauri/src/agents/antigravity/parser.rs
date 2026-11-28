@@ -143,17 +143,30 @@ impl AntigravityParser {
                 }
             }
             Some("tool") => {
-                let name = s
+                let raw_name = s
                     .get("tool_name")
                     .and_then(Value::as_str)
                     .or_else(|| s.pointer("/tool_info/name").and_then(Value::as_str))
-                    .unwrap_or("outil")
-                    .to_string();
+                    .unwrap_or("outil");
+                let raw_params = s.pointer("/tool_info/parameters").cloned().unwrap_or(Value::Null);
+                let (name, input) = if raw_name == "call_mcp_tool" {
+                    let server = raw_params.get("ServerName").and_then(Value::as_str).filter(|t| !t.is_empty());
+                    let tool = raw_params.get("ToolName").and_then(Value::as_str).filter(|t| !t.is_empty());
+                    match (server, tool) {
+                        (Some(srv), Some(t)) => {
+                            (format!("{srv}.{t}"), raw_params.get("Arguments").cloned().unwrap_or(Value::Null))
+                        }
+                        (None, Some(t)) => (t.to_string(), raw_params.get("Arguments").cloned().unwrap_or(Value::Null)),
+                        _ => (raw_name.to_string(), raw_params),
+                    }
+                } else {
+                    (raw_name.to_string(), raw_params)
+                };
                 if self.started_tools.insert(step) {
                     out.push(AdapterEvent::ToolCallStart {
                         id: self.id(step),
                         name: name.clone(),
-                        input: s.pointer("/tool_info/parameters").cloned().unwrap_or(Value::Null),
+                        input,
                         parent_id: None,
                     });
                 }
@@ -169,9 +182,16 @@ impl AntigravityParser {
                             kill_all || role.is_some_and(|r| roles.contains(&r))
                         }));
                     }
+                    let err_text = s
+                        .get("error")
+                        .and_then(Value::as_str)
+                        .or_else(|| s.pointer("/tool_info/error/message").and_then(Value::as_str))
+                        .or_else(|| s.pointer("/tool_info/error").and_then(Value::as_str))
+                        .filter(|e| !e.trim().is_empty())
+                        .map(str::to_string);
                     out.push(AdapterEvent::ToolCallResult {
                         id: self.id(step),
-                        output: s.get("error").and_then(Value::as_str).map(str::to_string).unwrap_or_else(|| {
+                        output: err_text.unwrap_or_else(|| {
                             if is_error { crate::tr!("État : {state}", "State: {state}") } else { output.to_string() }
                         }),
                         is_error,
@@ -373,5 +393,23 @@ mod tests {
         let mut p = AntigravityParser::new("n");
         let ev = p.feed(r#"{"event":"result","result":{"status":"ERROR","error":"boom","usage":{}}}"#);
         assert!(matches!(ev.as_slice(), [AdapterEvent::TurnComplete { error: Some(e), .. }] if e == "boom"));
+    }
+
+    #[test]
+    fn unwraps_call_mcp_tool_and_extracts_tool_error() {
+        let mut p = AntigravityParser::new("n");
+        let start = r#"{"event":"step_update","step_update":{"step_index":4,"state":"ACTIVE","step_type":"tool","tool_name":"call_mcp_tool","tool_info":{"name":"call_mcp_tool","parameters":{"Arguments":{"path":"test.txt"},"ServerName":"neuron_remote","ToolName":"remote_read"}}}}"#;
+        let done = r#"{"event":"step_update","step_update":{"step_index":4,"state":"ERROR","step_type":"tool","tool_name":"call_mcp_tool","tool_info":{"name":"call_mcp_tool","parameters":{"Arguments":{"path":"test.txt"},"ServerName":"neuron_remote","ToolName":"remote_read"},"error":{"type":"TOOL_ERROR","message":"permission denied"}}}}"#;
+        let ev1 = p.feed(start);
+        assert!(matches!(
+            ev1.as_slice(),
+            [AdapterEvent::ToolCallStart { name, input, .. }]
+                if name == "neuron_remote.remote_read" && input["path"] == "test.txt"
+        ));
+        let ev2 = p.feed(done);
+        assert!(ev2.iter().any(|e| matches!(
+            e,
+            AdapterEvent::ToolCallResult { output, is_error: true, .. } if output == "permission denied"
+        )));
     }
 }

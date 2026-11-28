@@ -28,7 +28,7 @@ const chat: Translation<typeof fr> = {
   aiDeviceHint: "Choose which device runs the AI agent for this project",
   workspaceDeviceLabel: "Files device",
   workspaceOn: "Files: {device}",
-  crossDeviceUnsupportedAgent: "Cross-device execution is available with Claude Code and Codex",
+  crossDeviceUnsupportedAgent: "Cross-device execution is available with Claude Code, Codex and Antigravity",
   crossDeviceToolsDisabled: "Remote tools disabled on {device}",
   crossDeviceOldHost: "Update {device} for cross-device execution",
   crossDeviceSummary: "AI on {ai} → files on {workspace}",

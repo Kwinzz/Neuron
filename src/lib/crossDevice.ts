@@ -13,9 +13,9 @@ import { ipc, remote } from "@/lib/ipc";
 import { PLATFORM_OS } from "@/lib/platform";
 import { useDevices } from "@/stores/devices";
 
-/** Agents supporting per-session remote MCP workspace execution in v1. */
+/** Agents supporting per-session remote MCP workspace execution. */
 export function supportsCrossDeviceAgent(agent: AgentKind): boolean {
-  return agent === "claude_code" || agent === "codex";
+  return agent === "claude_code" || agent === "codex" || agent === "antigravity";
 }
 
 export interface CrossDeviceValidation {

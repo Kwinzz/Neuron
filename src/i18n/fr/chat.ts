@@ -28,7 +28,7 @@ const chat = {
   aiDeviceHint: "Choisis sur quel appareil tourne l'agent IA pour ce projet",
   workspaceDeviceLabel: "Appareil des fichiers",
   workspaceOn: "Fichiers : {device}",
-  crossDeviceUnsupportedAgent: "Exécution croisée disponible avec Claude Code et Codex",
+  crossDeviceUnsupportedAgent: "Exécution croisée disponible avec Claude Code, Codex et Antigravity",
   crossDeviceToolsDisabled: "Outils distants désactivés sur {device}",
   crossDeviceOldHost: "Mettre à jour {device} pour l'exécution croisée",
   crossDeviceSummary: "IA sur {ai} → fichiers sur {workspace}",

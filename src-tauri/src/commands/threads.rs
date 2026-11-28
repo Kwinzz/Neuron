@@ -73,10 +73,10 @@ pub(crate) async fn create_thread_inner(state: &Shared, input: NewThreadInput) -
     let ctx_opts = app_settings.context.clone();
 
     let (cwd, project_id_for_db, workspace_runtime, project_context) = if let Some(ws) = input.workspace.clone() {
-        if !matches!(input.agent, AgentKind::ClaudeCode | AgentKind::Codex) {
+        if !matches!(input.agent, AgentKind::ClaudeCode | AgentKind::Codex | AgentKind::Antigravity) {
             return Err(AppError::Invalid(crate::tr!(
-                "l'exécution sur un autre appareil est disponible avec Claude Code et Codex",
-                "cross-device workspace execution is available with Claude Code and Codex"
+                "l'exécution sur un autre appareil est disponible avec Claude Code, Codex et Antigravity",
+                "cross-device workspace execution is available with Claude Code, Codex and Antigravity"
             )));
         }
         if ws.device_id.trim().is_empty() || ws.cwd.trim().is_empty() {
