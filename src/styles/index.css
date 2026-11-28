@@ -258,6 +258,13 @@
   user-select: none;
 }
 
+/* Composer being resized: keep vertical resize cursor and block text selection while dragging. */
+:root[data-composer-resizing],
+:root[data-composer-resizing] * {
+  cursor: ns-resize !important;
+  user-select: none;
+}
+
 /* Quick prompt window (transparent, frameless): only its card is painted. */
 html.quick-window,
 html.quick-window body {

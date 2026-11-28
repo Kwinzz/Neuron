@@ -47,6 +47,8 @@ const chat = {
   dropToAttach: "Déposer pour joindre",
   send: "Envoyer",
   resend: "Renvoyer",
+  resizeComposer: "Redimensionner la zone de saisie",
+  resizeComposerHint: "Glisser pour redimensionner · double-clic pour la taille automatique",
   // NewMessagesPill
   newMessages: "Nouveaux messages",
 
